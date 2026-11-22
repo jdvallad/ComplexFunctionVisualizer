@@ -1,0 +1,50 @@
+services:
+  complex-visualizer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        # Set to 1 ONLY if you want token-protected live C compilation on Unraid
+        WITH_CLANG: ${WITH_CLANG:-0}
+    image: complex-visualizer:latest
+    container_name: complex-visualizer
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-1738}:1738"
+    environment:
+      CFV_HOST: "0.0.0.0"
+      CFV_PORT: "1738"
+      CFV_WEB_DIR: "/app/web"
+      # Keep 0 for public internet safety! If enabling (1), ALWAYS set CFV_COMPILE_TOKEN.
+      CFV_ENABLE_COMPILE: "${CFV_ENABLE_COMPILE:-0}"
+      CFV_COMPILE_TOKEN: "${CFV_COMPILE_TOKEN:-}"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=32m,noexec
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:1738/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Optional Zero-Port-Forwarding HTTPS Tunnel to access safely from school!
+  # Enable with: docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: complex-visualizer-tunnel
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}"
+    depends_on:
+      complex-visualizer:
+        condition: service_healthy

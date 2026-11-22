@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>ComplexFunctionVisualizer</Name>
+  <Repository>complex-visualizer:latest</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project>https://github.com/your-user/ComplexFunctionVisualizer</Project>
+  <Overview>Native C11 (Clang) Complex &amp; 2D Real Function Visualizer featuring full analytic continuation of the Riemann Zeta function, Completed Zeta xi(s), Contour Integrals, 3D Riemann Sphere, and Riemann's 1859 Prime-Counting Explicit Formula.</Overview>
+  <Category>Productivity: Tools: Other:</Category>
+  <WebUI>http://[IP]:[PORT:1738]/</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams>--security-opt=no-new-privileges:true --cap-drop=ALL --memory=512m --cpus=2</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="1738" Default="1738" Mode="tcp" Description="Port for the Complex &amp; Real Function Visualizer Web UI" Type="Port" Display="always" Required="true" Mask="false">1738</Config>
+  <Config Name="Bind Host" Target="CFV_HOST" Default="0.0.0.0" Mode="" Description="Bind address inside container (keep 0.0.0.0)" Type="Variable" Display="advanced" Required="true" Mask="false">0.0.0.0</Config>
+  <Config Name="Enable Live C Compiler" Target="CFV_ENABLE_COMPILE" Default="0" Mode="" Description="Set to 0 for public web safety (read-only C source). Set to 1 ONLY with WITH_CLANG=1 build AND a strong CFV_COMPILE_TOKEN." Type="Variable" Display="always" Required="true" Mask="false">0</Config>
+  <Config Name="Compile Access Token" Target="CFV_COMPILE_TOKEN" Default="" Mode="" Description="Secret token required in the C Editor drawer when CFV_ENABLE_COMPILE=1" Type="Variable" Display="always" Required="false" Mask="true"/>
+</Container>

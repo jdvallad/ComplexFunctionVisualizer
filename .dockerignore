@@ -1,0 +1,9 @@
+.git
+.gitignore
+.clang-format
+visualizer
+test_math
+*.o
+*.so
+deploy/
+README.md
