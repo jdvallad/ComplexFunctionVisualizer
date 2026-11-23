@@ -10,6 +10,7 @@
 
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <math.h>
 #include <netinet/in.h>
@@ -23,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -277,13 +279,161 @@ static bool json_get_string(const char *json, const char *key, char *out, size_t
     return true;
 }
 
-static const FunctionDef *resolve_complex_fn(int fn_idx, FunctionDef *tmp_hot) {
+static _Thread_local int g_tls_slot = 0;
+static _Thread_local EvalParams g_tls_params;
+static _Thread_local int g_tls_dirichlet_n = 20;
+
+static double complex eval_tls_complex_slot(double complex z) {
+    return hot_eval_complex_slot(g_tls_slot, z, &g_tls_params);
+}
+
+static double complex eval_tls_dirichlet(double complex z) {
+    return c_zeta_partial(z, g_tls_dirichlet_n);
+}
+
+static double eval_tls_real_slot(double x) {
+    return hot_eval_real_slot(g_tls_slot, x, &g_tls_params);
+}
+
+static void json_get_double_array(const char *json, const char *key, double *out, size_t max_n,
+                                  int *count_out) {
+    *count_out = 0;
+    const char *v = json_find_key(json, key);
+    if (!v || *v != '[') {
+        return;
+    }
+    v++;
+    size_t n = 0;
+    while (*v && n < max_n) {
+        while (*v && (isspace((unsigned char)*v) || *v == ',')) {
+            v++;
+        }
+        if (*v == ']') {
+            break;
+        }
+        char *end = NULL;
+        double num = strtod(v, &end);
+        if (end == v) {
+            break;
+        }
+        out[n++] = isfinite(num) ? num : 0.0;
+        v = end;
+    }
+    *count_out = (int)n;
+}
+
+static size_t json_get_string_array(const char *json, const char *key, char **out_ptrs,
+                                    size_t max_items, size_t max_item_len) {
+    const char *v = json_find_key(json, key);
+    if (!v || *v != '[') {
+        return 0;
+    }
+    v++;
+    size_t count = 0;
+    while (*v && count < max_items) {
+        while (*v && (isspace((unsigned char)*v) || *v == ',')) {
+            v++;
+        }
+        if (*v == ']') {
+            break;
+        }
+        if (*v != '"') {
+            break;
+        }
+        v++;
+        char *buf = malloc(max_item_len);
+        if (!buf) {
+            break;
+        }
+        size_t n = 0;
+        while (*v && *v != '"' && n + 1 < max_item_len) {
+            if (*v == '\\' && v[1]) {
+                v++;
+                switch (*v) {
+                case 'n':
+                    buf[n++] = '\n';
+                    break;
+                case 'r':
+                    buf[n++] = '\r';
+                    break;
+                case 't':
+                    buf[n++] = '\t';
+                    break;
+                case '"':
+                    buf[n++] = '"';
+                    break;
+                case '\\':
+                    buf[n++] = '\\';
+                    break;
+                default:
+                    buf[n++] = *v;
+                    break;
+                }
+                v++;
+            } else {
+                buf[n++] = *v++;
+            }
+        }
+        buf[n] = '\0';
+        while (*v && *v != '"') {
+            if (*v == '\\' && v[1]) {
+                v += 2;
+            } else {
+                v++;
+            }
+        }
+        if (*v == '"') {
+            v++;
+        }
+        out_ptrs[count++] = buf;
+    }
+    return count;
+}
+
+static const FunctionDef *resolve_complex_req(const char *body, FunctionDef *tmp_hot) {
+    int slot = -1;
+    if (json_get_int(body, "slot", &slot) && slot >= 0 && slot < hot_complex_slot_count()) {
+        g_tls_slot = slot;
+        memset(&g_tls_params, 0, sizeof(g_tls_params));
+        json_get_double_array(body, "params", g_tls_params.v, MAX_EVAL_PARAMS, &g_tls_params.count);
+        memset(tmp_hot, 0, sizeof(*tmp_hot));
+        tmp_hot->id = "live_slot";
+        tmp_hot->name = "Live C Card";
+        tmp_hot->formula = "card(z)";
+        tmp_hot->eval = eval_tls_complex_slot;
+        return tmp_hot;
+    }
+    bool is_dirichlet = false;
+    if (json_get_bool(body, "dirichlet", &is_dirichlet) && is_dirichlet) {
+        int n = 20;
+        json_get_int(body, "n", &n);
+        if (n < 1) {
+            n = 1;
+        }
+        if (n > 1000) {
+            n = 1000;
+        }
+        g_tls_dirichlet_n = n;
+        memset(tmp_hot, 0, sizeof(*tmp_hot));
+        tmp_hot->id = "dirichlet";
+        tmp_hot->name = "Dirichlet Partial Sum";
+        tmp_hot->formula = "c_zeta_partial(s, N)";
+        tmp_hot->eval = eval_tls_dirichlet;
+        return tmp_hot;
+    }
+    int fn_idx = -1;
+    if (!json_get_int(body, "fn", &fn_idx)) {
+        return NULL;
+    }
     if (fn_idx == -1 && hot_has_complex()) {
+        g_tls_slot = 0;
+        memset(&g_tls_params, 0, sizeof(g_tls_params));
+        json_get_double_array(body, "params", g_tls_params.v, MAX_EVAL_PARAMS, &g_tls_params.count);
         memset(tmp_hot, 0, sizeof(*tmp_hot));
         tmp_hot->id = "live_c";
         tmp_hot->name = "Live C Function";
         tmp_hot->formula = "user_fn(z)";
-        tmp_hot->eval = hot_eval_complex;
+        tmp_hot->eval = eval_tls_complex_slot;
         return tmp_hot;
     }
     if (fn_idx < 0) {
@@ -294,11 +444,13 @@ static const FunctionDef *resolve_complex_fn(int fn_idx, FunctionDef *tmp_hot) {
 
 static const RealFunctionDef *resolve_real_fn(int fn_idx, RealFunctionDef *tmp_hot) {
     if (fn_idx == -1 && hot_has_real()) {
+        g_tls_slot = 0;
+        memset(&g_tls_params, 0, sizeof(g_tls_params));
         memset(tmp_hot, 0, sizeof(*tmp_hot));
         tmp_hot->id = "live_real_c";
         tmp_hot->name = "Live C Real Function";
         tmp_hot->formula = "user_real_fn(x)";
-        tmp_hot->exact_fn = hot_eval_real;
+        tmp_hot->exact_fn = eval_tls_real_slot;
         return tmp_hot;
     }
     if (fn_idx < 0) {
@@ -399,7 +551,7 @@ static void send_response(int fd, int status, const char *status_text, const cha
                  "HTTP/1.1 %d %s\r\n"
                  "Content-Type: %s\r\n"
                  "Content-Length: %zu\r\n"
-                 "Cache-Control: no-cache\r\n"
+                 "Cache-Control: no-store, no-cache, must-revalidate\r\n"
                  "X-Content-Type-Options: nosniff\r\n"
                  "X-Frame-Options: SAMEORIGIN\r\n"
                  "Referrer-Policy: no-referrer\r\n"
@@ -466,10 +618,8 @@ static void handle_api_functions(int fd, bool keep_alive) {
 }
 
 static void handle_api_eval(int fd, const char *body, bool keep_alive) {
-    int fn_idx = 0;
-    json_get_int(body, "fn", &fn_idx);
     FunctionDef tmp_hot;
-    const FunctionDef *fn = resolve_complex_fn(fn_idx, &tmp_hot);
+    const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
     if (!fn) {
         send_json_error(fd, 400, "Invalid function index", keep_alive);
         return;
@@ -525,10 +675,8 @@ static void append_curve_json(StrBuf *sb, const CurveResult *c) {
 }
 
 static void handle_api_trace(int fd, const char *body, bool keep_alive) {
-    int fn_idx = 0;
-    json_get_int(body, "fn", &fn_idx);
     FunctionDef tmp_hot;
-    const FunctionDef *fn = resolve_complex_fn(fn_idx, &tmp_hot);
+    const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
     if (!fn) {
         send_json_error(fd, 400, "Invalid function index", keep_alive);
         return;
@@ -593,11 +741,9 @@ static void handle_api_trace(int fd, const char *body, bool keep_alive) {
 }
 
 static void handle_api_domain(int fd, const char *body, bool keep_alive) {
-    int fn_idx = 0;
     double cx = 0.0, cy = 0.0, half_w = 4.0, half_h = 4.0;
     int width = 200, height = 200;
 
-    json_get_int(body, "fn", &fn_idx);
     json_get_double(body, "cx", &cx);
     json_get_double(body, "cy", &cy);
     json_get_double(body, "half_w", &half_w);
@@ -605,8 +751,14 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
     json_get_int(body, "width", &width);
     json_get_int(body, "height", &height);
 
+    int slot = -1;
+    bool is_slot =
+        json_get_int(body, "slot", &slot) && slot >= 0 && slot < hot_complex_slot_count();
+    bool is_dirichlet = false;
+    json_get_bool(body, "dirichlet", &is_dirichlet);
+
     FunctionDef tmp_hot;
-    const FunctionDef *fn = resolve_complex_fn(fn_idx, &tmp_hot);
+    const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
     if (!fn || width < 16 || height < 16 || width > 400 || height > 400 || half_w <= 0.0 ||
         half_h <= 0.0) {
         send_json_error(fd, 400, "Invalid domain parameters", keep_alive);
@@ -620,16 +772,76 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
         return;
     }
 
-    sampler_render_domain(fn, cx, cy, half_w, half_h, width, height, rgba);
+    if (is_slot || is_dirichlet || fn == &tmp_hot) {
+        /* Render TLS-backed evaluator on current thread so EvalParams/slot/N stay thread-safe. */
+        double x0 = cx - half_w;
+        double y0 = cy + half_h;
+        double dx = (2.0 * half_w) / (double)width;
+        double dy = (2.0 * half_h) / (double)height;
+        for (int py = 0; py < height; py++) {
+            double im = y0 - ((double)py + 0.5) * dy;
+            for (int px = 0; px < width; px++) {
+                double re = x0 + ((double)px + 0.5) * dx;
+                double complex w = fn->eval(c_make(re, im));
+                size_t idx = ((size_t)py * (size_t)width + (size_t)px) * 4;
+                if (!c_isfinite(w)) {
+                    rgba[idx + 0] = 240;
+                    rgba[idx + 1] = 245;
+                    rgba[idx + 2] = 255;
+                    rgba[idx + 3] = 255;
+                    continue;
+                }
+                double mag = cabs(w);
+                double arg = carg(w);
+                double h = (arg + 3.14159265358979323846) / (2.0 * 3.14159265358979323846);
+                double log2m = log2(mag + 1e-18);
+                double contour = 0.78 + 0.22 * (log2m - floor(log2m));
+                double light = 0.16 + 0.76 * (1.0 - 1.0 / (1.0 + 0.45 * pow(mag, 0.45)));
+                double val = fmin(0.96, light * contour);
+                double sat = 0.72 / (1.0 + 0.06 * log1p(mag));
+                double c = val * sat;
+                double hp = fmod(h * 6.0, 6.0);
+                if (hp < 0.0) {
+                    hp += 6.0;
+                }
+                double x = c * (1.0 - fabs(fmod(hp, 2.0) - 1.0));
+                double m = val - c;
+                double rf = 0, gf = 0, bf = 0;
+                if (hp < 1) {
+                    rf = c;
+                    gf = x;
+                } else if (hp < 2) {
+                    rf = x;
+                    gf = c;
+                } else if (hp < 3) {
+                    gf = c;
+                    bf = x;
+                } else if (hp < 4) {
+                    gf = x;
+                    bf = c;
+                } else if (hp < 5) {
+                    rf = x;
+                    bf = c;
+                } else {
+                    rf = c;
+                    bf = x;
+                }
+                rgba[idx + 0] = (uint8_t)fmin(255.0, fmax(0.0, (rf + m) * 255.0));
+                rgba[idx + 1] = (uint8_t)fmin(255.0, fmax(0.0, (gf + m) * 255.0));
+                rgba[idx + 2] = (uint8_t)fmin(255.0, fmax(0.0, (bf + m) * 255.0));
+                rgba[idx + 3] = 255;
+            }
+        }
+    } else {
+        sampler_render_domain(fn, cx, cy, half_w, half_h, width, height, rgba);
+    }
     send_response(fd, 200, "OK", "application/octet-stream", rgba, nbytes, keep_alive);
     free(rgba);
 }
 
 static void handle_api_integrate(int fd, const char *body, bool keep_alive) {
-    int fn_idx = 0;
-    json_get_int(body, "fn", &fn_idx);
     FunctionDef tmp_hot;
-    const FunctionDef *fn = resolve_complex_fn(fn_idx, &tmp_hot);
+    const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
     if (!fn) {
         send_json_error(fd, 400, "Invalid function index", keep_alive);
         return;
@@ -921,17 +1133,256 @@ static void handle_api_compile(int fd, const char *body, const char *provided_to
     sb_free(&sb);
 }
 
+static void handle_api_workspace_compile(int fd, const char *body, const char *provided_token,
+                                         bool keep_alive) {
+    if (!g_cfg.enable_compile) {
+        const char *msg =
+            "{\"ok\":false,\"diagnostics\":\"Live C compilation is disabled in public mode.\"}";
+        send_response(fd, 403, "Forbidden", "application/json", msg, strlen(msg), keep_alive);
+        return;
+    }
+    if (g_cfg.compile_token && g_cfg.compile_token[0] != '\0') {
+        if (!const_time_eq(provided_token, g_cfg.compile_token)) {
+            const char *msg =
+                "{\"ok\":false,\"diagnostics\":\"Invalid or missing X-Compile-Token access key.\"}";
+            send_response(fd, 401, "Unauthorized", "application/json", msg, strlen(msg),
+                          keep_alive);
+            return;
+        }
+    }
+
+    char kind[32] = "complex";
+    json_get_string(body, "kind", kind, sizeof(kind));
+    bool is_real = strcmp(kind, "real") == 0;
+
+    char *cards[MAX_HOT_SLOTS] = {0};
+    char *pnames[MAX_EVAL_PARAMS] = {0};
+    size_t card_count = json_get_string_array(body, "cards", cards, MAX_HOT_SLOTS, 4096);
+    size_t param_count = json_get_string_array(body, "param_names", pnames, MAX_EVAL_PARAMS, 32);
+
+    if (card_count == 0) {
+        for (size_t i = 0; i < param_count; i++) {
+            free(pnames[i]);
+        }
+        send_json_error(fd, 400, "No C cards provided", keep_alive);
+        return;
+    }
+
+    char *diag = malloc(4096);
+    if (!diag) {
+        for (size_t i = 0; i < card_count; i++) {
+            free(cards[i]);
+        }
+        for (size_t i = 0; i < param_count; i++) {
+            free(pnames[i]);
+        }
+        send_json_error(fd, 500, "Out of memory", keep_alive);
+        return;
+    }
+    diag[0] = '\0';
+
+    double elapsed_ms = 0.0;
+    bool ok =
+        hot_compile_workspace(is_real, (const char *const *)cards, card_count,
+                              (const char *const *)pnames, param_count, diag, 4096, &elapsed_ms);
+
+    for (size_t i = 0; i < card_count; i++) {
+        free(cards[i]);
+    }
+    for (size_t i = 0; i < param_count; i++) {
+        free(pnames[i]);
+    }
+
+    StrBuf sb = {0};
+    sb_printf(&sb, "{\"ok\":%s,\"elapsed_ms\":%.1f,\"slots\":%zu,\"diagnostics\":",
+              ok ? "true" : "false", elapsed_ms, ok ? card_count : 0);
+    sb_append_json_str(&sb, diag);
+    sb_append(&sb, "}");
+    free(diag);
+    send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+    sb_free(&sb);
+}
+
+static void handle_api_workspace_real_sample(int fd, const char *body, bool keep_alive) {
+    double xmin = 1.8, xmax = 40.0;
+    int samples = 450;
+    json_get_double(body, "xmin", &xmin);
+    json_get_double(body, "xmax", &xmax);
+    json_get_int(body, "samples", &samples);
+    if (xmax <= xmin || samples < 8) {
+        send_json_error(fd, 400, "Invalid range", keep_alive);
+        return;
+    }
+    if (samples > 1200) {
+        samples = 1200;
+    }
+
+    int slots[MAX_HOT_SLOTS];
+    size_t slot_count = 0;
+    json_get_int_array(body, "slots", slots, MAX_HOT_SLOTS, &slot_count);
+
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    double *xs = malloc((size_t)samples * sizeof(double));
+    double *ys = malloc((size_t)samples * sizeof(double));
+    if (!xs || !ys) {
+        free(xs);
+        free(ys);
+        send_json_error(fd, 500, "Out of memory", keep_alive);
+        return;
+    }
+    for (int i = 0; i < samples; i++) {
+        xs[i] = xmin + (xmax - xmin) * ((double)i / (double)(samples - 1));
+    }
+
+    StrBuf sb = {0};
+    sb_append(&sb, "{\"xs\":");
+    append_double_array_json(&sb, xs, (size_t)samples);
+    sb_append(&sb, ",\"series\":[");
+    for (size_t j = 0; j < slot_count; j++) {
+        if (j > 0) {
+            sb_append(&sb, ",");
+        }
+        hot_sample_real_slot(slots[j], &params, xs, (size_t)samples, ys);
+        sb_printf(&sb, "{\"slot\":%d,\"ys\":", slots[j]);
+        append_double_array_json(&sb, ys, (size_t)samples);
+        sb_append(&sb, "}");
+    }
+    sb_append(&sb, "]}");
+
+    free(xs);
+    free(ys);
+    send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+    sb_free(&sb);
+}
+
+static void handle_api_workspace_implicit(int fd, const char *body, bool keep_alive) {
+    int slot = 0;
+    double xmin = -10.0, xmax = 10.0, ymin = -10.0, ymax = 10.0;
+    int nx = 110, ny = 80;
+    json_get_int(body, "slot", &slot);
+    json_get_double(body, "xmin", &xmin);
+    json_get_double(body, "xmax", &xmax);
+    json_get_double(body, "ymin", &ymin);
+    json_get_double(body, "ymax", &ymax);
+    json_get_int(body, "nx", &nx);
+    json_get_int(body, "ny", &ny);
+
+    if (xmax <= xmin || ymax <= ymin || slot < 0 || slot >= hot_real_slot_count()) {
+        send_json_error(fd, 400, "Invalid implicit parameters", keep_alive);
+        return;
+    }
+    if (nx < 8) {
+        nx = 8;
+    }
+    if (nx > 220) {
+        nx = 220;
+    }
+    if (ny < 8) {
+        ny = 8;
+    }
+    if (ny > 180) {
+        ny = 180;
+    }
+
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    size_t count = (size_t)nx * (size_t)ny;
+    float *grid = malloc(count * sizeof(float));
+    if (!grid) {
+        send_json_error(fd, 500, "Out of memory", keep_alive);
+        return;
+    }
+    hot_sample_implicit_slot(slot, &params, xmin, xmax, ymin, ymax, nx, ny, grid);
+    send_response(fd, 200, "OK", "application/octet-stream", grid, count * sizeof(float),
+                  keep_alive);
+    free(grid);
+}
+
+static void handle_api_workspace_parametric(int fd, const char *body, bool keep_alive) {
+    int slot = 0;
+    double tmin = 0.0, tmax = 6.283185307179586;
+    int samples = 600;
+    json_get_int(body, "slot", &slot);
+    json_get_double(body, "tmin", &tmin);
+    json_get_double(body, "tmax", &tmax);
+    json_get_int(body, "samples", &samples);
+
+    if (tmax <= tmin || slot < 0 || slot >= hot_real_slot_count()) {
+        send_json_error(fd, 400, "Invalid parametric parameters", keep_alive);
+        return;
+    }
+    if (samples < 16) {
+        samples = 16;
+    }
+    if (samples > 4800) {
+        samples = 4800;
+    }
+
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    size_t nfloats = (size_t)samples * 2;
+    float *xy = malloc(nfloats * sizeof(float));
+    if (!xy) {
+        send_json_error(fd, 500, "Out of memory", keep_alive);
+        return;
+    }
+    hot_sample_parametric_slot(slot, &params, tmin, tmax, (size_t)samples, xy);
+    send_response(fd, 200, "OK", "application/octet-stream", xy, nfloats * sizeof(float),
+                  keep_alive);
+    free(xy);
+}
+
+static void handle_api_real_seed(int fd, const char *body, bool keep_alive) {
+    Point2D *pts = NULL;
+    size_t npts = 0;
+    if (strstr(body, "\"cells\"") != NULL && json_get_points(body, "cells", &pts, &npts)) {
+        int *xy = NULL;
+        if (npts > 0) {
+            xy = malloc(npts * 2 * sizeof(int));
+            if (xy) {
+                for (size_t i = 0; i < npts; i++) {
+                    xy[i * 2] = (int)floor(pts[i].x + 0.5);
+                    xy[i * 2 + 1] = (int)floor(pts[i].y + 0.5);
+                }
+            }
+        }
+        real_seed_set_cells(xy, xy ? npts : 0);
+        free(xy);
+        free(pts);
+    } else {
+        char *hex_rows[64] = {0};
+        size_t n = json_get_string_array(body, "rows", hex_rows, 64, 32);
+        uint64_t rows[64];
+        memset(rows, 0, sizeof(rows));
+        for (size_t i = 0; i < n && i < 64; i++) {
+            if (hex_rows[i]) {
+                rows[i] = strtoull(hex_rows[i], NULL, 16);
+                free(hex_rows[i]);
+            }
+        }
+        real_seed_set_rows(rows, n);
+    }
+    char resp[64];
+    int len = snprintf(resp, sizeof(resp), "{\"ok\":true,\"count\":%d}", real_seed_count());
+    send_response(fd, 200, "OK", "application/json", resp, (size_t)(len > 0 ? len : 0), keep_alive);
+}
+
 static void handle_api_find_zeros(int fd, const char *body, bool keep_alive) {
-    int fn_idx = 0;
     double xmin = -4.0, xmax = 4.0, ymin = -4.0, ymax = 4.0;
-    json_get_int(body, "fn", &fn_idx);
     json_get_double(body, "xmin", &xmin);
     json_get_double(body, "xmax", &xmax);
     json_get_double(body, "ymin", &ymin);
     json_get_double(body, "ymax", &ymax);
 
     FunctionDef tmp_hot;
-    const FunctionDef *fn = resolve_complex_fn(fn_idx, &tmp_hot);
+    const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
     if (!fn) {
         send_json_error(fd, 400, "Invalid function index", keep_alive);
         return;
@@ -978,16 +1429,14 @@ static void handle_api_find_zeros(int fd, const char *body, bool keep_alive) {
 }
 
 static void handle_api_taylor(int fd, const char *body, bool keep_alive) {
-    int fn_idx = 0;
     double x0 = 2.0, y0 = 0.0;
     int degree = 12;
-    json_get_int(body, "fn", &fn_idx);
     json_get_double(body, "x0", &x0);
     json_get_double(body, "y0", &y0);
     json_get_int(body, "degree", &degree);
 
     FunctionDef tmp_hot;
-    const FunctionDef *fn = resolve_complex_fn(fn_idx, &tmp_hot);
+    const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
     if (!fn) {
         send_json_error(fd, 400, "Invalid function index", keep_alive);
         return;
@@ -1071,8 +1520,19 @@ static void handle_api_real_calculus(int fd, const char *body, bool keep_alive) 
     json_get_bool(body, "deriv", &want_deriv);
     json_get_bool(body, "integral", &want_int);
 
+    int slot = -1;
     RealFunctionDef tmp_hot;
-    const RealFunctionDef *fn = resolve_real_fn(fn_idx, &tmp_hot);
+    const RealFunctionDef *fn = NULL;
+    if (json_get_int(body, "slot", &slot) && slot >= 0 && slot < hot_real_slot_count()) {
+        g_tls_slot = slot;
+        memset(&g_tls_params, 0, sizeof(g_tls_params));
+        json_get_double_array(body, "params", g_tls_params.v, MAX_EVAL_PARAMS, &g_tls_params.count);
+        memset(&tmp_hot, 0, sizeof(tmp_hot));
+        tmp_hot.exact_fn = eval_tls_real_slot;
+        fn = &tmp_hot;
+    } else {
+        fn = resolve_real_fn(fn_idx, &tmp_hot);
+    }
     if (!fn || !fn->exact_fn || xmax <= xmin) {
         send_json_error(fd, 400, "Invalid calculus parameters", keep_alive);
         return;
@@ -1176,6 +1636,176 @@ static void handle_api_real_harmonics(int fd, const char *body, bool keep_alive)
 }
 
 /* ----------------------------------------------------------------------------
+ * Persistent Repo-Backed User Projects Storage (projects/<id>.json)
+ * ---------------------------------------------------------------------------- */
+
+static pthread_mutex_t g_projects_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static bool sanitize_project_id(const char *raw, char *out, size_t out_cap) {
+    if (!raw || !out || out_cap < 4) {
+        return false;
+    }
+    size_t n = 0;
+    for (const char *p = raw; *p && n + 1 < out_cap && n < 96; p++) {
+        unsigned char c = (unsigned char)*p;
+        if (isalnum(c) || c == '_' || c == '-') {
+            out[n++] = (char)c;
+        } else if (c == ' ') {
+            out[n++] = '_';
+        }
+    }
+    out[n] = '\0';
+    return n > 0;
+}
+
+static void handle_api_projects_list(int fd, bool keep_alive) {
+    pthread_mutex_lock(&g_projects_mu);
+    (void)mkdir("projects", 0755);
+
+    StrBuf sb = {0};
+    sb_append(&sb, "{\"projects\":[");
+
+    DIR *dir = opendir("projects");
+    size_t count = 0;
+    if (dir) {
+        struct dirent *ent = NULL;
+        while ((ent = readdir(dir)) != NULL) {
+            const char *name = ent->d_name;
+            if (!name || name[0] == '.') {
+                continue;
+            }
+            size_t nlen = strlen(name);
+            if (nlen <= 5 || strcmp(name + nlen - 5, ".json") != 0) {
+                continue;
+            }
+            char path[512];
+            int pn = snprintf(path, sizeof(path), "projects/%s", name);
+            if (pn <= 0 || (size_t)pn >= sizeof(path)) {
+                continue;
+            }
+            FILE *fp = fopen(path, "rb");
+            if (!fp) {
+                continue;
+            }
+            if (fseek(fp, 0, SEEK_END) != 0) {
+                fclose(fp);
+                continue;
+            }
+            long fsize = ftell(fp);
+            if (fsize <= 2 || fsize > 2 * 1024 * 1024) {
+                fclose(fp);
+                continue;
+            }
+            rewind(fp);
+            char *buf = malloc((size_t)fsize + 1);
+            if (!buf) {
+                fclose(fp);
+                continue;
+            }
+            size_t nread = fread(buf, 1, (size_t)fsize, fp);
+            fclose(fp);
+            buf[nread] = '\0';
+
+            const char *s = buf;
+            while (*s && isspace((unsigned char)*s)) {
+                s++;
+            }
+            if (*s == '{') {
+                if (count > 0) {
+                    sb_append(&sb, ",");
+                }
+                sb_append_raw(&sb, buf, nread);
+                count++;
+            }
+            free(buf);
+        }
+        closedir(dir);
+    }
+
+    sb_append(&sb, "]}");
+    pthread_mutex_unlock(&g_projects_mu);
+
+    send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+    sb_free(&sb);
+}
+
+static void handle_api_projects_save(int fd, const char *body, bool keep_alive) {
+    if (!body) {
+        send_json_error(fd, 400, "Empty body", keep_alive);
+        return;
+    }
+    const char *s = body;
+    while (*s && isspace((unsigned char)*s)) {
+        s++;
+    }
+    if (*s != '{') {
+        send_json_error(fd, 400, "Expected JSON project object", keep_alive);
+        return;
+    }
+
+    char raw_id[128] = {0};
+    char safe_id[128] = {0};
+    if (!json_get_string(body, "id", raw_id, sizeof(raw_id)) ||
+        !sanitize_project_id(raw_id, safe_id, sizeof(safe_id))) {
+        send_json_error(fd, 400, "Missing or invalid project id", keep_alive);
+        return;
+    }
+
+    char final_path[256];
+    char tmp_path[256];
+    snprintf(final_path, sizeof(final_path), "projects/%s.json", safe_id);
+    snprintf(tmp_path, sizeof(tmp_path), "projects/%s.json.tmp", safe_id);
+
+    pthread_mutex_lock(&g_projects_mu);
+    (void)mkdir("projects", 0755);
+    FILE *fp = fopen(tmp_path, "wb");
+    if (!fp) {
+        pthread_mutex_unlock(&g_projects_mu);
+        send_json_error(fd, 500, "Failed to open project file for writing", keep_alive);
+        return;
+    }
+    size_t blen = strlen(body);
+    size_t written = fwrite(body, 1, blen, fp);
+    fclose(fp);
+    if (written != blen || rename(tmp_path, final_path) != 0) {
+        (void)unlink(tmp_path);
+        pthread_mutex_unlock(&g_projects_mu);
+        send_json_error(fd, 500, "Failed to save project file", keep_alive);
+        return;
+    }
+    pthread_mutex_unlock(&g_projects_mu);
+
+    StrBuf sb = {0};
+    sb_append(&sb, "{\"ok\":true,\"id\":");
+    sb_append_json_str(&sb, safe_id);
+    sb_append(&sb, ",\"path\":");
+    sb_append_json_str(&sb, final_path);
+    sb_append(&sb, "}");
+    send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+    sb_free(&sb);
+}
+
+static void handle_api_projects_delete(int fd, const char *body, bool keep_alive) {
+    char raw_id[128] = {0};
+    char safe_id[128] = {0};
+    if (!body || !json_get_string(body, "id", raw_id, sizeof(raw_id)) ||
+        !sanitize_project_id(raw_id, safe_id, sizeof(safe_id))) {
+        send_json_error(fd, 400, "Missing or invalid project id", keep_alive);
+        return;
+    }
+
+    char final_path[256];
+    snprintf(final_path, sizeof(final_path), "projects/%s.json", safe_id);
+
+    pthread_mutex_lock(&g_projects_mu);
+    int rc = unlink(final_path);
+    pthread_mutex_unlock(&g_projects_mu);
+
+    const char *resp = (rc == 0) ? "{\"ok\":true,\"deleted\":true}" : "{\"ok\":true,\"deleted\":false}";
+    send_response(fd, 200, "OK", "application/json", resp, strlen(resp), keep_alive);
+}
+
+/* ----------------------------------------------------------------------------
  * Static File Serving
  * ---------------------------------------------------------------------------- */
 
@@ -1200,8 +1830,8 @@ static const char *mime_for_path(const char *path) {
 }
 
 static void handle_static(int fd, const char *req_path, bool keep_alive) {
-    const char *rel = (strcmp(req_path, "/") == 0 || strcmp(req_path, "/integral") == 0 ||
-                       strcmp(req_path, "/real") == 0)
+    const char *rel = (strcmp(req_path, "/") == 0 || strcmp(req_path, "/map") == 0 ||
+                       strcmp(req_path, "/integral") == 0 || strcmp(req_path, "/real") == 0)
                           ? "index.html"
                           : req_path + 1;
     if (strstr(rel, "..") != NULL || strchr(rel, '\\') != NULL) {
@@ -1414,6 +2044,14 @@ static void serve_client(int fd) {
             handle_api_real_sample(fd, body, keep_alive);
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/compile") == 0) {
             handle_api_compile(fd, body, tok_str, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/compile") == 0) {
+            handle_api_workspace_compile(fd, body, tok_str, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/real_sample") == 0) {
+            handle_api_workspace_real_sample(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/implicit") == 0) {
+            handle_api_workspace_implicit(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/parametric") == 0) {
+            handle_api_workspace_parametric(fd, body, keep_alive);
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/find_zeros") == 0) {
             handle_api_find_zeros(fd, body, keep_alive);
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/taylor") == 0) {
@@ -1424,6 +2062,14 @@ static void serve_client(int fd) {
             handle_api_real_calculus(fd, body, keep_alive);
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/real/harmonics") == 0) {
             handle_api_real_harmonics(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/real/seed") == 0) {
+            handle_api_real_seed(fd, body, keep_alive);
+        } else if (strcmp(method, "GET") == 0 && strcmp(path, "/api/projects") == 0) {
+            handle_api_projects_list(fd, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/projects/save") == 0) {
+            handle_api_projects_save(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/projects/delete") == 0) {
+            handle_api_projects_delete(fd, body, keep_alive);
         } else if (strcmp(method, "GET") == 0) {
             handle_static(fd, path, keep_alive);
         } else {

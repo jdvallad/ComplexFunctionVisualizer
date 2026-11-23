@@ -1,0 +1,47 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795418673334_375",
+  "name": "Bhashara's Sine Approximation",
+  "subtitle": "2 cards · 0 presets",
+  "mode": "real",
+  "cards": [
+    {
+      "title": "Curve 1",
+      "code": "sin(x)",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Curve 2",
+      "code": "16*x*(M_PI-x)/(5*M_PI*M_PI-4*x*(M_PI-x))",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [],
+  "vars": [],
+  "points": [],
+  "lines": [],
+  "viewport": {
+    "view": {
+      "xmin": -1.0304,
+      "xmax": 5.0701,
+      "ymin": -1.9452,
+      "ymax": 4.1553
+    },
+    "squareAspect": false,
+    "showPrimes": false,
+    "showZeros": false
+  },
+  "presets": []
+}

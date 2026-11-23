@@ -39,7 +39,7 @@ WORKDIR /app
 COPY --from=builder /src/visualizer /app/visualizer
 COPY web/ /app/web/
 # Copy public headers so optional WITH_CLANG=1 hot-compilation can #include them
-COPY complex_math.h real_math.h /app/
+COPY complex_math.h real_math.h hot_compile.h /app/
 
 RUN chown -R cfv:cfv /app
 

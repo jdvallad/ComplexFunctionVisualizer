@@ -1,0 +1,6417 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795411966438_682",
+  "name": "soccer ball",
+  "subtitle": "2 cards · 4 presets",
+  "mode": "map",
+  "splitPct": 42,
+  "cards": [
+    {
+      "title": "SU(2) Rigid Sphere Rotation M(z)",
+      "code": "double c = cos(0.5 * roll);\ndouble sn = sin(0.5 * roll);\ndouble complex num = c_make(c, 0.0) * z + c_make(sn, 0.0);\ndouble complex den = c_make(-sn, 0.0) * z + c_make(c, 0.0);\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn cexp(c_make(0.0, spin)) * (num / den);",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": false
+    },
+    {
+      "title": "Conformal Soccer Ball Map w = stretch * M(z)",
+      "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn c_make(stretch, 0.0) * w;",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [
+    {
+      "name": "cam_spin",
+      "label": "3D Camera Orbit",
+      "value": -1.2365950212000019,
+      "min": -3.1416,
+      "max": 3.1416,
+      "step": 0.03,
+      "speed": 0.5
+    },
+    {
+      "name": "roll",
+      "label": "SU(2) Möbius Roll",
+      "value": 0,
+      "min": -3.1416,
+      "max": 3.1416,
+      "step": 0.03,
+      "speed": 0.5
+    },
+    {
+      "name": "spin",
+      "label": "Polar Spin",
+      "value": 0.22339949016000768,
+      "min": -3.1416,
+      "max": 3.1416,
+      "step": 0.03,
+      "speed": 0.5
+    },
+    {
+      "name": "stretch",
+      "label": "Hyperbolic Conformal Stretch",
+      "value": 1,
+      "min": 0.25,
+      "max": 3,
+      "step": 0.02,
+      "speed": 0.5
+    }
+  ],
+  "vars": [
+    {
+      "name": "sphere_yaw",
+      "label": "3D Sphere Longitude",
+      "expr": "-0.58 + cam_spin"
+    }
+  ],
+  "shapes": [
+    {
+      "kind": "polygon",
+      "label": "Pentagon S (South Pole)",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.1432,
+          "y": 0.104
+        },
+        {
+          "x": -0.0547,
+          "y": 0.1683
+        },
+        {
+          "x": -0.177,
+          "y": 0
+        },
+        {
+          "x": -0.0547,
+          "y": -0.1683
+        },
+        {
+          "x": 0.1432,
+          "y": -0.104
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon L0",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.3216,
+          "y": 0.2336
+        },
+        {
+          "x": 0.2966,
+          "y": 0.4819
+        },
+        {
+          "x": 0.5646,
+          "y": 0.6231
+        },
+        {
+          "x": 0.767,
+          "y": 0.3444
+        },
+        {
+          "x": 0.55,
+          "y": 0.1332
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon L1",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.1228,
+          "y": 0.3781
+        },
+        {
+          "x": -0.3667,
+          "y": 0.431
+        },
+        {
+          "x": -0.4181,
+          "y": 0.7295
+        },
+        {
+          "x": -0.0905,
+          "y": 0.8359
+        },
+        {
+          "x": 0.0433,
+          "y": 0.5642
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon L2",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.3975,
+          "y": 0
+        },
+        {
+          "x": -0.5233,
+          "y": -0.2155
+        },
+        {
+          "x": -0.823,
+          "y": -0.1722
+        },
+        {
+          "x": -0.823,
+          "y": 0.1722
+        },
+        {
+          "x": -0.5233,
+          "y": 0.2155
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon L3",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.1228,
+          "y": -0.3781
+        },
+        {
+          "x": 0.0433,
+          "y": -0.5642
+        },
+        {
+          "x": -0.0905,
+          "y": -0.8359
+        },
+        {
+          "x": -0.4181,
+          "y": -0.7295
+        },
+        {
+          "x": -0.3667,
+          "y": -0.431
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon L4",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.3216,
+          "y": -0.2336
+        },
+        {
+          "x": 0.55,
+          "y": -0.1332
+        },
+        {
+          "x": 0.767,
+          "y": -0.3444
+        },
+        {
+          "x": 0.5646,
+          "y": -0.6231
+        },
+        {
+          "x": 0.2966,
+          "y": -0.4819
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon U0",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 1.1641,
+          "y": -0.2436
+        },
+        {
+          "x": 1.1641,
+          "y": 0.2436
+        },
+        {
+          "x": 1.634,
+          "y": 0.673
+        },
+        {
+          "x": 2.5156,
+          "y": 0
+        },
+        {
+          "x": 1.634,
+          "y": -0.673
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon U1",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.5914,
+          "y": 1.0318
+        },
+        {
+          "x": 0.1281,
+          "y": 1.1824
+        },
+        {
+          "x": -0.1352,
+          "y": 1.762
+        },
+        {
+          "x": 0.7774,
+          "y": 2.3925
+        },
+        {
+          "x": 1.145,
+          "y": 1.3461
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon U2",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.7986,
+          "y": 0.8813
+        },
+        {
+          "x": -1.085,
+          "y": 0.4871
+        },
+        {
+          "x": -1.7176,
+          "y": 0.416
+        },
+        {
+          "x": -2.0352,
+          "y": 1.4786
+        },
+        {
+          "x": -0.9264,
+          "y": 1.5049
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon U3",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -1.085,
+          "y": -0.4871
+        },
+        {
+          "x": -0.7986,
+          "y": -0.8813
+        },
+        {
+          "x": -0.9264,
+          "y": -1.5049
+        },
+        {
+          "x": -2.0352,
+          "y": -1.4786
+        },
+        {
+          "x": -1.7176,
+          "y": -0.416
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon U4",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.1281,
+          "y": -1.1824
+        },
+        {
+          "x": 0.5914,
+          "y": -1.0318
+        },
+        {
+          "x": 1.145,
+          "y": -1.3461
+        },
+        {
+          "x": 0.7774,
+          "y": -2.3925
+        },
+        {
+          "x": -0.1352,
+          "y": -1.762
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon S0",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.1432,
+          "y": 0.104
+        },
+        {
+          "x": 0.3216,
+          "y": 0.2336
+        },
+        {
+          "x": 0.2966,
+          "y": 0.4819
+        },
+        {
+          "x": 0.0433,
+          "y": 0.5642
+        },
+        {
+          "x": -0.1228,
+          "y": 0.3781
+        },
+        {
+          "x": -0.0547,
+          "y": 0.1683
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon S1",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.0547,
+          "y": 0.1683
+        },
+        {
+          "x": -0.1228,
+          "y": 0.3781
+        },
+        {
+          "x": -0.3667,
+          "y": 0.431
+        },
+        {
+          "x": -0.5233,
+          "y": 0.2155
+        },
+        {
+          "x": -0.3975,
+          "y": 0
+        },
+        {
+          "x": -0.177,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon S2",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.177,
+          "y": 0
+        },
+        {
+          "x": -0.3975,
+          "y": 0
+        },
+        {
+          "x": -0.5233,
+          "y": -0.2155
+        },
+        {
+          "x": -0.3667,
+          "y": -0.431
+        },
+        {
+          "x": -0.1228,
+          "y": -0.3781
+        },
+        {
+          "x": -0.0547,
+          "y": -0.1683
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon S3",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.0547,
+          "y": -0.1683
+        },
+        {
+          "x": -0.1228,
+          "y": -0.3781
+        },
+        {
+          "x": 0.0433,
+          "y": -0.5642
+        },
+        {
+          "x": 0.2966,
+          "y": -0.4819
+        },
+        {
+          "x": 0.3216,
+          "y": -0.2336
+        },
+        {
+          "x": 0.1432,
+          "y": -0.104
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon S4",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.1432,
+          "y": -0.104
+        },
+        {
+          "x": 0.3216,
+          "y": -0.2336
+        },
+        {
+          "x": 0.55,
+          "y": -0.1332
+        },
+        {
+          "x": 0.55,
+          "y": 0.1332
+        },
+        {
+          "x": 0.3216,
+          "y": 0.2336
+        },
+        {
+          "x": 0.1432,
+          "y": 0.104
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon LE0",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.2966,
+          "y": 0.4819
+        },
+        {
+          "x": 0.0433,
+          "y": 0.5642
+        },
+        {
+          "x": -0.0905,
+          "y": 0.8359
+        },
+        {
+          "x": 0.1281,
+          "y": 1.1824
+        },
+        {
+          "x": 0.5914,
+          "y": 1.0318
+        },
+        {
+          "x": 0.5646,
+          "y": 0.6231
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon LE1",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.3667,
+          "y": 0.431
+        },
+        {
+          "x": -0.5233,
+          "y": 0.2155
+        },
+        {
+          "x": -0.823,
+          "y": 0.1722
+        },
+        {
+          "x": -1.085,
+          "y": 0.4871
+        },
+        {
+          "x": -0.7986,
+          "y": 0.8813
+        },
+        {
+          "x": -0.4181,
+          "y": 0.7295
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon LE2",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.5233,
+          "y": -0.2155
+        },
+        {
+          "x": -0.3667,
+          "y": -0.431
+        },
+        {
+          "x": -0.4181,
+          "y": -0.7295
+        },
+        {
+          "x": -0.7986,
+          "y": -0.8813
+        },
+        {
+          "x": -1.085,
+          "y": -0.4871
+        },
+        {
+          "x": -0.823,
+          "y": -0.1722
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon LE3",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.0433,
+          "y": -0.5642
+        },
+        {
+          "x": 0.2966,
+          "y": -0.4819
+        },
+        {
+          "x": 0.5646,
+          "y": -0.6231
+        },
+        {
+          "x": 0.5914,
+          "y": -1.0318
+        },
+        {
+          "x": 0.1281,
+          "y": -1.1824
+        },
+        {
+          "x": -0.0905,
+          "y": -0.8359
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon LE4",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.55,
+          "y": -0.1332
+        },
+        {
+          "x": 0.55,
+          "y": 0.1332
+        },
+        {
+          "x": 0.767,
+          "y": 0.3444
+        },
+        {
+          "x": 1.1641,
+          "y": 0.2436
+        },
+        {
+          "x": 1.1641,
+          "y": -0.2436
+        },
+        {
+          "x": 0.767,
+          "y": -0.3444
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon UE0",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.767,
+          "y": 0.3444
+        },
+        {
+          "x": 0.5646,
+          "y": 0.6231
+        },
+        {
+          "x": 0.5914,
+          "y": 1.0318
+        },
+        {
+          "x": 1.145,
+          "y": 1.3461
+        },
+        {
+          "x": 1.634,
+          "y": 0.673
+        },
+        {
+          "x": 1.1641,
+          "y": 0.2436
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon UE1",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.0905,
+          "y": 0.8359
+        },
+        {
+          "x": -0.4181,
+          "y": 0.7295
+        },
+        {
+          "x": -0.7986,
+          "y": 0.8813
+        },
+        {
+          "x": -0.9264,
+          "y": 1.5049
+        },
+        {
+          "x": -0.1352,
+          "y": 1.762
+        },
+        {
+          "x": 0.1281,
+          "y": 1.1824
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon UE2",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.823,
+          "y": 0.1722
+        },
+        {
+          "x": -0.823,
+          "y": -0.1722
+        },
+        {
+          "x": -1.085,
+          "y": -0.4871
+        },
+        {
+          "x": -1.7176,
+          "y": -0.416
+        },
+        {
+          "x": -1.7176,
+          "y": 0.416
+        },
+        {
+          "x": -1.085,
+          "y": 0.4871
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon UE3",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.4181,
+          "y": -0.7295
+        },
+        {
+          "x": -0.0905,
+          "y": -0.8359
+        },
+        {
+          "x": 0.1281,
+          "y": -1.1824
+        },
+        {
+          "x": -0.1352,
+          "y": -1.762
+        },
+        {
+          "x": -0.9264,
+          "y": -1.5049
+        },
+        {
+          "x": -0.7986,
+          "y": -0.8813
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon UE4",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.5646,
+          "y": -0.6231
+        },
+        {
+          "x": 0.767,
+          "y": -0.3444
+        },
+        {
+          "x": 1.1641,
+          "y": -0.2436
+        },
+        {
+          "x": 1.634,
+          "y": -0.673
+        },
+        {
+          "x": 1.145,
+          "y": -1.3461
+        },
+        {
+          "x": 0.5914,
+          "y": -1.0318
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon N0",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 1.634,
+          "y": 0.673
+        },
+        {
+          "x": 1.145,
+          "y": 1.3461
+        },
+        {
+          "x": 0.7774,
+          "y": 2.3925
+        },
+        {
+          "x": 1.7457,
+          "y": 5.3726
+        },
+        {
+          "x": 5.5903,
+          "y": 4.0616
+        },
+        {
+          "x": 5.6491,
+          "y": 0
+        },
+        {
+          "x": 2.5156,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon N1",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.1352,
+          "y": 1.762
+        },
+        {
+          "x": -0.9264,
+          "y": 1.5049
+        },
+        {
+          "x": -2.0352,
+          "y": 1.4786
+        },
+        {
+          "x": -4.5702,
+          "y": 3.3205
+        },
+        {
+          "x": -2.1353,
+          "y": 6.5718
+        },
+        {
+          "x": 1.7457,
+          "y": 5.3726
+        },
+        {
+          "x": 0.7774,
+          "y": 2.3925
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon N2",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -1.7176,
+          "y": 0.416
+        },
+        {
+          "x": -1.7176,
+          "y": -0.416
+        },
+        {
+          "x": -2.0352,
+          "y": -1.4786
+        },
+        {
+          "x": -4.5702,
+          "y": -3.3205
+        },
+        {
+          "x": -6.91,
+          "y": 0
+        },
+        {
+          "x": -4.5702,
+          "y": 3.3205
+        },
+        {
+          "x": -2.0352,
+          "y": 1.4786
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon N3",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": -0.9264,
+          "y": -1.5049
+        },
+        {
+          "x": -0.1352,
+          "y": -1.762
+        },
+        {
+          "x": 0.7774,
+          "y": -2.3925
+        },
+        {
+          "x": 1.7457,
+          "y": -5.3726
+        },
+        {
+          "x": -2.1353,
+          "y": -6.5718
+        },
+        {
+          "x": -4.5702,
+          "y": -3.3205
+        },
+        {
+          "x": -2.0352,
+          "y": -1.4786
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Hexagon N4",
+      "color": "#f8fafc",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 1.145,
+          "y": -1.3461
+        },
+        {
+          "x": 1.634,
+          "y": -0.673
+        },
+        {
+          "x": 2.5156,
+          "y": 0
+        },
+        {
+          "x": 5.6491,
+          "y": 0
+        },
+        {
+          "x": 5.5903,
+          "y": -4.0616
+        },
+        {
+          "x": 1.7457,
+          "y": -5.3726
+        },
+        {
+          "x": 0.7774,
+          "y": -2.3925
+        }
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Pentagon N Seam (North Pole)",
+      "color": "#1e293b",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 5.6491,
+          "y": 0
+        },
+        {
+          "x": 5.5903,
+          "y": 4.0616
+        },
+        {
+          "x": 1.7457,
+          "y": 5.3726
+        },
+        {
+          "x": -2.1353,
+          "y": 6.5718
+        },
+        {
+          "x": -4.5702,
+          "y": 3.3205
+        },
+        {
+          "x": -6.91,
+          "y": 0
+        },
+        {
+          "x": -4.5702,
+          "y": -3.3205
+        },
+        {
+          "x": -2.1353,
+          "y": -6.5718
+        },
+        {
+          "x": 1.7457,
+          "y": -5.3726
+        },
+        {
+          "x": 5.5903,
+          "y": -4.0616
+        },
+        {
+          "x": 5.6491,
+          "y": 0
+        }
+      ]
+    }
+  ],
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "label": "South Pole Center",
+      "icon": "dot",
+      "color": "#fbbf24",
+      "size": 4,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "lines": [
+    {
+      "orientation": "horizontal",
+      "value": 0,
+      "label": "Real Axis",
+      "color": "#334155",
+      "lineWidth": 1.5,
+      "lineStyle": "dashed",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "orientation": "vertical",
+      "value": 0,
+      "label": "Imaginary Axis",
+      "color": "#334155",
+      "lineWidth": 1.5,
+      "lineStyle": "dashed",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "viewport": {
+    "inView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 7.4
+    },
+    "outView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 7.4
+    },
+    "inSquare": true,
+    "outSquare": true,
+    "showSphere": true,
+    "sphereView": {
+      "yaw": -1.8166,
+      "pitch": -0.0605,
+      "zoom": 1.15
+    }
+  },
+  "presets": [
+    {
+      "id": "soccer_sphere_orbit",
+      "name": "3D Soccer Ball (Orbit)",
+      "startSlider": "cam_spin",
+      "mode": "map",
+      "splitPct": 42,
+      "cards": [
+        {
+          "title": "SU(2) Rigid Sphere Rotation M(z)",
+          "code": "double c = cos(0.5 * roll);\ndouble sn = sin(0.5 * roll);\ndouble complex num = c_make(c, 0.0) * z + c_make(sn, 0.0);\ndouble complex den = c_make(-sn, 0.0) * z + c_make(c, 0.0);\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn cexp(c_make(0.0, spin)) * (num / den);",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Conformal Soccer Ball Map w = stretch * M(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn c_make(stretch, 0.0) * w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "cam_spin",
+          "label": "3D Camera Orbit",
+          "value": 1.8229542407999444,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "roll",
+          "label": "SU(2) Möbius Roll",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "spin",
+          "label": "Polar Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "stretch",
+          "label": "Hyperbolic Conformal Stretch",
+          "value": 1,
+          "min": 0.25,
+          "max": 3,
+          "step": 0.02,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + cam_spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Pentagon S (South Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": -0.104
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": 0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon N Seam (North Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "South Pole Center",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 4,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": true,
+        "sphereView": {
+          "yaw": 1.243,
+          "pitch": 0.25,
+          "zoom": 1.15
+        }
+      }
+    },
+    {
+      "id": "mobius_roll_3d",
+      "name": "SU(2) Möbius Ball Roll",
+      "startSlider": "roll",
+      "mode": "map",
+      "splitPct": 42,
+      "cards": [
+        {
+          "title": "SU(2) Rigid Sphere Rotation M(z)",
+          "code": "double c = cos(0.5 * roll);\ndouble sn = sin(0.5 * roll);\ndouble complex num = c_make(c, 0.0) * z + c_make(sn, 0.0);\ndouble complex den = c_make(-sn, 0.0) * z + c_make(c, 0.0);\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn cexp(c_make(0.0, spin)) * (num / den);",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Conformal Soccer Ball Map w = stretch * M(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn c_make(stretch, 0.0) * w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "cam_spin",
+          "label": "3D Camera Orbit",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "roll",
+          "label": "SU(2) Möbius Roll",
+          "value": -3.1416,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "spin",
+          "label": "Polar Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "stretch",
+          "label": "Hyperbolic Conformal Stretch",
+          "value": 1,
+          "min": 0.25,
+          "max": 3,
+          "step": 0.02,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + cam_spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Pentagon S (South Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": -0.104
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": 0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon N Seam (North Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "South Pole Center",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 4,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": true,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1.15
+        }
+      }
+    },
+    {
+      "id": "stereographic_flat",
+      "name": "2D Stereographic Soccer Plane",
+      "mode": "map",
+      "splitPct": 42,
+      "cards": [
+        {
+          "title": "SU(2) Rigid Sphere Rotation M(z)",
+          "code": "double c = cos(0.5 * roll);\ndouble sn = sin(0.5 * roll);\ndouble complex num = c_make(c, 0.0) * z + c_make(sn, 0.0);\ndouble complex den = c_make(-sn, 0.0) * z + c_make(c, 0.0);\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn cexp(c_make(0.0, spin)) * (num / den);",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Conformal Soccer Ball Map w = stretch * M(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn c_make(stretch, 0.0) * w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "cam_spin",
+          "label": "3D Camera Orbit",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "roll",
+          "label": "SU(2) Möbius Roll",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "spin",
+          "label": "Polar Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "stretch",
+          "label": "Hyperbolic Conformal Stretch",
+          "value": 1,
+          "min": 0.25,
+          "max": 3,
+          "step": 0.02,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + cam_spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Pentagon S (South Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": -0.104
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": 0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon N Seam (North Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "South Pole Center",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 4,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": false,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.25,
+          "zoom": 1.15
+        }
+      }
+    },
+    {
+      "id": "conformal_stretch_3d",
+      "name": "Conformal Hyperbolic Warp",
+      "startSlider": "stretch",
+      "mode": "map",
+      "splitPct": 42,
+      "cards": [
+        {
+          "title": "SU(2) Rigid Sphere Rotation M(z)",
+          "code": "double c = cos(0.5 * roll);\ndouble sn = sin(0.5 * roll);\ndouble complex num = c_make(c, 0.0) * z + c_make(sn, 0.0);\ndouble complex den = c_make(-sn, 0.0) * z + c_make(c, 0.0);\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn cexp(c_make(0.0, spin)) * (num / den);",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Conformal Soccer Ball Map w = stretch * M(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn c_make(stretch, 0.0) * w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "cam_spin",
+          "label": "3D Camera Orbit",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "roll",
+          "label": "SU(2) Möbius Roll",
+          "value": 0.35,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "spin",
+          "label": "Polar Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        },
+        {
+          "name": "stretch",
+          "label": "Hyperbolic Conformal Stretch",
+          "value": 0.25,
+          "min": 0.25,
+          "max": 3,
+          "step": 0.02,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + cam_spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Pentagon S (South Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon L4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U0",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U1",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U2",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U3",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon U4",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": 0.104
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": 0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": 0.3781
+            },
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.177,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.177,
+              "y": 0
+            },
+            {
+              "x": -0.3975,
+              "y": 0
+            },
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0547,
+              "y": -0.1683
+            },
+            {
+              "x": -0.1228,
+              "y": -0.3781
+            },
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": -0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon S4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.1432,
+              "y": -0.104
+            },
+            {
+              "x": 0.3216,
+              "y": -0.2336
+            },
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.3216,
+              "y": 0.2336
+            },
+            {
+              "x": 0.1432,
+              "y": 0.104
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.2966,
+              "y": 0.4819
+            },
+            {
+              "x": 0.0433,
+              "y": 0.5642
+            },
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.3667,
+              "y": 0.431
+            },
+            {
+              "x": -0.5233,
+              "y": 0.2155
+            },
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.5233,
+              "y": -0.2155
+            },
+            {
+              "x": -0.3667,
+              "y": -0.431
+            },
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.0433,
+              "y": -0.5642
+            },
+            {
+              "x": 0.2966,
+              "y": -0.4819
+            },
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon LE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.55,
+              "y": -0.1332
+            },
+            {
+              "x": 0.55,
+              "y": 0.1332
+            },
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.767,
+              "y": 0.3444
+            },
+            {
+              "x": 0.5646,
+              "y": 0.6231
+            },
+            {
+              "x": 0.5914,
+              "y": 1.0318
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.1641,
+              "y": 0.2436
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.0905,
+              "y": 0.8359
+            },
+            {
+              "x": -0.4181,
+              "y": 0.7295
+            },
+            {
+              "x": -0.7986,
+              "y": 0.8813
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": 0.1281,
+              "y": 1.1824
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.823,
+              "y": 0.1722
+            },
+            {
+              "x": -0.823,
+              "y": -0.1722
+            },
+            {
+              "x": -1.085,
+              "y": -0.4871
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.085,
+              "y": 0.4871
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.4181,
+              "y": -0.7295
+            },
+            {
+              "x": -0.0905,
+              "y": -0.8359
+            },
+            {
+              "x": 0.1281,
+              "y": -1.1824
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.7986,
+              "y": -0.8813
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon UE4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 0.5646,
+              "y": -0.6231
+            },
+            {
+              "x": 0.767,
+              "y": -0.3444
+            },
+            {
+              "x": 1.1641,
+              "y": -0.2436
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 0.5914,
+              "y": -1.0318
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N0",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.634,
+              "y": 0.673
+            },
+            {
+              "x": 1.145,
+              "y": 1.3461
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N1",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.1352,
+              "y": 1.762
+            },
+            {
+              "x": -0.9264,
+              "y": 1.5049
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": 2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N2",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -1.7176,
+              "y": 0.416
+            },
+            {
+              "x": -1.7176,
+              "y": -0.416
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": 1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N3",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": -0.9264,
+              "y": -1.5049
+            },
+            {
+              "x": -0.1352,
+              "y": -1.762
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.0352,
+              "y": -1.4786
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Hexagon N4",
+          "color": "#f8fafc",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 1.145,
+              "y": -1.3461
+            },
+            {
+              "x": 1.634,
+              "y": -0.673
+            },
+            {
+              "x": 2.5156,
+              "y": 0
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 0.7774,
+              "y": -2.3925
+            }
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Pentagon N Seam (North Pole)",
+          "color": "#1e293b",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "rawPts": [
+            {
+              "x": 5.6491,
+              "y": 0
+            },
+            {
+              "x": 5.5903,
+              "y": 4.0616
+            },
+            {
+              "x": 1.7457,
+              "y": 5.3726
+            },
+            {
+              "x": -2.1353,
+              "y": 6.5718
+            },
+            {
+              "x": -4.5702,
+              "y": 3.3205
+            },
+            {
+              "x": -6.91,
+              "y": 0
+            },
+            {
+              "x": -4.5702,
+              "y": -3.3205
+            },
+            {
+              "x": -2.1353,
+              "y": -6.5718
+            },
+            {
+              "x": 1.7457,
+              "y": -5.3726
+            },
+            {
+              "x": 5.5903,
+              "y": -4.0616
+            },
+            {
+              "x": 5.6491,
+              "y": 0
+            }
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "South Pole Center",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 4,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#334155",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 7.4
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": true,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.25,
+          "zoom": 1.15
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1506 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795411296862_34",
+  "name": "Julia Origami: Holomorphic Fractal Folder",
+  "subtitle": "2 cards · 4 presets",
+  "mode": "map",
+  "splitPct": 50,
+  "cards": [
+    {
+      "title": "Quadratic Step Q(z) = z^2 + c",
+      "code": "z * z + c_make(c_re, c_im)",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": false
+    },
+    {
+      "title": "Continuous Holomorphic Iteration Q^(depth)(z)",
+      "code": "double complex w = z;\ndouble d = depth;\nif (d < 0.0) d = 0.0;\nif (d > 4.0) d = 4.0;\nint steps = (int)floor(d);\ndouble frac = d - (double)steps;\nfor (int k = 0; k < steps; ++k) {\n    w = f1(w);\n    if (!c_isfinite(w) || cabs(w) > 1e6) return c_make(INFINITY, 0.0);\n}\nif (frac > 1e-9) {\n    double complex next_w = f1(w);\n    if (!c_isfinite(next_w) || cabs(next_w) > 1e6) return c_make(INFINITY, 0.0);\n    w = c_make(1.0 - frac, 0.0) * w + c_make(frac, 0.0) * next_w;\n}\nreturn w;",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [
+    {
+      "name": "depth",
+      "label": "Fold Depth (Iterations)",
+      "value": 0,
+      "min": 0,
+      "max": 4,
+      "step": 0.02,
+      "speed": 0.5
+    },
+    {
+      "name": "c_re",
+      "label": "Julia Re(c)",
+      "value": -0.123,
+      "min": -1.5,
+      "max": 0.6,
+      "step": 0.01,
+      "speed": 0.25
+    },
+    {
+      "name": "c_im",
+      "label": "Julia Im(c)",
+      "value": 0.745,
+      "min": -1.2,
+      "max": 1.2,
+      "step": 0.01,
+      "speed": 0.25
+    },
+    {
+      "name": "r_scale",
+      "label": "Probe Shell Scale",
+      "value": 1,
+      "min": 0.4,
+      "max": 1.4,
+      "step": 0.02,
+      "speed": 0.25
+    },
+    {
+      "name": "spin",
+      "label": "3D Sphere Spin",
+      "value": 0,
+      "min": -3.1416,
+      "max": 3.1416,
+      "step": 0.03,
+      "speed": 0.5
+    }
+  ],
+  "vars": [
+    {
+      "name": "r1",
+      "label": "Inner Core Radius",
+      "expr": "0.45 * r_scale"
+    },
+    {
+      "name": "r2",
+      "label": "Mid Shell Radius",
+      "expr": "0.82 * r_scale"
+    },
+    {
+      "name": "r3",
+      "label": "Julia Boundary Shell",
+      "expr": "1.12 * r_scale"
+    },
+    {
+      "name": "r4",
+      "label": "Outer Escape Shell",
+      "expr": "1.35 * r_scale"
+    },
+    {
+      "name": "sphere_yaw",
+      "label": "3D Sphere Longitude",
+      "expr": "-0.58 + spin"
+    }
+  ],
+  "shapes": [
+    {
+      "kind": "circle",
+      "label": "Inner Core Disk",
+      "color": "#34d399",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "formula": {
+        "kind": "circle",
+        "cx": "0",
+        "cy": "0",
+        "r": "r1"
+      }
+    },
+    {
+      "kind": "arc",
+      "label": "Mid Conformal Ring",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "arc",
+        "cx": "0",
+        "cy": "0",
+        "r": "r2",
+        "a0": "0",
+        "a1": "2*pi"
+      }
+    },
+    {
+      "kind": "arc",
+      "label": "Julia Frontier Ring",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "arc",
+        "cx": "0",
+        "cy": "0",
+        "r": "r3",
+        "a0": "0",
+        "a1": "2*pi"
+      }
+    },
+    {
+      "kind": "arc",
+      "label": "Outer Escape Ring",
+      "color": "#fbbf24",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "arc",
+        "cx": "0",
+        "cy": "0",
+        "r": "r4",
+        "a0": "0",
+        "a1": "2*pi"
+      }
+    },
+    {
+      "kind": "line",
+      "label": "Real Axis Spine",
+      "color": "#fb7185",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "line",
+        "x0": "-r4",
+        "y0": "0",
+        "x1": "r4",
+        "y1": "0"
+      }
+    },
+    {
+      "kind": "line",
+      "label": "Imaginary Axis Spine",
+      "color": "#fb923c",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "line",
+        "x0": "0",
+        "y0": "-r4",
+        "x1": "0",
+        "y1": "r4"
+      }
+    }
+  ],
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "label": "Critical Orbit Q^n(0)",
+      "icon": "star",
+      "color": "#fbbf24",
+      "size": 6,
+      "locked": false,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 0.5,
+      "y": 0.5,
+      "label": "Tracked Probe 0.5+0.5i",
+      "icon": "dot",
+      "color": "#34d399",
+      "size": 5,
+      "locked": false,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "label": "Unit Ref +1",
+      "icon": "ring",
+      "color": "#f8fafc",
+      "size": 5,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -1,
+      "y": 0,
+      "label": "Unit Ref -1",
+      "icon": "ring",
+      "color": "#f8fafc",
+      "size": 5,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "lines": [
+    {
+      "orientation": "horizontal",
+      "value": 0,
+      "label": "Real Axis",
+      "color": "#475569",
+      "lineWidth": 1.5,
+      "lineStyle": "dashed",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "orientation": "vertical",
+      "value": 0,
+      "label": "Imaginary Axis",
+      "color": "#475569",
+      "lineWidth": 1.5,
+      "lineStyle": "dashed",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "viewport": {
+    "inView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 2
+    },
+    "outView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 2.5
+    },
+    "inSquare": true,
+    "outSquare": true,
+    "showSphere": false,
+    "sphereView": {
+      "yaw": -0.58,
+      "pitch": 0.24,
+      "zoom": 1.05
+    }
+  },
+  "presets": [
+    {
+      "id": "douady_rabbit_anim",
+      "name": "Douady's Rabbit (Animate Fold)",
+      "startSlider": "depth",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Quadratic Step Q(z) = z^2 + c",
+          "code": "z * z + c_make(c_re, c_im)",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Continuous Holomorphic Iteration Q^(depth)(z)",
+          "code": "double complex w = z;\ndouble d = depth;\nif (d < 0.0) d = 0.0;\nif (d > 4.0) d = 4.0;\nint steps = (int)floor(d);\ndouble frac = d - (double)steps;\nfor (int k = 0; k < steps; ++k) {\n    w = f1(w);\n    if (!c_isfinite(w) || cabs(w) > 1e6) return c_make(INFINITY, 0.0);\n}\nif (frac > 1e-9) {\n    double complex next_w = f1(w);\n    if (!c_isfinite(next_w) || cabs(next_w) > 1e6) return c_make(INFINITY, 0.0);\n    w = c_make(1.0 - frac, 0.0) * w + c_make(frac, 0.0) * next_w;\n}\nreturn w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "depth",
+          "label": "Fold Depth (Iterations)",
+          "value": 0,
+          "min": 0,
+          "max": 4,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "c_re",
+          "label": "Julia Re(c)",
+          "value": -0.123,
+          "min": -1.5,
+          "max": 0.6,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "c_im",
+          "label": "Julia Im(c)",
+          "value": 0.745,
+          "min": -1.2,
+          "max": 1.2,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "r_scale",
+          "label": "Probe Shell Scale",
+          "value": 1,
+          "min": 0.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "r1",
+          "label": "Inner Core Radius",
+          "expr": "0.45 * r_scale"
+        },
+        {
+          "name": "r2",
+          "label": "Mid Shell Radius",
+          "expr": "0.82 * r_scale"
+        },
+        {
+          "name": "r3",
+          "label": "Julia Boundary Shell",
+          "expr": "1.12 * r_scale"
+        },
+        {
+          "name": "r4",
+          "label": "Outer Escape Shell",
+          "expr": "1.35 * r_scale"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Inner Core Disk",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "r1"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Mid Conformal Ring",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Julia Frontier Ring",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r3",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Escape Ring",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r4",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Real Axis Spine",
+          "color": "#fb7185",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "-r4",
+            "y0": "0",
+            "x1": "r4",
+            "y1": "0"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Imaginary Axis Spine",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "0",
+            "y0": "-r4",
+            "x1": "0",
+            "y1": "r4"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Critical Orbit Q^n(0)",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5,
+          "y": 0.5,
+          "label": "Tracked Probe 0.5+0.5i",
+          "icon": "dot",
+          "color": "#34d399",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Unit Ref +1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Unit Ref -1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.5
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": false,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.24,
+          "zoom": 1.05
+        }
+      }
+    },
+    {
+      "id": "san_marco_basilica",
+      "name": "San Marco Basilica (c = -1)",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Quadratic Step Q(z) = z^2 + c",
+          "code": "z * z + c_make(c_re, c_im)",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Continuous Holomorphic Iteration Q^(depth)(z)",
+          "code": "double complex w = z;\ndouble d = depth;\nif (d < 0.0) d = 0.0;\nif (d > 4.0) d = 4.0;\nint steps = (int)floor(d);\ndouble frac = d - (double)steps;\nfor (int k = 0; k < steps; ++k) {\n    w = f1(w);\n    if (!c_isfinite(w) || cabs(w) > 1e6) return c_make(INFINITY, 0.0);\n}\nif (frac > 1e-9) {\n    double complex next_w = f1(w);\n    if (!c_isfinite(next_w) || cabs(next_w) > 1e6) return c_make(INFINITY, 0.0);\n    w = c_make(1.0 - frac, 0.0) * w + c_make(frac, 0.0) * next_w;\n}\nreturn w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "depth",
+          "label": "Fold Depth (Iterations)",
+          "value": 3,
+          "min": 0,
+          "max": 4,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "c_re",
+          "label": "Julia Re(c)",
+          "value": -1,
+          "min": -1.5,
+          "max": 0.6,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "c_im",
+          "label": "Julia Im(c)",
+          "value": 0,
+          "min": -1.2,
+          "max": 1.2,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "r_scale",
+          "label": "Probe Shell Scale",
+          "value": 0.95,
+          "min": 0.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "r1",
+          "label": "Inner Core Radius",
+          "expr": "0.45 * r_scale"
+        },
+        {
+          "name": "r2",
+          "label": "Mid Shell Radius",
+          "expr": "0.82 * r_scale"
+        },
+        {
+          "name": "r3",
+          "label": "Julia Boundary Shell",
+          "expr": "1.12 * r_scale"
+        },
+        {
+          "name": "r4",
+          "label": "Outer Escape Shell",
+          "expr": "1.35 * r_scale"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Inner Core Disk",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "r1"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Mid Conformal Ring",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Julia Frontier Ring",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r3",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Escape Ring",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r4",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Real Axis Spine",
+          "color": "#fb7185",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "-r4",
+            "y0": "0",
+            "x1": "r4",
+            "y1": "0"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Imaginary Axis Spine",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "0",
+            "y0": "-r4",
+            "x1": "0",
+            "y1": "r4"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Critical Orbit Q^n(0)",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5,
+          "y": 0.5,
+          "label": "Tracked Probe 0.5+0.5i",
+          "icon": "dot",
+          "color": "#34d399",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Unit Ref +1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Unit Ref -1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.5
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": false,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.24,
+          "zoom": 1.05
+        }
+      }
+    },
+    {
+      "id": "dendrite_lightning",
+      "name": "Dendrite Lightning (c = i)",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Quadratic Step Q(z) = z^2 + c",
+          "code": "z * z + c_make(c_re, c_im)",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Continuous Holomorphic Iteration Q^(depth)(z)",
+          "code": "double complex w = z;\ndouble d = depth;\nif (d < 0.0) d = 0.0;\nif (d > 4.0) d = 4.0;\nint steps = (int)floor(d);\ndouble frac = d - (double)steps;\nfor (int k = 0; k < steps; ++k) {\n    w = f1(w);\n    if (!c_isfinite(w) || cabs(w) > 1e6) return c_make(INFINITY, 0.0);\n}\nif (frac > 1e-9) {\n    double complex next_w = f1(w);\n    if (!c_isfinite(next_w) || cabs(next_w) > 1e6) return c_make(INFINITY, 0.0);\n    w = c_make(1.0 - frac, 0.0) * w + c_make(frac, 0.0) * next_w;\n}\nreturn w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "depth",
+          "label": "Fold Depth (Iterations)",
+          "value": 3,
+          "min": 0,
+          "max": 4,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "c_re",
+          "label": "Julia Re(c)",
+          "value": 0,
+          "min": -1.5,
+          "max": 0.6,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "c_im",
+          "label": "Julia Im(c)",
+          "value": 1,
+          "min": -1.2,
+          "max": 1.2,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "r_scale",
+          "label": "Probe Shell Scale",
+          "value": 0.9,
+          "min": 0.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "r1",
+          "label": "Inner Core Radius",
+          "expr": "0.45 * r_scale"
+        },
+        {
+          "name": "r2",
+          "label": "Mid Shell Radius",
+          "expr": "0.82 * r_scale"
+        },
+        {
+          "name": "r3",
+          "label": "Julia Boundary Shell",
+          "expr": "1.12 * r_scale"
+        },
+        {
+          "name": "r4",
+          "label": "Outer Escape Shell",
+          "expr": "1.35 * r_scale"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Inner Core Disk",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "r1"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Mid Conformal Ring",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Julia Frontier Ring",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r3",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Escape Ring",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r4",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Real Axis Spine",
+          "color": "#fb7185",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "-r4",
+            "y0": "0",
+            "x1": "r4",
+            "y1": "0"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Imaginary Axis Spine",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "0",
+            "y0": "-r4",
+            "x1": "0",
+            "y1": "r4"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Critical Orbit Q^n(0)",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5,
+          "y": 0.5,
+          "label": "Tracked Probe 0.5+0.5i",
+          "icon": "dot",
+          "color": "#34d399",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Unit Ref +1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Unit Ref -1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.6
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": false,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.24,
+          "zoom": 1.05
+        }
+      }
+    },
+    {
+      "id": "riemann_sphere_siegel",
+      "name": "3D Sphere: Siegel Vortex",
+      "startSlider": "spin",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Quadratic Step Q(z) = z^2 + c",
+          "code": "z * z + c_make(c_re, c_im)",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Continuous Holomorphic Iteration Q^(depth)(z)",
+          "code": "double complex w = z;\ndouble d = depth;\nif (d < 0.0) d = 0.0;\nif (d > 4.0) d = 4.0;\nint steps = (int)floor(d);\ndouble frac = d - (double)steps;\nfor (int k = 0; k < steps; ++k) {\n    w = f1(w);\n    if (!c_isfinite(w) || cabs(w) > 1e6) return c_make(INFINITY, 0.0);\n}\nif (frac > 1e-9) {\n    double complex next_w = f1(w);\n    if (!c_isfinite(next_w) || cabs(next_w) > 1e6) return c_make(INFINITY, 0.0);\n    w = c_make(1.0 - frac, 0.0) * w + c_make(frac, 0.0) * next_w;\n}\nreturn w;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "depth",
+          "label": "Fold Depth (Iterations)",
+          "value": 3,
+          "min": 0,
+          "max": 4,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "c_re",
+          "label": "Julia Re(c)",
+          "value": -0.391,
+          "min": -1.5,
+          "max": 0.6,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "c_im",
+          "label": "Julia Im(c)",
+          "value": -0.587,
+          "min": -1.2,
+          "max": 1.2,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "r_scale",
+          "label": "Probe Shell Scale",
+          "value": 1.05,
+          "min": 0.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": -3.1416,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "r1",
+          "label": "Inner Core Radius",
+          "expr": "0.45 * r_scale"
+        },
+        {
+          "name": "r2",
+          "label": "Mid Shell Radius",
+          "expr": "0.82 * r_scale"
+        },
+        {
+          "name": "r3",
+          "label": "Julia Boundary Shell",
+          "expr": "1.12 * r_scale"
+        },
+        {
+          "name": "r4",
+          "label": "Outer Escape Shell",
+          "expr": "1.35 * r_scale"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Inner Core Disk",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "r1"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Mid Conformal Ring",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Julia Frontier Ring",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r3",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Escape Ring",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "0",
+            "cy": "0",
+            "r": "r4",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Real Axis Spine",
+          "color": "#fb7185",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "-r4",
+            "y0": "0",
+            "x1": "r4",
+            "y1": "0"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Imaginary Axis Spine",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "0",
+            "y0": "-r4",
+            "x1": "0",
+            "y1": "r4"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Critical Orbit Q^n(0)",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5,
+          "y": 0.5,
+          "label": "Tracked Probe 0.5+0.5i",
+          "icon": "dot",
+          "color": "#34d399",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Unit Ref +1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Unit Ref -1",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": true,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.28,
+          "zoom": 1.15
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795413343931_257",
+  "name": "test",
+  "subtitle": "0 cards · 0 presets",
+  "mode": "map",
+  "splitPct": 50,
+  "cards": [],
+  "sliders": [],
+  "vars": [],
+  "shapes": [],
+  "points": [],
+  "lines": [],
+  "viewport": {
+    "inView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 4
+    },
+    "outView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 4
+    },
+    "inSquare": true,
+    "outSquare": true,
+    "showSphere": false,
+    "sphereView": {
+      "yaw": -0.58,
+      "pitch": 0.22,
+      "zoom": 1
+    }
+  },
+  "presets": []
+}

@@ -2,6 +2,7 @@
 #define REAL_MATH_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #define RIEMANN_ZERO_COUNT 200
 
@@ -42,5 +43,12 @@ double real_zero_wave(double x, int zero_idx);
 /* Adaptive 8-point Gauss-Legendre definite integral int_a^b f(x) dx. */
 typedef double (*RealScalarFn)(double x);
 double real_integrate_interval(RealScalarFn fn, double a, double b);
+
+/* Thread-safe cellular automaton seed & cached [-R, R]^2 B3/S23 evaluator (from 2D Real polygons). */
+void real_seed_set_rows(const uint64_t *rows, size_t count);
+void real_seed_set_cells(const int *xy, size_t npairs);
+uint64_t real_seed_row(int r);
+int real_seed_count(void);
+int real_life_cell_at(int R, int gen, int cell_idx, int *out_gx, int *out_gy);
 
 #endif /* REAL_MATH_H */

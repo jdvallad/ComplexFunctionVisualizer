@@ -3,563 +3,627 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Complex &amp; Real Function Visualizer</title>
-  <link rel="stylesheet" href="/style.css" />
+  <title>C11 Function Studio</title>
+  <link rel="stylesheet" href="/style.css?v=30" />
 </head>
 <body>
   <div class="app-shell">
-    <!-- Top Header -->
+    <!-- Clean Single-Tier Top Header: Modes, Pretty Project Bar, Left-Aligned Toolbar, Coords + Top-Right Utilities -->
     <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="9" opacity="0.35" />
-            <path d="M4 12 C8 5, 16 19, 20 12" stroke="#38bdf8" stroke-width="2.2" />
-            <circle cx="12" cy="12" r="2.2" fill="#a78bfa" stroke="none" />
-          </svg>
+      <div class="header-left">
+        <div class="brand" title="C11 Function Studio">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="9" opacity="0.35" />
+              <path d="M4 12 C8 5, 16 19, 20 12" stroke="#38bdf8" stroke-width="2.2" />
+              <circle cx="12" cy="12" r="2.2" fill="#a78bfa" stroke="none" />
+            </svg>
+          </div>
         </div>
-        <div class="brand-text">
-          <h1>Function Visualizer</h1>
+
+        <!-- Unified 3-Way Workspace Switcher -->
+        <div class="workspace-switch" role="tablist" aria-label="Workspace Mode">
+          <button class="ws-btn active" data-ws-mode="map" role="tab" aria-selected="true" title="Complex Mapping w = f(z)">
+            <span class="ws-sym">&Copf;</span><span>Map</span>
+          </button>
+          <button class="ws-btn" data-ws-mode="integral" role="tab" aria-selected="false" title="Complex Contour Integrals ∫ f(z) dz">
+            <span class="ws-sym">&oint;</span><span>Integral</span>
+          </button>
+          <button class="ws-btn" data-ws-mode="real" role="tab" aria-selected="false" title="2D Real Functions, Vertical Lines &amp; Implicit Relations">
+            <span class="ws-sym">&Ropf;</span><span>2D Real</span>
+          </button>
+        </div>
+
+        <span class="topbar-vsep" aria-hidden="true"></span>
+
+        <!-- Pretty Unified Project Controls: Selector + Save/Save As + [Rename|JSON|Delete] + New -->
+        <div class="topbar-project-bar">
+          <div class="sidebar-examples-wrap">
+            <button id="btn-examples" class="btn-examples" title="Open Project Library (Folders, Saved Projects &amp; Examples)" aria-haspopup="listbox" aria-expanded="false">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+              </svg>
+              <span id="active-example-name">New Project</span>
+              <span class="dropdown-caret">&#9662;</span>
+            </button>
+            <div id="examples-dropdown" class="examples-dropdown hidden" role="listbox">
+              <div class="examples-dropdown-toolbar">
+                <div class="dd-hdr-left">
+                  <span class="dd-hdr-title">Project Library</span>
+                  <span id="dd-mode-badge" class="dd-hdr-badge">Complex Map</span>
+                </div>
+                <div class="dd-hdr-actions">
+                  <button id="btn-new-folder" class="dd-tool-btn emerald-tint" title="Create a new project folder">+ Folder</button>
+                  <button id="btn-import-project" class="dd-tool-btn" title="Import a Full Project JSON (cfv_project_v1)">⤒ Import</button>
+                  <button id="btn-export-project" class="dd-tool-btn" title="Export current Project as Full Project JSON">⤓ Export</button>
+                </div>
+              </div>
+              <div id="new-folder-form" class="new-folder-form hidden">
+                <input type="text" id="new-folder-name" class="project-filter-input flex-1" placeholder="New folder name (e.g. Fractals, Homework)..." maxlength="36" autocomplete="off" />
+                <button id="btn-confirm-new-folder" class="preset-save-confirm">Create</button>
+                <button id="btn-cancel-new-folder" class="preset-save-cancel">&times;</button>
+              </div>
+              <div class="examples-search-bar">
+                <input type="text" id="project-filter-input" class="project-filter-input" placeholder="Filter folders, projects &amp; examples..." autocomplete="off" />
+              </div>
+              <div id="examples-list" class="examples-list"></div>
+            </div>
+          </div>
+
+          <div class="topbar-proj-pill-group">
+            <button id="btn-save-project" class="proj-seg-btn" disabled title="Save changes to current saved project (Ctrl+S)">Save</button>
+            <button id="btn-save-as-project" class="proj-seg-btn" title="Save as a new project in any folder (Ctrl+Shift+S)">Save As</button>
+            <span class="proj-seg-div" aria-hidden="true"></span>
+            <button id="btn-top-rename-project" class="proj-seg-btn icon-seg" title="Rename current project">✎</button>
+            <button id="btn-top-json-project" class="proj-seg-btn mono-seg" title="Export current project as Full Project JSON">JSON</button>
+            <button id="btn-top-delete-project" class="proj-seg-btn danger-seg" disabled title="Delete current project">&times;</button>
+          </div>
+
+          <button id="btn-new-project" class="btn-new-proj-pill" title="New Blank Project">New</button>
+
+          <div id="save-project-form" class="save-project-popover hidden">
+            <div class="save-pop-row">
+              <label class="save-pop-lbl" for="save-project-name">Name</label>
+              <input type="text" id="save-project-name" class="save-preset-input flex-1" placeholder="New project name..." maxlength="48" />
+            </div>
+            <div class="save-pop-row">
+              <label class="save-pop-lbl" for="save-project-folder">Folder</label>
+              <select id="save-project-folder" class="save-folder-select flex-1"></select>
+            </div>
+            <div class="save-pop-actions">
+              <button id="btn-confirm-save-project" class="preset-save-confirm flex-1">Save Project</button>
+              <button id="btn-cancel-save-project" class="preset-save-cancel">Cancel</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- BIG Dimension Toggle: Complex (C) vs 2D Real (R) -->
-      <div class="dim-toggle" role="tablist" aria-label="Space Dimension">
-        <button id="dim-complex" class="dim-btn active" data-dim="complex" role="tab" aria-selected="true" title="Complex Plane Visualizer (Map &amp; Contour Integrals)">
-          <span class="dim-sym">&Copf;</span>
-          <span>Complex</span>
-        </button>
-        <button id="dim-real" class="dim-btn" data-dim="real" role="tab" aria-selected="false" title="Classic 2D Real-Valued Functions &amp; Prime Explicit Formula">
-          <span class="dim-sym">&Ropf;</span>
-          <span>2D Real</span>
-        </button>
+      <!-- Left-Aligned Contextual Drawing & Polygon Toolbar -->
+      <div class="topbar-toolbar-slot">
+        <div class="topbar-draw-dock" id="complex-draw-dock">
+          <button class="dock-tool" data-tool="move" title="Select, Multi-Select (Ctrl/Shift+Click or Drag Box), Move &amp; Resize (V)">Move</button>
+          <button class="dock-tool active" data-tool="freehand" title="Freehand Path (1) — Snap end to start to close">Draw</button>
+          <button class="dock-tool" data-tool="line" title="Line Segment (2) — Endpoints magnetically snap">Line</button>
+          <button class="dock-tool" data-tool="circle" title="Closed Circle (3)">Circle</button>
+          <button class="dock-tool" data-tool="rect" title="Closed Rectangle (4)">Rect</button>
+          <button class="dock-tool" data-tool="polygon" title="Polygon (5)">Poly</button>
+          <button class="dock-tool" data-tool="pan" title="Pan (Space or Right-drag)">Pan</button>
+          <span class="dock-sep"></span>
+          <button class="dock-act dock-join-btn" id="btn-join-shapes" title="Join selected or touching open paths into one continuous contour / closed loop">Join</button>
+          <button class="dock-act" id="btn-close-shape" title="Close open path">Close</button>
+          <button class="dock-act" id="btn-reverse-shape" title="Reverse orientation">&rlarr;</button>
+          <button class="dock-act play" id="btn-trace-play" title="Animate tracer (P)">&#9654;</button>
+          <button class="dock-act" id="btn-undo-shape" title="Undo">Undo</button>
+          <button class="dock-act danger" id="btn-clear-shapes" title="Clear unlocked shapes">Clear</button>
+        </div>
+
+        <div class="topbar-draw-dock hidden" id="real-poly-dock">
+          <button class="dock-tool real-dock-tool" data-real-tool="select" title="Select / Box-Select (V) · Ctrl/Shift+Click to deselect · Alt+Drag box-deselect">Select</button>
+          <button class="dock-tool real-dock-tool deselect-tool" data-real-tool="deselect" title="Click or drag-paint to deselect cells (D)">Deselect</button>
+          <button class="dock-tool real-dock-tool" data-real-tool="add" title="Click or drag-paint to add square cells (A)">+ Cell</button>
+          <button class="dock-tool real-dock-tool active" data-real-tool="pan" title="Pan view (Space or Right-drag)">Pan</button>
+          <span class="dock-sep"></span>
+          <button class="dock-act" id="btn-real-select-all" title="Select all polygons (Ctrl+A)">All</button>
+          <button class="dock-act danger" id="btn-real-del-polys" title="Delete selected polygons (Delete / Backspace)">Delete</button>
+          <button class="dock-act" id="btn-real-undo-polys" title="Undo polygon edit (Ctrl+Z)">Undo</button>
+          <button class="dock-act" id="btn-real-fill-grid" title="Fill entire [-R, R]×[-R, R] play area with square polygons">Fill [-R,R]&sup2;</button>
+          <button class="dock-act danger" id="btn-real-clear-polys" title="Clear all polygons">Clear</button>
+        </div>
       </div>
 
-      <!-- Complex Sub-Mode Switcher -->
-      <div class="mode-switch" id="complex-mode-switch" role="tablist" aria-label="Complex Visualization Mode">
-        <button id="mode-map" class="mode-btn active" data-mode="map" role="tab" aria-selected="true">
-          <span>Map</span>
-          <code>w=f(z)</code>
-        </button>
-        <button id="mode-integral" class="mode-btn" data-mode="integral" role="tab" aria-selected="false">
-          <span>Integral</span>
-          <code>&int;f dz</code>
-        </button>
-      </div>
-
-      <div class="fn-picker-group">
-        <label for="fn-select" class="sr-only">Active Function</label>
-        <select id="fn-select" class="fn-select"></select>
-        <select id="real-fn-select" class="fn-select hidden"></select>
-        <span id="fn-formula" class="formula-pill">f(z) = &zeta;(s)</span>
-      </div>
-
-      <div class="readout-strip" id="readout-strip">
-        <div class="readout-item">
+      <!-- Top-Right Cluster: Live Coordinates to the Left of Docs & AI, Tools, PNG -->
+      <div class="header-right">
+        <div class="readout-strip">
           <span class="readout-label" id="readout-in-label">z</span>
-          <span class="readout-val" id="readout-z">—</span>
-        </div>
-        <span class="readout-arrow">&rarr;</span>
-        <div class="readout-item">
+          <span class="readout-val" id="readout-in">—</span>
+          <span class="readout-arrow">&rarr;</span>
           <span class="readout-label" id="readout-out-label">f(z)</span>
-          <span class="readout-val accent" id="readout-w">—</span>
+          <span class="readout-val accent" id="readout-out">—</span>
         </div>
-        <div class="readout-item muted" id="readout-extra-wrap">
-          <span class="readout-label" id="readout-extra-label">|f|</span>
-          <span class="readout-val" id="readout-mag">—</span>
-        </div>
-      </div>
 
-      <!-- Clean Header Drawer Actions (keeps toolbars uncluttered!) -->
-      <div class="header-actions">
-        <button id="btn-open-editor" class="btn-header-pill" title="Live C Code Editor &amp; Hot-Compiler (clang + dlopen)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="16 18 22 12 16 6" />
-            <polyline points="8 6 2 12 8 18" />
-          </svg>
-          <span>C Editor</span>
-        </button>
-        <button id="btn-open-lab" class="btn-header-pill" title="Open Analysis Lab (Zero Hunter, Taylor Series, Dirichlet vs Zeta, Harmonics, Calculus)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3" />
-          </svg>
-          <span>Lab</span>
-          <span id="lab-active-dot" class="active-dot hidden"></span>
-        </button>
-        <button id="btn-open-export" class="btn-header-pill" title="Export high-res PNG or copy bookmark link">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          <span>Export</span>
-        </button>
+        <div class="header-actions">
+          <button id="btn-open-docs" class="btn-header-pill primary-tint" title="Multi-Card GenAI Prompt Studio, AI Import Terminal &amp; C11 Reference">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+            <span>Docs &amp; AI</span>
+          </button>
+
+          <button id="btn-open-tools" class="btn-header-pill" title="Analysis Tools">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span>Tools</span>
+            <span id="tools-active-dot" class="active-dot hidden"></span>
+          </button>
+
+          <button id="btn-export-png" class="btn-header-pill" title="Download clean high-res PNG snapshot">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>PNG</span>
+          </button>
+        </div>
       </div>
     </header>
 
-    <!-- Compact Export & Bookmark Popover -->
-    <div id="export-popover" class="export-popover hidden">
-      <div class="popover-title">Snapshot &amp; Share</div>
-      <button id="btn-export-png" class="popover-action">
-        <span>Download High-Res PNG (2x)</span>
-        <span class="popover-hint">Dark composite</span>
-      </button>
-      <button id="btn-copy-bookmark" class="popover-action">
-        <span>Copy Bookmark URL</span>
-        <span class="popover-hint" id="bookmark-status">Saves view &amp; mode</span>
-      </button>
-    </div>
-
-    <!-- Complex Mode Toolbar (Minimal & Focused) -->
-    <div class="toolbar" id="complex-toolbar">
-      <div class="tool-group" role="group" aria-label="Drawing Tools">
-        <button class="tool-btn" data-tool="move" title="Select, Move &amp; Resize Shapes (V) — Or Alt+drag">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M5 3l14 9-6.5 1.8L9 20.5 5 3z" fill="currentColor" fill-opacity="0.18" />
-          </svg>
-          <span>Move</span>
-        </button>
-        <button class="tool-btn active" data-tool="freehand" title="Freehand Path (1) — Bring end near start to close">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 17c3-9 6 4 10-5 2-4 5-3 8-5" />
-          </svg>
-          <span>Draw</span>
-        </button>
-        <button class="tool-btn" data-tool="line" title="Line Segment (2)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="5" y1="19" x2="19" y2="5" />
-            <circle cx="5" cy="19" r="2" fill="currentColor" />
-            <circle cx="19" cy="5" r="2" fill="currentColor" />
-          </svg>
-          <span>Line</span>
-        </button>
-        <button class="tool-btn" data-tool="circle" title="Closed Circle (3)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.18" />
-          </svg>
-          <span>Circle</span>
-        </button>
-        <button class="tool-btn" data-tool="rect" title="Closed Rectangle (4)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="4" y="6" width="16" height="12" rx="1.5" fill="currentColor" fill-opacity="0.18" />
-          </svg>
-          <span>Rect</span>
-        </button>
-        <button class="tool-btn" data-tool="polygon" title="Closed Polygon (5)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="12,3 21,9 17,20 7,20 3,9" fill="currentColor" fill-opacity="0.18" />
-          </svg>
-          <span>Poly</span>
-        </button>
-        <button class="tool-btn" data-tool="pan" title="Pan View (Space or Right-drag)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v20M2 12h20" />
-          </svg>
-          <span>Pan</span>
-        </button>
-      </div>
-
-      <div class="divider"></div>
-      <div class="palette" id="palette" aria-label="Stroke Color"></div>
-      <div class="divider"></div>
-
-      <div class="tool-group">
-        <button id="btn-close-last" class="btn-subtle" title="Close selected/latest open path">Close</button>
-        <button id="btn-reverse" class="btn-subtle" title="Reverse contour orientation">Reverse &rlarr;</button>
-        <button id="btn-toggle-mesh" class="btn-subtle active" title="Conformal interior grid">Grid</button>
-        <button id="btn-toggle-domain" class="btn-subtle" title="Multi-threaded C domain coloring">Domain</button>
-        <button id="btn-toggle-landmarks" class="btn-subtle active" title="Poles, zeros &amp; critical line">Markers</button>
-      </div>
-
-      <div class="toolbar-spacer"></div>
-
-      <div class="tool-group">
-        <button id="btn-play" class="btn-primary" title="Animate glowing tracer (P)">
-          <svg id="icon-play" viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-            <polygon points="6,4 20,12 6,20" />
-          </svg>
-          <span id="label-play">Trace</span>
-        </button>
-        <button id="btn-undo" class="btn-subtle" title="Undo (Ctrl+Z)">Undo</button>
-        <button id="btn-clear" class="btn-danger" title="Clear all shapes">Clear</button>
-      </div>
-    </div>
-
-    <!-- 2D Real Mode Toolbar (Clean Convergence Controls) -->
-    <div class="toolbar hidden" id="real-toolbar">
-      <div class="tool-group" id="real-series-toggles"></div>
-      <div class="divider" id="real-slider-divider"></div>
-      <div class="real-slider-group" id="real-slider-group">
-        <button id="real-btn-livek" class="btn-subtle" title="Overlay interactive custom K curve">Live K</button>
-        <input type="range" id="real-k-slider" class="k-slider" min="0" max="200" value="25" />
-        <span id="real-k-readout" class="k-readout">K = 25 zeros</span>
-        <button id="real-btn-animate" class="btn-primary" title="Sweep K from 0 to max">
-          <svg id="real-icon-play" viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-            <polygon points="6,4 20,12 6,20" />
-          </svg>
-          <span id="real-label-play">Animate K</span>
-        </button>
-      </div>
-      <div class="toolbar-spacer"></div>
-      <div class="tool-group">
-        <button id="real-btn-errfill" class="btn-subtle active" title="Shade error region">Error Fill</button>
-        <button id="real-btn-markers" class="btn-subtle active" title="Prime / zero markers on X-axis">Markers</button>
-      </div>
-    </div>
-
-    <!-- Main Workspace Wrapper (Canvases + Optional Slide-Over Drawer) -->
-    <div class="workspace-body">
-      <!-- Dual Complex Planes -->
-      <main class="planes-container" id="complex-planes">
-        <section class="plane-card" id="input-plane-card">
-          <div class="plane-hud top-left">
-            <span class="plane-tag input-tag" id="input-tag">INPUT PLANE</span>
-            <span class="plane-sub" id="input-sub">z = x + iy</span>
-          </div>
-          <div class="plane-hud top-right">
-            <button class="hud-btn" id="in-zoom-in" title="Zoom in">+</button>
-            <button class="hud-btn" id="in-zoom-out" title="Zoom out">&minus;</button>
-            <button class="hud-btn" id="in-reset" title="Reset input view">Reset</button>
-          </div>
-          <div class="plane-hint" id="input-hint">
-            Drag to trace &middot; Snap end to start to close &middot; V or Alt+drag to move/resize
-          </div>
-          <canvas id="canvas-in"></canvas>
-        </section>
-
-        <section class="plane-card" id="output-plane-card">
-          <div class="plane-hud top-left">
-            <span class="plane-tag output-tag" id="output-tag">OUTPUT PLANE</span>
-            <span class="plane-sub" id="output-sub">w = &zeta;(s)</span>
-          </div>
-          <div class="plane-hud top-right">
-            <button class="hud-btn sphere-btn" id="btn-toggle-sphere" title="Toggle 3D Riemann Sphere stereographic projection">3D Sphere</button>
-            <button class="hud-btn accent-btn" id="out-autofit" title="Fit output curves">Auto-Fit</button>
-            <button class="hud-btn" id="out-zoom-in" title="Zoom in">+</button>
-            <button class="hud-btn" id="out-zoom-out" title="Zoom out">&minus;</button>
-            <button class="hud-btn" id="out-reset" title="Reset output view">Reset</button>
-          </div>
-
-          <!-- Contour Integral Readout Card -->
-          <div class="integral-card hidden" id="integral-card">
-            <div class="integral-card-header">
-              <span class="integral-dot" id="int-dot"></span>
-              <span class="integral-title" id="int-title">Active Contour</span>
-              <span class="integral-orient" id="int-orient">CCW &circlearrowleft;</span>
-            </div>
-            <div class="integral-main-row">
-              <span class="integral-sym" id="int-sym">&oint;<sub>&gamma;</sub> f(z) dz =</span>
-              <span class="integral-value" id="int-val">—</span>
-            </div>
-            <div class="integral-metrics">
-              <div class="int-metric">
-                <span class="int-metric-label">&divide; 2&pi;i (Residue / Z&minus;P)</span>
-                <span class="int-metric-val highlight" id="int-res">—</span>
-              </div>
-              <div class="int-metric">
-                <span class="int-metric-label">|I|</span>
-                <span class="int-metric-val" id="int-mag">—</span>
-              </div>
-              <div class="int-metric">
-                <span class="int-metric-label">Arc Length</span>
-                <span class="int-metric-val" id="int-len">—</span>
-              </div>
-            </div>
-            <div class="integral-sum-row hidden" id="int-sum-row">
-              <span class="int-sum-label">Sum of visible contours:</span>
-              <span class="int-sum-val" id="int-sum-val">—</span>
-            </div>
-          </div>
-
-          <canvas id="canvas-out"></canvas>
-        </section>
-      </main>
-
-      <!-- Single Full-Width 2D Real Plane -->
-      <main class="real-plane-container hidden" id="real-plane-container">
-        <section class="plane-card real-card" id="real-plane-card">
-          <div class="plane-hud top-left">
-            <span class="plane-tag real-tag">2D REAL PLANE</span>
-            <span class="plane-sub" id="real-plane-sub">y = &pi;(x)</span>
-          </div>
-          <div class="plane-hud top-right">
-            <button class="hud-btn accent-btn" id="real-autofit-y" title="Auto-fit Y axis">Fit Y</button>
-            <button class="hud-btn" id="real-zoom-in" title="Zoom in">+</button>
-            <button class="hud-btn" id="real-zoom-out" title="Zoom out">&minus;</button>
-            <button class="hud-btn" id="real-reset" title="Reset 2D view">Reset</button>
-          </div>
-
-          <div class="real-legend-card" id="real-legend-card">
-            <div class="real-legend-header">
-              <span>Convergence Curves</span>
-              <span class="real-legend-x" id="real-legend-x">Hover graph</span>
-            </div>
-            <div class="real-legend-rows" id="real-legend-rows"></div>
-          </div>
-
-          <div class="plane-hint">
-            Drag to pan &middot; Scroll to zoom (Shift: X, Alt: Y) &middot; Open <strong>Lab</strong> for Prime Harmonics &amp; Calculus
-          </div>
-          <canvas id="canvas-real"></canvas>
-        </section>
-      </main>
+    <!-- Main Body: Persistent Mini Sliders & Variables Rail / Full Left Sidebar + Full Canvas Stage -->
+    <div class="main-layout" id="main-layout">
+      <!-- Persistent Mini Sliders & Variables Sidebar (Shown whenever main sidebar is closed, even when all display panels are hidden!) -->
+      <aside id="mini-slider-sidebar" class="mini-slider-sidebar hidden" aria-label="Compact Sliders &amp; Variables Rail">
+        <div class="mini-sidebar-hdr">
+          <span class="mini-sidebar-title">Sliders &amp; Vars</span>
+          <span class="vtab-count" id="mini-sliders-count">0</span>
+        </div>
+        <div id="mini-sliders-list" class="mini-sliders-list"></div>
+      </aside>
 
       <!-- =================================================================
-           Slide-Over Drawer 1: Live C Compiler (clang -O2 -shared + dlopen)
+           DESMOS-STYLE LEFT SIDEBAR
+           3 Collapsible Vertical Tabs:
+           1. Function Tab (+Fn, +Slider, +Var) | 2. Domain Shapes Tab (+Circle..+Pt,+Line) | 3. Landmarks
            ================================================================= -->
-      <aside id="drawer-editor" class="side-drawer hidden" aria-label="Live C Code Editor">
-        <div class="drawer-header">
-          <div>
-            <h2>Live C Compiler</h2>
-            <span class="drawer-badge" id="editor-kind-badge">clang -O2 · dlopen()</span>
-          </div>
-          <button class="icon-btn" data-close-drawer title="Close">&times;</button>
+      <aside id="expr-sidebar" class="expr-sidebar" aria-label="Functions, Domain Shapes &amp; Landmarks">
+        <div id="sidebar-token-bar" class="sidebar-token-bar hidden">
+          <input type="password" id="sidebar-token-input" placeholder="Server compile token (X-Compile-Token)" autocomplete="off" />
         </div>
 
-        <div class="drawer-body">
-          <p class="drawer-note" id="editor-desc">
-            Write literal C11 code below and compile natively on your CPU — hot-reloads with zero restart.
+        <div class="compile-bar">
+          <span id="compile-status-text" class="compile-status ok">Ready · C11 Native</span>
+          <div class="compile-bar-actions">
+            <button id="btn-compile-all" class="btn-run-c" title="Compile all C cards with clang (Ctrl+Enter)">Compile</button>
+            <button id="btn-toggle-sidebar" class="hud-btn panel-hide-btn" title="Close Sidebar (keeps persistent mini sliders rail)">&times;</button>
+          </div>
+        </div>
+        <pre id="compile-diag" class="compile-diag hidden"></pre>
+
+        <!-- Scrollable 3-Tab Vertical Accordion -->
+        <div class="sidebar-scroll">
+          <!-- TAB 1: Function Tab (with integrated +Fn, +Slider, +Var quick-add bar!) -->
+          <div class="vtab-section" id="vtab-fn">
+            <div class="sidebar-section-hdr vtab-hdr" id="tab-fn-hdr" role="button" tabindex="0" aria-expanded="true">
+              <span class="vtab-title">
+                <span class="vtab-chev">&#9662;</span>
+                <span id="fn-tab-label">Function w = f(z)</span>
+                <span class="vtab-count" id="fn-tab-count">0</span>
+              </span>
+              <div class="domain-quick-adds fn-quick-adds" id="fn-quick-adds">
+                <button class="mini-hdr-btn fn-hdr-btn" id="btn-add-fn" title="Add a C11 function / auxiliary card">+ Fn</button>
+                <button class="mini-hdr-btn" id="btn-add-slider" title="Add interactive parameter slider">+ Slider</button>
+                <button class="mini-hdr-btn" id="btn-add-var" title="Add computed variable (e.g. R = 2.2 + 18*t*t)">+ Var</button>
+              </div>
+            </div>
+            <div id="fn-cards" class="expr-cards vtab-body"></div>
+          </div>
+
+          <!-- TAB 2: Domain Shapes Tab (with +Circle, +Arc, +Rect, +Seg, +Pt, +Line, Join!) -->
+          <div class="vtab-section" id="vtab-domain">
+            <div class="sidebar-section-hdr domain-hdr vtab-hdr" id="tab-domain-hdr" role="button" tabindex="0" aria-expanded="true">
+              <span class="vtab-title">
+                <span class="vtab-chev">&#9662;</span>
+                <span id="domain-section-label">Domain Shapes</span>
+                <span class="vtab-count" id="domain-tab-count">0</span>
+              </span>
+              <div class="domain-quick-adds" id="domain-quick-adds">
+                <button class="mini-hdr-btn complex-only-add" id="btn-quick-circle" title="Add circle contour">+ Circle</button>
+                <button class="mini-hdr-btn complex-only-add" id="btn-quick-arc" title="Add variable circular arc (Pac-Man / Semicircle)">+ Arc</button>
+                <button class="mini-hdr-btn complex-only-add" id="btn-quick-rect" title="Add rectangle contour">+ Rect</button>
+                <button class="mini-hdr-btn complex-only-add" id="btn-quick-line" title="Add line segment contour">+ Seg</button>
+                <button class="mini-hdr-btn" id="btn-add-point" title="Add a point">+ Pt</button>
+                <button class="mini-hdr-btn" id="btn-add-guide" title="Add a vertical or horizontal guide line">+ Line</button>
+                <button class="mini-hdr-btn join-hdr-btn complex-only-add" id="btn-sidebar-join" title="Join selected or touching open paths into one continuous contour / closed loop">Join</button>
+              </div>
+            </div>
+            <div id="domain-cards" class="expr-cards vtab-body"></div>
+          </div>
+
+          <!-- TAB 3: Landmarks Tab (All Locked Shapes, Points & Lines!) -->
+          <div class="vtab-section" id="vtab-landmarks">
+            <div class="sidebar-section-hdr landmarks-hdr vtab-hdr" id="tab-landmarks-hdr" role="button" tabindex="0" aria-expanded="true">
+              <span class="vtab-title">
+                <span class="vtab-chev">&#9662;</span>
+                <span id="landmarks-tab-label">Landmarks (Locked)</span>
+                <span class="vtab-count" id="landmarks-tab-count">0</span>
+              </span>
+            </div>
+            <div id="landmark-cards" class="expr-cards vtab-body"></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Draggable Sidebar Resizer -->
+      <div id="sidebar-splitter" class="sidebar-splitter" role="separator" aria-orientation="vertical" title="Drag left/right to resize card sidebar · Double-click to reset">
+        <span class="splitter-grip"></span>
+      </div>
+
+      <!-- =================================================================
+           CANVAS STAGE + BOTTOM PRESET SHOWCASE & CUSTOM PRESETS BAR
+           ================================================================= -->
+      <section class="stage-column" id="stage-column">
+        <div class="stage-area">
+          <!-- Complex Stage: Resizable Dual Synchronized Planes -->
+          <div id="stage-complex" class="planes-container">
+            <div class="plane-card" id="input-plane-card">
+              <div class="plane-hud top-left">
+                <span class="plane-tag input-tag" id="input-tag">INPUT PLANE</span>
+                <span class="plane-sub" id="input-sub">z = x + iy</span>
+              </div>
+              <div class="plane-hud top-right">
+                <button class="hud-btn square-btn active" id="in-square" title="1:1 equal axes (click to unlock independent Shift/Alt+scroll X/Y stretch)">1:1</button>
+                <button class="hud-btn" id="in-zoom-in" title="Zoom in">+</button>
+                <button class="hud-btn" id="in-zoom-out" title="Zoom out">&minus;</button>
+                <button class="hud-btn" id="in-reset" title="Reset view">Reset</button>
+                <button class="hud-btn panel-hide-btn" id="btn-hide-input" title="Hide Input Plane (Output fills remaining space)">&times;</button>
+              </div>
+
+              <!-- Multi-Selection & Join Context Pill -->
+              <div class="selection-banner hidden" id="selection-banner">
+                <span class="sel-banner-text" id="sel-banner-text">0 selected</span>
+                <button class="sel-banner-btn emerald hidden" id="btn-sel-join" title="Join selected open paths into one contour">Join</button>
+                <button class="sel-banner-btn danger hidden" id="btn-sel-del" title="Delete selected items (Del)">Delete</button>
+                <button class="sel-banner-btn" id="btn-sel-clear" title="Clear selection">&times;</button>
+              </div>
+
+              <canvas id="canvas-in"></canvas>
+            </div>
+
+            <!-- Draggable Split-Pane Divider -->
+            <div id="planes-splitter" class="planes-splitter" role="separator" aria-orientation="vertical" title="Drag left/right to resize Input vs Output plane · Double-click to reset 50/50">
+              <span class="splitter-grip"></span>
+            </div>
+
+            <div class="plane-card" id="output-plane-card">
+              <div class="plane-hud top-left">
+                <span class="plane-tag output-tag" id="output-tag">OUTPUT PLANE</span>
+                <span class="plane-sub" id="output-sub">w = f(z)</span>
+              </div>
+              <div class="plane-hud top-right">
+                <button class="hud-btn sphere-btn" id="btn-toggle-sphere" title="Toggle 3D Riemann Sphere">3D Sphere</button>
+                <button class="hud-btn square-btn active" id="out-square" title="1:1 equal axes (click to unlock independent Shift/Alt+scroll X/Y stretch &amp; non-uniform Fit)">1:1</button>
+                <button class="hud-btn accent-btn" id="out-autofit" title="Auto-fit output">Fit</button>
+                <button class="hud-btn" id="out-zoom-in" title="Zoom in">+</button>
+                <button class="hud-btn" id="out-zoom-out" title="Zoom out">&minus;</button>
+                <button class="hud-btn" id="out-reset" title="Reset output view">Reset</button>
+                <button class="hud-btn panel-hide-btn" id="btn-hide-output" title="Hide Output Plane (Input fills remaining space)">&times;</button>
+              </div>
+
+              <!-- Multi-Contour Integral Results Panel (draggable & minimizable; points & landmark lines ignored!) -->
+              <div class="integral-panel hidden" id="integral-panel">
+                <div class="integral-panel-hdr" id="integral-panel-hdr" title="Drag to move panel">
+                  <span class="integral-hdr-left">
+                    <span class="integral-drag-grip" aria-hidden="true">&#8942;&#8942;</span>
+                    <span>Contour Integrals</span>
+                    <span class="integral-min-sum hidden" id="integral-min-sum"></span>
+                  </span>
+                  <span class="integral-hdr-right">
+                    <span class="integral-panel-sub">Points &amp; guides ignored &middot; C11 GL</span>
+                    <button class="integral-min-btn" id="btn-min-integral" title="Minimize / expand panel">&minus;</button>
+                  </span>
+                </div>
+                <div id="integral-rows" class="integral-rows"></div>
+                <div id="integral-sum-row" class="integral-sum-row hidden">
+                  <span>Sum of contours</span>
+                  <strong id="integral-sum-val">—</strong>
+                </div>
+                <div class="integral-resize-handle" id="integral-resize-handle" title="Drag to resize Contour Integrals box"></div>
+              </div>
+
+              <canvas id="canvas-out"></canvas>
+            </div>
+          </div>
+
+          <!-- 2D Real Stage -->
+          <div id="stage-real" class="real-stage hidden">
+            <div class="plane-card real-card" id="real-plane-card">
+              <div class="plane-hud top-left">
+                <span class="plane-tag real-tag">2D REAL PLANE</span>
+                <span class="plane-sub" id="real-plane-sub">y = f(x)</span>
+              </div>
+              <div class="plane-hud top-right">
+                <button class="hud-btn square-btn active" id="real-square" title="Toggle 1:1 square aspect ratio &amp; equal axes">1:1</button>
+                <button class="hud-btn accent-btn" id="real-fit-y" title="Auto-fit Y range">Fit Y</button>
+                <button class="hud-btn" id="real-zoom-in" title="Zoom in">+</button>
+                <button class="hud-btn" id="real-zoom-out" title="Zoom out">&minus;</button>
+                <button class="hud-btn" id="real-reset" title="Reset 2D view">Reset</button>
+                <button class="hud-btn panel-hide-btn" id="btn-hide-real" title="Hide 2D Real Plane (Sidebar fills space)">&times;</button>
+              </div>
+
+              <div class="real-legend-card" id="real-legend-card">
+                <div class="real-legend-header">
+                  <span>Curves &amp; Relations</span>
+                  <span class="real-legend-x" id="real-legend-x">Hover graph</span>
+                </div>
+                <div class="real-legend-rows" id="real-legend-rows"></div>
+              </div>
+
+              <!-- 2D Real Polygon Selection Pill -->
+              <div class="selection-banner hidden" id="real-selection-banner">
+                <span class="sel-banner-text" id="real-sel-banner-text">0 selected</span>
+                <button class="sel-banner-btn" id="btn-real-sel-invert" title="Invert selection">Invert</button>
+                <button class="sel-banner-btn danger" id="btn-real-sel-del" title="Delete selected polygons (Del)">Delete</button>
+                <button class="sel-banner-btn" id="btn-real-sel-clear" title="Clear selection (Esc)">&times;</button>
+              </div>
+
+              <canvas id="canvas-real"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Full-Width Bottom Footer Bar: Bottom-Left Panel Restore Pills + Add Preset + Presets List -->
+    <footer class="preset-bar" id="preset-bar">
+      <!-- Hidden Panel Restore Pills (Appear in Bottom-Left when Sidebar, Input, Output, or 2D Plane are hidden) -->
+      <div id="panel-restore-bar" class="panel-restore-bar hidden">
+        <button id="btn-show-sidebar" class="panel-restore-pill hidden" title="Show Full Sidebar">+ Sidebar</button>
+        <button id="btn-show-input" class="panel-restore-pill hidden" title="Show Input Plane">+ Input</button>
+        <button id="btn-show-output" class="panel-restore-pill hidden" title="Show Output Plane">+ Output</button>
+        <button id="btn-show-real" class="panel-restore-pill hidden" title="Show 2D Real Plane">+ 2D Plane</button>
+      </div>
+
+      <span id="bottom-restore-sep" class="topbar-vsep hidden" aria-hidden="true"></span>
+
+      <!-- Add Preset placed directly to the LEFT of the "Presets" label -->
+      <div class="preset-save-wrap preset-save-left">
+        <button id="btn-save-preset" class="preset-save-btn" title="Add current view &amp; shapes as a preset inside this project">+ Add Preset</button>
+        <div id="save-preset-form" class="save-preset-form hidden">
+          <input type="text" id="save-preset-name" class="save-preset-input" placeholder="Preset name..." maxlength="48" />
+          <button id="btn-confirm-save-preset" class="preset-save-confirm">Add</button>
+          <button id="btn-cancel-save-preset" class="preset-save-cancel">&times;</button>
+        </div>
+      </div>
+
+      <span class="preset-bar-label">Presets</span>
+      <div id="preset-bar-list" class="preset-bar-list"></div>
+    </footer>
+
+    <!-- =================================================================
+         ITEM SETTINGS POPOVER (Color, Size/Width, Style/Icon, Lock, Closed)
+         ================================================================= -->
+    <div id="item-settings-popover" class="item-settings-popover hidden">
+      <div class="popover-header">
+        <strong id="item-settings-title">Item Style</strong>
+        <button id="btn-close-item-settings" class="icon-btn">&times;</button>
+      </div>
+      <div id="item-settings-body" class="tools-body"></div>
+    </div>
+
+    <!-- =================================================================
+         COMPACT CONTEXTUAL TOOLS POPOVER
+         ================================================================= -->
+    <div id="tools-popover" class="tools-popover hidden">
+      <div class="popover-header">
+        <strong id="tools-popover-title">Complex Analysis Tools</strong>
+        <button id="btn-close-tools" class="icon-btn">&times;</button>
+      </div>
+
+      <div id="tools-complex-body" class="tools-body">
+        <div class="tools-section">
+          <div class="tools-sec-label">Display Overlays</div>
+          <label class="toggle-row"><span>Interior Conformal Grid</span><input type="checkbox" id="opt-mesh" checked /></label>
+          <label class="toggle-row"><span>Domain Coloring (C pthreads)</span><input type="checkbox" id="opt-domain" /></label>
+          <label class="toggle-row"><span>Show Landmark Guides</span><input type="checkbox" id="opt-landmarks" checked /></label>
+        </div>
+
+        <div class="tools-section">
+          <div class="tools-sec-label">Zero Hunter (Newton-Raphson)</div>
+          <div class="btn-row">
+            <button id="btn-hunt-shape" class="btn-subtle flex-1">Inside Shape</button>
+            <button id="btn-hunt-view" class="btn-subtle flex-1">Viewport</button>
+            <button id="btn-hunt-clear" class="btn-subtle">Clear</button>
+          </div>
+          <div id="zeros-list" class="mini-list"></div>
+        </div>
+
+        <div class="tools-section">
+          <div class="tools-sec-label">Taylor Series &amp; Disk of Convergence</div>
+          <label class="toggle-row"><span>Show Taylor Disk &amp; Tₙ(z)</span><input type="checkbox" id="opt-taylor" /></label>
+          <div class="field-grid">
+            <label class="mini-field"><span>Re(z₀)</span><input type="number" id="taylor-x0" step="0.1" value="2.0" /></label>
+            <label class="mini-field"><span>Im(z₀)</span><input type="number" id="taylor-y0" step="0.1" value="0.0" /></label>
+          </div>
+          <div class="slider-row">
+            <span>Deg N</span>
+            <input type="range" id="taylor-deg" min="1" max="20" value="8" />
+            <code id="taylor-deg-val">8</code>
+          </div>
+          <div class="kv-row"><span>Radius R</span><strong id="taylor-radius">—</strong></div>
+        </div>
+      </div>
+
+      <div id="tools-real-body" class="tools-body hidden">
+        <div class="tools-section">
+          <div class="tools-sec-label">Display Overlays</div>
+          <label class="toggle-row"><span>Prime / Zero Axis Markers</span><input type="checkbox" id="opt-real-markers" checked /></label>
+          <label class="toggle-row"><span>Shade Error (Card #1 vs Last)</span><input type="checkbox" id="opt-real-errfill" /></label>
+        </div>
+
+        <div class="tools-section">
+          <div class="tools-sec-label">Calculus Toolkit (on Card #1)</div>
+          <label class="toggle-row"><span>Plot Derivative f'(x)</span><input type="checkbox" id="opt-real-deriv" /></label>
+          <label class="toggle-row"><span>Live Tangent Line at Cursor</span><input type="checkbox" id="opt-real-tangent" /></label>
+          <label class="toggle-row"><span>Definite Integral &int;[a, b]</span><input type="checkbox" id="opt-real-int" /></label>
+          <div class="field-grid">
+            <label class="mini-field"><span>a</span><input type="number" id="calc-a" step="0.5" value="2" /></label>
+            <label class="mini-field"><span>b</span><input type="number" id="calc-b" step="0.5" value="20" /></label>
+          </div>
+          <div class="kv-row"><span>&int;<sub>a</sub><sup>b</sup> f₁(x) dx</span><strong id="calc-int-val" class="accent-val">—</strong></div>
+        </div>
+
+        <div class="tools-section">
+          <div class="tools-sec-label">Music of the Primes (Web Audio)</div>
+          <button id="btn-audio-play" class="btn-primary full-btn">Play Riemann Zero Chord</button>
+          <div class="slider-row" style="margin-top:6px;">
+            <span>Zeros</span>
+            <input type="range" id="audio-voices" min="1" max="24" value="10" />
+            <code id="audio-voices-val">10</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         DELETE PROJECT CONFIRMATION MODAL
+         ================================================================= -->
+    <div id="delete-project-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog unsaved-dialog delete-dialog">
+        <div class="modal-header">
+          <div>
+            <h2>Delete Project?</h2>
+            <span class="modal-sub" id="delete-project-sub">This will permanently remove the project from your library.</span>
+          </div>
+          <button id="btn-close-delete-modal" class="icon-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="delete-confirm-msg" id="delete-project-msg">Are you sure you want to delete this project?</p>
+          <div class="btn-row unsaved-actions">
+            <button id="btn-confirm-delete-project" class="btn-danger flex-1">Delete Project</button>
+            <button id="btn-cancel-delete-project" class="btn-subtle flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         UNSAVED PROGRESS CONFIRMATION MODAL
+         ================================================================= -->
+    <div id="unsaved-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog unsaved-dialog">
+        <div class="modal-header">
+          <div>
+            <h2>Unsaved Project Changes</h2>
+            <span class="modal-sub">Save this project (including all its presets) before leaving, or discard your changes?</span>
+          </div>
+          <button id="btn-close-unsaved" class="icon-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label class="unsaved-field-label" for="unsaved-preset-name">Project Name (optional if discarding)</label>
+          <input type="text" id="unsaved-preset-name" class="modal-input" placeholder="e.g. My Custom Project" maxlength="48" />
+          <div class="btn-row unsaved-actions">
+            <button id="btn-unsaved-save" class="btn-primary flex-1">Save Project &amp; Continue</button>
+            <button id="btn-unsaved-discard" class="btn-danger flex-1">Discard &amp; Continue</button>
+            <button id="btn-unsaved-cancel" class="btn-subtle">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         DOCS, MULTI-CARD GENAI PROMPT, AI IMPORT TERMINAL & COOKBOOK MODAL
+         ================================================================= -->
+    <div id="docs-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog docs-dialog">
+        <div class="modal-header">
+          <div>
+            <h2>C11 Math Studio · Docs &amp; GenAI Workbench</h2>
+            <span class="modal-sub">Context-aware GenAI Prompt Builder, Live-Validating Multi-Card Terminal, Complete C11 API Reference &amp; Recipes</span>
+          </div>
+          <button id="btn-close-docs" class="icon-btn">&times;</button>
+        </div>
+
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-docs-tab="prompt">1. GenAI Project Prompt</button>
+          <button class="modal-tab" data-docs-tab="terminal">2. Project Import &amp; Export JSON</button>
+          <button class="modal-tab" data-docs-tab="reference">3. C11 API Reference</button>
+          <button class="modal-tab" data-docs-tab="cookbook">4. Cookbook &amp; Shortcuts</button>
+        </div>
+
+        <!-- Tab 1: Context-Aware Full-Project GenAI Prompt Builder -->
+        <div class="modal-body" data-docs-pane="prompt">
+          <p class="modal-note" id="prompt-mode-note">
+            Describe the project you want. Copy the prompt into ChatGPT / Claude / Gemini — it instructs the AI to output a complete <strong>Full Project JSON (<code>cfv_project_v1</code>)</strong> encoding all C11 cards, sliders, computed variables, shapes/cells, viewports, and presets. Paste the returned JSON into <strong>Project Import &amp; Export JSON</strong>!
           </p>
-
-          <div class="snippet-row" id="editor-snippets"></div>
-
-          <div class="code-sig" id="editor-sig">double complex user_fn(double complex z) {</div>
-          <textarea id="editor-textarea" class="code-editor" spellcheck="false" rows="10"></textarea>
-          <div class="code-sig">}</div>
-
-          <label id="editor-token-wrap" class="mini-field hidden">
-            <span>Compile Access Token (X-Compile-Token)</span>
-            <input type="password" id="editor-token-input" placeholder="Enter your server token" autocomplete="off" />
-          </label>
-
-          <div class="editor-actions" id="editor-actions">
-            <button id="btn-compile-run" class="btn-primary full-btn">Compile &amp; Run with Clang</button>
+          <input type="text" id="prompt-goal" class="modal-input" placeholder="e.g. Build a keyhole contour project with 3 presets, or a 2D Real epicycle/cellular automaton centered at (0,0)..." />
+          <div class="prompt-opts-row">
+            <label class="prompt-opt-chip"><input type="checkbox" id="prompt-opt-context" checked /><span>Include current workspace state</span></label>
+            <label class="prompt-opt-chip"><input type="checkbox" id="prompt-opt-sliders" checked /><span>Include sliders, vars &amp; presets</span></label>
+            <label class="prompt-opt-chip"><input type="checkbox" id="prompt-opt-landmarks" checked /><span>Include shapes, cells &amp; landmarks</span></label>
           </div>
-
-          <div id="editor-status" class="editor-status hidden"></div>
-
-          <div class="drawer-card muted-card">
-            <div class="card-mini-title">Built-in C Math Available</div>
-            <div class="cheat-code" id="editor-cheatsheet">
-              c_zeta(z), c_xi(z), c_gamma(z), c_lgamma(z), c_ei(z), c_eta(z), c_zeta_deriv(z), c_make(re, im), cexp, clog, csin, ccos, cpow, csqrt
-            </div>
+          <div id="prompt-ideas" class="snippet-row"></div>
+          <textarea id="prompt-preview" class="prompt-preview" readonly rows="13"></textarea>
+          <div class="btn-row">
+            <button id="btn-copy-prompt" class="btn-primary flex-1">Copy Full-Project GenAI Prompt</button>
+            <button id="btn-goto-terminal" class="btn-subtle">Open Import / Export Terminal &rarr;</button>
           </div>
         </div>
-      </aside>
 
-      <!-- =================================================================
-           Slide-Over Drawer 2: Contextual Analysis Lab
-           ================================================================= -->
-      <aside id="drawer-lab" class="side-drawer hidden" aria-label="Analysis Lab">
-        <div class="drawer-header">
-          <div>
-            <h2 id="lab-heading">Complex Analysis Lab</h2>
-            <span class="drawer-badge" id="lab-sub-badge">Native C11 Engine</span>
+        <!-- Tab 2: Live-Validating Full Project JSON Import & Export Terminal -->
+        <div class="modal-body hidden" data-docs-pane="terminal">
+          <p class="modal-note">
+            Paste a <strong>Full Project JSON (<code>cfv_project_v1</code>)</strong> from ChatGPT / Claude / Gemini or an exported project below, or click <strong>⤓ Load Current Project JSON</strong> to export, copy, or download your active project (including all cards, shapes, viewports, and presets).
+          </p>
+          <div class="ai-terminal-box">
+            <div class="ai-terminal-bar">
+              <span class="term-dots"><i></i><i></i><i></i></span>
+              <span class="term-title">cfv-project-json — full project import &amp; export terminal</span>
+              <input type="file" id="terminal-file-input" accept=".json,application/json" class="hidden" />
+              <button id="btn-upload-terminal-json" class="doc-mini-btn" title="Upload a .json project file from disk">⤒ Upload .json</button>
+              <button id="btn-export-current-json" class="doc-mini-btn accent" title="Serialize the active project (cards, shapes, viewports &amp; all presets) into JSON">⤓ Load Current Project JSON</button>
+              <button id="btn-copy-terminal-json" class="doc-mini-btn" title="Copy JSON in terminal to clipboard">Copy JSON</button>
+              <button id="btn-download-terminal-json" class="doc-mini-btn" title="Download terminal JSON as a .json project file">Download .json</button>
+              <button id="btn-load-sample-bundle" class="doc-mini-btn">Sample: Current</button>
+              <button id="btn-load-sample-integral" class="doc-mini-btn">Sample: Integral</button>
+              <button id="btn-load-sample-real" class="doc-mini-btn">Sample: 2D Real</button>
+            </div>
+            <textarea id="ai-terminal-input" class="ai-terminal-input" spellcheck="false" rows="11" placeholder="$ Paste Full Project JSON (cfv_project_v1), GenAI response, or click '⤓ Load Current Project JSON' to export..."></textarea>
+            <div id="ai-terminal-preview" class="ai-preview-strip">Paste a Full Project JSON or click ⤓ Load Current Project JSON above for instant validation &amp; breakdown.</div>
+            <pre id="ai-terminal-log" class="ai-terminal-log">Ready. Paste Project JSON to import, or export your current workspace.</pre>
           </div>
-          <button class="icon-btn" data-close-drawer title="Close">&times;</button>
-        </div>
-
-        <!-- Complex Lab Tabs -->
-        <div class="drawer-tabs" id="complex-lab-tabs">
-          <button class="drawer-tab active" data-lab-tab="zeros">Zeros</button>
-          <button class="drawer-tab" data-lab-tab="taylor">Taylor</button>
-          <button class="drawer-tab" data-lab-tab="dirichlet">Dirichlet &amp; Morph</button>
-        </div>
-
-        <!-- 2D Real Lab Tabs -->
-        <div class="drawer-tabs hidden" id="real-lab-tabs">
-          <button class="drawer-tab active" data-lab-tab="harmonics">Prime Harmonics</button>
-          <button class="drawer-tab" data-lab-tab="calculus">Calculus Toolkit</button>
-        </div>
-
-        <div class="drawer-body">
-          <!-- COMPLEX TAB 1: Zero Hunter -->
-          <div class="lab-pane" data-lab-pane="zeros">
-            <p class="drawer-note">
-              Automatically locate roots of <code>f(z) = 0</code> using multi-seed complex Newton-Raphson in C.
-            </p>
-            <div class="btn-row">
-              <button id="btn-hunt-shape" class="btn-primary flex-1">Hunt Inside Shape</button>
-              <button id="btn-hunt-view" class="btn-subtle flex-1">Hunt Viewport</button>
-            </div>
-            <div class="btn-row">
-              <button id="btn-hunt-clear" class="btn-subtle full-btn">Clear Found Pins</button>
-            </div>
-            <div id="zeros-summary" class="lab-stat-bar">No scan run yet.</div>
-            <div id="zeros-list" class="zeros-list"></div>
-          </div>
-
-          <!-- COMPLEX TAB 2: Taylor Series & Disk of Convergence -->
-          <div class="lab-pane hidden" data-lab-pane="taylor">
-            <p class="drawer-note">
-              Expands <code>f(z)</code> around <code>z₀</code> via Cauchy's Integral Formula in C and renders the exact <strong>disk of convergence</strong> up to the nearest pole.
-            </p>
-            <label class="toggle-row">
-              <span>Enable Taylor Overlay</span>
-              <input type="checkbox" id="taylor-enable" />
-            </label>
-            <div class="field-grid">
-              <label class="mini-field">
-                <span>Re(z₀)</span>
-                <input type="number" id="taylor-x0" step="0.1" value="2.0" />
-              </label>
-              <label class="mini-field">
-                <span>Im(z₀)</span>
-                <input type="number" id="taylor-y0" step="0.1" value="0.0" />
-              </label>
-            </div>
-            <div class="slider-row">
-              <span>Degree N</span>
-              <input type="range" id="taylor-deg" min="1" max="20" value="8" />
-              <code id="taylor-deg-val">8</code>
-            </div>
-            <div class="btn-row">
-              <button id="btn-taylor-pick" class="btn-subtle full-btn">Click Input Plane to Place z₀</button>
-            </div>
-            <div class="drawer-card">
-              <div class="kv-row"><span>Convergence Radius R</span><strong id="taylor-radius">—</strong></div>
-              <div class="card-mini-title" style="margin-top:8px;">Leading Coefficients aₙ</div>
-              <div id="taylor-coeffs" class="coeffs-list">—</div>
-            </div>
-          </div>
-
-          <!-- COMPLEX TAB 3: Dirichlet Partial Sums & Homotopy Morph -->
-          <div class="lab-pane hidden" data-lab-pane="dirichlet">
-            <div class="drawer-card">
-              <div class="card-mini-title">Homotopy Morph: (1 − t)z + t · f(z)</div>
-              <p class="drawer-note">Continuously deform the identity plane into <code>f(z)</code> at 120fps.</p>
-              <div class="slider-row">
-                <span>t</span>
-                <input type="range" id="morph-slider" min="0" max="100" value="100" />
-                <code id="morph-val">1.00</code>
-              </div>
-              <button id="btn-morph-anim" class="btn-subtle full-btn" style="margin-top:6px;">Animate Identity &rarr; f(z)</button>
-            </div>
-
-            <div class="drawer-card" style="margin-top:10px;">
-              <div class="card-mini-title">Dirichlet Partial Sum Sₙ(s) = &Sigma; n⁻ˢ</div>
-              <p class="drawer-note">
-                Overlay the naive Dirichlet sum in coral next to <code>&zeta;(s)</code>. Watch it match for <code>Re(s) &gt; 1</code> and explode past the <code>Re(s) = 1</code> wall!
-              </p>
-              <label class="toggle-row">
-                <span>Show Partial Sum Sₙ(s)</span>
-                <input type="checkbox" id="dirichlet-enable" />
-              </label>
-              <div class="slider-row">
-                <span>Terms N</span>
-                <input type="range" id="dirichlet-n" min="2" max="180" value="20" />
-                <code id="dirichlet-n-val">20</code>
-              </div>
-              <button id="btn-dirichlet-demo" class="btn-primary full-btn" style="margin-top:8px;">
-                Load Re(s) = 1 Wall Demo
-              </button>
-            </div>
-          </div>
-
-          <!-- REAL TAB 1: Music of the Primes (Harmonic Decomposition & Web Audio) -->
-          <div class="lab-pane hidden" data-lab-pane="harmonics">
-            <p class="drawer-note">
-              Each Riemann zero <code>&gamma;ₖ</code> contributes an oscillatory wave <code>&minus;2 Re(Ei(&rho;ₖ ln x))</code> to the prime staircase. Click a wave to solo it on the main graph, or listen to the chord!
-            </p>
-            <div class="drawer-card">
-              <div class="card-mini-title">Riemann Zero Audio Synth (Web Audio)</div>
-              <div class="btn-row">
-                <button id="btn-audio-play" class="btn-primary flex-1">Play Music of the Primes</button>
-              </div>
-              <div class="slider-row" style="margin-top:8px;">
-                <span>Voices</span>
-                <input type="range" id="audio-voices" min="1" max="24" value="10" />
-                <code id="audio-voices-val">10</code>
-              </div>
-              <div class="slider-row">
-                <span>Volume</span>
-                <input type="range" id="audio-vol" min="0" max="100" value="35" />
-                <code id="audio-vol-val">35%</code>
-              </div>
-            </div>
-            <div class="card-mini-title" style="margin-top:10px;">Individual Zero Waves (Click to Solo)</div>
-            <div id="harmonics-list" class="harmonics-list"></div>
-          </div>
-
-          <!-- REAL TAB 2: 2D Calculus Toolkit -->
-          <div class="lab-pane hidden" data-lab-pane="calculus">
-            <p class="drawer-note">
-              Explore live slopes, numerical derivatives, and Gauss-Legendre definite integrals on any 2D real function.
-            </p>
-            <div class="drawer-card">
-              <div class="card-mini-title">Differentiation</div>
-              <label class="toggle-row">
-                <span>Plot Derivative f'(x)</span>
-                <input type="checkbox" id="calc-deriv-toggle" />
-              </label>
-              <label class="toggle-row">
-                <span>Live Tangent Line at Cursor</span>
-                <input type="checkbox" id="calc-tangent-toggle" />
-              </label>
-              <div class="kv-row" style="margin-top:6px;">
-                <span>Slope f'(x)</span>
-                <strong id="calc-slope-val">—</strong>
-              </div>
-            </div>
-
-            <div class="drawer-card" style="margin-top:10px;">
-              <div class="card-mini-title">Definite Integral &int;[a, b] f(x) dx</div>
-              <label class="toggle-row">
-                <span>Enable Draggable [a, b] Gates</span>
-                <input type="checkbox" id="calc-int-toggle" />
-              </label>
-              <div class="field-grid" style="margin-top:6px;">
-                <label class="mini-field">
-                  <span>Lower a</span>
-                  <input type="number" id="calc-a" step="0.5" value="2" />
-                </label>
-                <label class="mini-field">
-                  <span>Upper b</span>
-                  <input type="number" id="calc-b" step="0.5" value="20" />
-                </label>
-              </div>
-              <div class="kv-row" style="margin-top:8px;">
-                <span>&int;<sub>a</sub><sup>b</sup> f(x) dx</span>
-                <strong id="calc-int-val" class="accent-val">—</strong>
-              </div>
-            </div>
+          <div class="btn-row">
+            <button id="btn-ai-import-replace" class="btn-primary flex-1">Import Project &amp; Compile</button>
+            <button id="btn-ai-import-save-repo" class="btn-subtle flex-1" title="Import this Project JSON and immediately save it to projects/ in the repository">Import &amp; Save to My Projects</button>
+            <button id="btn-ai-import-append" class="btn-subtle">Append Cards Only</button>
+            <button id="btn-ai-import-clear" class="btn-subtle">Clear</button>
           </div>
         </div>
-      </aside>
+
+        <!-- Tab 3: Searchable & Filterable Complete C11 Reference -->
+        <div class="modal-body hidden" data-docs-pane="reference">
+          <input type="text" id="docs-search" class="modal-input" placeholder="Search C11 functions, formulas, syntax (e.g. zeta, xi, gamma, ei, pi, vertical, implicit, f1)..." />
+          <div id="docs-cat-pills" class="docs-cat-pills"></div>
+          <div id="docs-list" class="docs-list"></div>
+        </div>
+
+        <!-- Tab 4: Interactive Cookbook Recipes & Studio Shortcuts -->
+        <div class="modal-body hidden" data-docs-pane="cookbook">
+          <p class="modal-note">
+            Click <strong>Load Recipe</strong> on any pattern below to compile &amp; run it directly in the workspace, or <strong>Copy JSON</strong> to use as a template with your GenAI tool.
+          </p>
+          <div id="docs-cookbook" class="docs-list"></div>
+        </div>
+      </div>
     </div>
-
-    <!-- Bottom Dock (Complex Mode) -->
-    <footer class="bottom-dock" id="complex-dock">
-      <div class="dock-section presets-section">
-        <span class="dock-label" id="presets-label">Presets</span>
-        <div class="presets-list" id="presets-list"></div>
-      </div>
-      <div class="dock-divider"></div>
-      <div class="dock-section shapes-section">
-        <span class="dock-label">Shapes <span id="shape-count" class="count-pill">0</span></span>
-        <div class="shapes-list" id="shapes-list">
-          <span class="empty-note">Draw on the input plane or click a preset.</span>
-        </div>
-      </div>
-    </footer>
-
-    <!-- Bottom Dock (2D Real Mode) -->
-    <footer class="bottom-dock hidden" id="real-dock">
-      <div class="dock-section presets-section">
-        <span class="dock-label">2D Demos</span>
-        <div class="presets-list" id="real-presets-list"></div>
-      </div>
-      <div class="dock-divider"></div>
-      <div class="dock-section">
-        <span class="dock-label">Engine</span>
-        <span class="empty-note" id="real-status-note">Riemann's 1859 Explicit Formula · First 200 non-trivial zeta zeros in C11</span>
-      </div>
-    </footer>
   </div>
 
-  <script src="/sphere3d.js"></script>
-  <script src="/real2d.js"></script>
-  <script src="/app.js"></script>
-  <script src="/lab.js"></script>
+  <script src="/sphere3d.js?v=30"></script>
+  <script src="/examples.js?v=30"></script>
+  <script src="/docs_prompt.js?v=30"></script>
+  <script src="/canvas_complex.js?v=30"></script>
+  <script src="/canvas_real.js?v=30"></script>
+  <script src="/workspace.js?v=30"></script>
 </body>
 </html>

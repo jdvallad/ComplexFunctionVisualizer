@@ -1,0 +1,1666 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795411269376_115",
+  "name": "more conformal mapping",
+  "subtitle": "2 cards · 4 presets",
+  "mode": "map",
+  "splitPct": 50,
+  "cards": [
+    {
+      "title": "Joukowsky Core J(z) = z + morph / z",
+      "code": "if (fabs(morph) < 1e-12) return z;\nif (cabs(z) < 1e-12) return c_make(INFINITY, 0.0);\nreturn z + c_make(morph, 0.0) / z;",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": false
+    },
+    {
+      "title": "Pitched Airfoil Map w = e^(i*aoa) * J(z)",
+      "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn w * cexp(c_make(0.0, aoa));",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [
+    {
+      "name": "morph",
+      "label": "Conformal Morph (z -> z + 1/z)",
+      "value": 1,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "speed": 0.5
+    },
+    {
+      "name": "thick",
+      "label": "Airfoil Thickness",
+      "value": 0.15,
+      "min": 0,
+      "max": 0.45,
+      "step": 0.01,
+      "speed": 0.25
+    },
+    {
+      "name": "camber",
+      "label": "Wing Camber",
+      "value": 0.2,
+      "min": -0.35,
+      "max": 0.35,
+      "step": 0.01,
+      "speed": 0.25
+    },
+    {
+      "name": "aoa",
+      "label": "Pitch Angle (rad)",
+      "value": 0.12,
+      "min": -0.7854,
+      "max": 0.7854,
+      "step": 0.02,
+      "speed": 0.25
+    },
+    {
+      "name": "spin",
+      "label": "3D Sphere Spin",
+      "value": 0,
+      "min": -3.1416,
+      "max": 3.1416,
+      "step": 0.03,
+      "speed": 0.5
+    }
+  ],
+  "vars": [
+    {
+      "name": "mux",
+      "label": "Circle Center Re(mu)",
+      "expr": "-thick"
+    },
+    {
+      "name": "muy",
+      "label": "Circle Center Im(mu)",
+      "expr": "camber"
+    },
+    {
+      "name": "R",
+      "label": "Kutta Circle Radius",
+      "expr": "sqrt((1 - mux)*(1 - mux) + muy*muy)"
+    },
+    {
+      "name": "R1",
+      "label": "Inner Flow Shell",
+      "expr": "R * 1.28"
+    },
+    {
+      "name": "R2",
+      "label": "Outer Flow Shell",
+      "expr": "R * 1.62"
+    },
+    {
+      "name": "sphere_yaw",
+      "label": "3D Sphere Longitude",
+      "expr": "-0.58 + spin"
+    }
+  ],
+  "shapes": [
+    {
+      "kind": "circle",
+      "label": "Airfoil Generator Circle",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": true,
+      "visible": true,
+      "formula": {
+        "kind": "circle",
+        "cx": "mux",
+        "cy": "muy",
+        "r": "R"
+      }
+    },
+    {
+      "kind": "arc",
+      "label": "Inner Potential Shell",
+      "color": "#34d399",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "arc",
+        "cx": "mux",
+        "cy": "muy",
+        "r": "R1",
+        "a0": "0",
+        "a1": "2*pi"
+      }
+    },
+    {
+      "kind": "arc",
+      "label": "Outer Potential Shell",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "arc",
+        "cx": "mux",
+        "cy": "muy",
+        "r": "R2",
+        "a0": "0",
+        "a1": "2*pi"
+      }
+    },
+    {
+      "kind": "line",
+      "label": "Upper Orthogonal Ray",
+      "color": "#fbbf24",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "line",
+        "x0": "mux",
+        "y0": "muy + R",
+        "x1": "mux",
+        "y1": "muy + R2"
+      }
+    },
+    {
+      "kind": "line",
+      "label": "Lower Orthogonal Ray",
+      "color": "#fbbf24",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "line",
+        "x0": "mux",
+        "y0": "muy - R",
+        "x1": "mux",
+        "y1": "muy - R2"
+      }
+    },
+    {
+      "kind": "line",
+      "label": "Leading Orthogonal Ray",
+      "color": "#fb923c",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "line",
+        "x0": "mux - R",
+        "y0": "muy",
+        "x1": "mux - R2",
+        "y1": "muy"
+      }
+    },
+    {
+      "kind": "line",
+      "label": "Trailing Orthogonal Ray",
+      "color": "#fb923c",
+      "lineWidth": 2.2,
+      "lineStyle": "solid",
+      "locked": false,
+      "closed": false,
+      "visible": true,
+      "formula": {
+        "kind": "line",
+        "x0": "mux + R",
+        "y0": "muy",
+        "x1": "mux + R2",
+        "y1": "muy"
+      }
+    }
+  ],
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "label": "Simple Pole z = 0",
+      "icon": "cross",
+      "color": "#fb7185",
+      "size": 6,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -1,
+      "y": 0,
+      "label": "Critical Point z = -1",
+      "icon": "diamond",
+      "color": "#fbbf24",
+      "size": 6,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "label": "Kutta Trailing Edge",
+      "icon": "star",
+      "color": "#34d399",
+      "size": 6,
+      "locked": false,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -1.317,
+      "y": 0.2,
+      "label": "Leading Edge",
+      "icon": "dot",
+      "color": "#f8fafc",
+      "size": 5,
+      "locked": false,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -0.15,
+      "y": 1.367,
+      "label": "Upper Camber Crest",
+      "icon": "ring",
+      "color": "#38bdf8",
+      "size": 5,
+      "locked": false,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "lines": [
+    {
+      "orientation": "horizontal",
+      "value": 0,
+      "label": "Real Axis",
+      "color": "#475569",
+      "lineWidth": 1.5,
+      "lineStyle": "dashed",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "orientation": "vertical",
+      "value": 0,
+      "label": "Imaginary Axis",
+      "color": "#475569",
+      "lineWidth": 1.5,
+      "lineStyle": "dashed",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "viewport": {
+    "inView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 3
+    },
+    "outView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 3.5
+    },
+    "inSquare": true,
+    "outSquare": true,
+    "showSphere": false,
+    "sphereView": {
+      "yaw": -0.58,
+      "pitch": 0.22,
+      "zoom": 1
+    }
+  },
+  "presets": [
+    {
+      "id": "cambered_airfoil",
+      "name": "Cambered Airfoil (1:1)",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Joukowsky Core J(z) = z + morph / z",
+          "code": "if (fabs(morph) < 1e-12) return z;\nif (cabs(z) < 1e-12) return c_make(INFINITY, 0.0);\nreturn z + c_make(morph, 0.0) / z;",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Pitched Airfoil Map w = e^(i*aoa) * J(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn w * cexp(c_make(0.0, aoa));",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Conformal Morph (z -> z + 1/z)",
+          "value": 1,
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "thick",
+          "label": "Airfoil Thickness",
+          "value": 0.15,
+          "min": 0,
+          "max": 0.45,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "camber",
+          "label": "Wing Camber",
+          "value": 0.2,
+          "min": -0.35,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "aoa",
+          "label": "Pitch Angle (rad)",
+          "value": 0.12,
+          "min": -0.7854,
+          "max": 0.7854,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "mux",
+          "label": "Circle Center Re(mu)",
+          "expr": "-thick"
+        },
+        {
+          "name": "muy",
+          "label": "Circle Center Im(mu)",
+          "expr": "camber"
+        },
+        {
+          "name": "R",
+          "label": "Kutta Circle Radius",
+          "expr": "sqrt((1 - mux)*(1 - mux) + muy*muy)"
+        },
+        {
+          "name": "R1",
+          "label": "Inner Flow Shell",
+          "expr": "R * 1.28"
+        },
+        {
+          "name": "R2",
+          "label": "Outer Flow Shell",
+          "expr": "R * 1.62"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Airfoil Generator Circle",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Inner Potential Shell",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R1",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Potential Shell",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Upper Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy + R",
+            "x1": "mux",
+            "y1": "muy + R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Lower Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy - R",
+            "x1": "mux",
+            "y1": "muy - R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Leading Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux - R",
+            "y0": "muy",
+            "x1": "mux - R2",
+            "y1": "muy"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Trailing Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux + R",
+            "y0": "muy",
+            "x1": "mux + R2",
+            "y1": "muy"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Simple Pole z = 0",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Critical Point z = -1",
+          "icon": "diamond",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Kutta Trailing Edge",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1.317,
+          "y": 0.2,
+          "label": "Leading Edge",
+          "icon": "dot",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -0.15,
+          "y": 1.367,
+          "label": "Upper Camber Crest",
+          "icon": "ring",
+          "color": "#38bdf8",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3.5
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": false,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        }
+      }
+    },
+    {
+      "id": "morph_wing",
+      "name": "Animate Circle -> Wing",
+      "startSlider": "morph",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Joukowsky Core J(z) = z + morph / z",
+          "code": "if (fabs(morph) < 1e-12) return z;\nif (cabs(z) < 1e-12) return c_make(INFINITY, 0.0);\nreturn z + c_make(morph, 0.0) / z;",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Pitched Airfoil Map w = e^(i*aoa) * J(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn w * cexp(c_make(0.0, aoa));",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Conformal Morph (z -> z + 1/z)",
+          "value": 0,
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "thick",
+          "label": "Airfoil Thickness",
+          "value": 0.16,
+          "min": 0,
+          "max": 0.45,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "camber",
+          "label": "Wing Camber",
+          "value": 0.22,
+          "min": -0.35,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "aoa",
+          "label": "Pitch Angle (rad)",
+          "value": 0.1,
+          "min": -0.7854,
+          "max": 0.7854,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "mux",
+          "label": "Circle Center Re(mu)",
+          "expr": "-thick"
+        },
+        {
+          "name": "muy",
+          "label": "Circle Center Im(mu)",
+          "expr": "camber"
+        },
+        {
+          "name": "R",
+          "label": "Kutta Circle Radius",
+          "expr": "sqrt((1 - mux)*(1 - mux) + muy*muy)"
+        },
+        {
+          "name": "R1",
+          "label": "Inner Flow Shell",
+          "expr": "R * 1.28"
+        },
+        {
+          "name": "R2",
+          "label": "Outer Flow Shell",
+          "expr": "R * 1.62"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Airfoil Generator Circle",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Inner Potential Shell",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R1",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Potential Shell",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Upper Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy + R",
+            "x1": "mux",
+            "y1": "muy + R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Lower Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy - R",
+            "x1": "mux",
+            "y1": "muy - R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Leading Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux - R",
+            "y0": "muy",
+            "x1": "mux - R2",
+            "y1": "muy"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Trailing Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux + R",
+            "y0": "muy",
+            "x1": "mux + R2",
+            "y1": "muy"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Simple Pole z = 0",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Critical Point z = -1",
+          "icon": "diamond",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Kutta Trailing Edge",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1.317,
+          "y": 0.2,
+          "label": "Leading Edge",
+          "icon": "dot",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -0.15,
+          "y": 1.367,
+          "label": "Upper Camber Crest",
+          "icon": "ring",
+          "color": "#38bdf8",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3.5
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": false,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        }
+      }
+    },
+    {
+      "id": "razor_sail",
+      "name": "Zero-Thickness Cambered Sail",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Joukowsky Core J(z) = z + morph / z",
+          "code": "if (fabs(morph) < 1e-12) return z;\nif (cabs(z) < 1e-12) return c_make(INFINITY, 0.0);\nreturn z + c_make(morph, 0.0) / z;",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Pitched Airfoil Map w = e^(i*aoa) * J(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn w * cexp(c_make(0.0, aoa));",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Conformal Morph (z -> z + 1/z)",
+          "value": 1,
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "thick",
+          "label": "Airfoil Thickness",
+          "value": 0,
+          "min": 0,
+          "max": 0.45,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "camber",
+          "label": "Wing Camber",
+          "value": 0.28,
+          "min": -0.35,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "aoa",
+          "label": "Pitch Angle (rad)",
+          "value": 0.18,
+          "min": -0.7854,
+          "max": 0.7854,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": 0,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "mux",
+          "label": "Circle Center Re(mu)",
+          "expr": "-thick"
+        },
+        {
+          "name": "muy",
+          "label": "Circle Center Im(mu)",
+          "expr": "camber"
+        },
+        {
+          "name": "R",
+          "label": "Kutta Circle Radius",
+          "expr": "sqrt((1 - mux)*(1 - mux) + muy*muy)"
+        },
+        {
+          "name": "R1",
+          "label": "Inner Flow Shell",
+          "expr": "R * 1.28"
+        },
+        {
+          "name": "R2",
+          "label": "Outer Flow Shell",
+          "expr": "R * 1.62"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Airfoil Generator Circle",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Inner Potential Shell",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R1",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Potential Shell",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Upper Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy + R",
+            "x1": "mux",
+            "y1": "muy + R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Lower Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy - R",
+            "x1": "mux",
+            "y1": "muy - R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Leading Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux - R",
+            "y0": "muy",
+            "x1": "mux - R2",
+            "y1": "muy"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Trailing Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux + R",
+            "y0": "muy",
+            "x1": "mux + R2",
+            "y1": "muy"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Simple Pole z = 0",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Critical Point z = -1",
+          "icon": "diamond",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Kutta Trailing Edge",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1.317,
+          "y": 0.2,
+          "label": "Leading Edge",
+          "icon": "dot",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -0.15,
+          "y": 1.367,
+          "label": "Upper Camber Crest",
+          "icon": "ring",
+          "color": "#38bdf8",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3.4
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": false,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        }
+      }
+    },
+    {
+      "id": "riemann_sphere",
+      "name": "3D Riemann Sphere Flyby",
+      "startSlider": "spin",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Joukowsky Core J(z) = z + morph / z",
+          "code": "if (fabs(morph) < 1e-12) return z;\nif (cabs(z) < 1e-12) return c_make(INFINITY, 0.0);\nreturn z + c_make(morph, 0.0) / z;",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Pitched Airfoil Map w = e^(i*aoa) * J(z)",
+          "code": "double complex w = f1(z);\nif (!c_isfinite(w)) return c_make(INFINITY, 0.0);\nreturn w * cexp(c_make(0.0, aoa));",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Conformal Morph (z -> z + 1/z)",
+          "value": 1,
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "thick",
+          "label": "Airfoil Thickness",
+          "value": 0.15,
+          "min": 0,
+          "max": 0.45,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "camber",
+          "label": "Wing Camber",
+          "value": 0.2,
+          "min": -0.35,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.25
+        },
+        {
+          "name": "aoa",
+          "label": "Pitch Angle (rad)",
+          "value": 0.12,
+          "min": -0.7854,
+          "max": 0.7854,
+          "step": 0.02,
+          "speed": 0.25
+        },
+        {
+          "name": "spin",
+          "label": "3D Sphere Spin",
+          "value": -3.1416,
+          "min": -3.1416,
+          "max": 3.1416,
+          "step": 0.03,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "mux",
+          "label": "Circle Center Re(mu)",
+          "expr": "-thick"
+        },
+        {
+          "name": "muy",
+          "label": "Circle Center Im(mu)",
+          "expr": "camber"
+        },
+        {
+          "name": "R",
+          "label": "Kutta Circle Radius",
+          "expr": "sqrt((1 - mux)*(1 - mux) + muy*muy)"
+        },
+        {
+          "name": "R1",
+          "label": "Inner Flow Shell",
+          "expr": "R * 1.28"
+        },
+        {
+          "name": "R2",
+          "label": "Outer Flow Shell",
+          "expr": "R * 1.62"
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "3D Sphere Longitude",
+          "expr": "-0.58 + spin"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Airfoil Generator Circle",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Inner Potential Shell",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R1",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "arc",
+          "label": "Outer Potential Shell",
+          "color": "#a78bfa",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "arc",
+            "cx": "mux",
+            "cy": "muy",
+            "r": "R2",
+            "a0": "0",
+            "a1": "2*pi"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Upper Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy + R",
+            "x1": "mux",
+            "y1": "muy + R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Lower Orthogonal Ray",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux",
+            "y0": "muy - R",
+            "x1": "mux",
+            "y1": "muy - R2"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Leading Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux - R",
+            "y0": "muy",
+            "x1": "mux - R2",
+            "y1": "muy"
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Trailing Orthogonal Ray",
+          "color": "#fb923c",
+          "lineWidth": 2.2,
+          "lineStyle": "solid",
+          "locked": false,
+          "closed": false,
+          "visible": true,
+          "formula": {
+            "kind": "line",
+            "x0": "mux + R",
+            "y0": "muy",
+            "x1": "mux + R2",
+            "y1": "muy"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Simple Pole z = 0",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "label": "Critical Point z = -1",
+          "icon": "diamond",
+          "color": "#fbbf24",
+          "size": 6,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "label": "Kutta Trailing Edge",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 6,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1.317,
+          "y": 0.2,
+          "label": "Leading Edge",
+          "icon": "dot",
+          "color": "#f8fafc",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -0.15,
+          "y": 1.367,
+          "label": "Upper Camber Crest",
+          "icon": "ring",
+          "color": "#38bdf8",
+          "size": 5,
+          "locked": false,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "horizontal",
+          "value": 0,
+          "label": "Real Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Imaginary Axis",
+          "color": "#475569",
+          "lineWidth": 1.5,
+          "lineStyle": "dashed",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3.5
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "showSphere": true,
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.28,
+          "zoom": 1.15
+        }
+      }
+    }
+  ]
+}

@@ -5,6 +5,7 @@
 #include "sampler.h"
 
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -27,10 +28,50 @@ static void check_near(const char *label, double complex got, double complex exp
     }
 }
 
+static void *psi_race_worker(void *arg) {
+    double *out = (double *)arg;
+    *out = real_psi_exact(10.0);
+    return NULL;
+}
+
 int main(void) {
     printf("=== Complex Function Visualizer — Math Test Suite ===\n\n");
 
-    printf("1. Right Half-Plane zeta(s) (Euler-Maclaurin):\n");
+    printf("0. Concurrent Thread-Safety of Prime & Chebyshev psi(x) Tables:\n");
+    pthread_t th[4];
+    double psi10[4] = {0.0, 0.0, 0.0, 0.0};
+    for (int i = 0; i < 4; i++) {
+        pthread_create(&th[i], NULL, psi_race_worker, &psi10[i]);
+    }
+    for (int i = 0; i < 4; i++) {
+        pthread_join(th[i], NULL);
+    }
+    /* psi(10) = log(lcm(1..10)) = log(2520) = 7.832014180505... */
+    double expected_psi10 = log(2520.0);
+    for (int i = 0; i < 4; i++) {
+        check_near("concurrent real_psi_exact(10) = log(2520)", c_make(psi10[i], 0.0),
+                   c_make(expected_psi10, 0.0), 1e-12);
+    }
+    check_near("real_psi_exact(5.0) = log(60)", c_make(real_psi_exact(5.0), 0.0),
+               c_make(log(60.0), 0.0), 1e-12);
+    uint64_t test_rows[3] = {0x5ULL, 0ULL, (1ULL << 59) | 1ULL};
+    real_seed_set_rows(test_rows, 3);
+    check_near("real_seed_count() == 4", c_make((double)real_seed_count(), 0.0), c_make(4.0, 0.0),
+               1e-12);
+    check_near("real_seed_row(2) bit 59 preserved",
+               c_make((double)((real_seed_row(2) >> 59) & 1ULL), 0.0), c_make(1.0, 0.0), 1e-12);
+    /* Centered [-R, R]^2 blinker test at origin (-1,0),(0,0),(1,0) -> (0,-1),(0,0),(0,1) at gen 1 */
+    int blinker_xy[6] = {-1, 0, 0, 0, 1, 0};
+    real_seed_set_cells(blinker_xy, 3);
+    int bx = 0, by = 0;
+    int bcnt = real_life_cell_at(16, 1, 0, &bx, &by);
+    check_near("centered real_life_cell_at blinker count == 3", c_make((double)bcnt, 0.0),
+               c_make(3.0, 0.0), 1e-12);
+    check_near("centered blinker gen 1 top cell == (0, 1)", c_make((double)bx, (double)by),
+               c_make(0.0, 1.0), 1e-12);
+    real_seed_set_rows(NULL, 0);
+
+    printf("\n1. Right Half-Plane zeta(s) (Euler-Maclaurin):\n");
     check_near("zeta(2) = pi^2 / 6", c_zeta(c_make(2.0, 0.0)), c_make(M_PI * M_PI / 6.0, 0.0),
                1e-13);
     check_near("zeta(4) = pi^4 / 90", c_zeta(c_make(4.0, 0.0)), c_make(pow(M_PI, 4.0) / 90.0, 0.0),

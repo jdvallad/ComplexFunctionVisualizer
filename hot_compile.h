@@ -5,31 +5,61 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/* Initialize hot-compiler rwlock state. */
+#define MAX_HOT_SLOTS 24
+#define MAX_EVAL_PARAMS 16
+
+typedef struct {
+    double v[MAX_EVAL_PARAMS];
+    int count;
+} EvalParams;
+
+/* Initialize hot-compiler state. */
 void hot_init(void);
 
 /* Unload any dynamically compiled shared libraries and remove temp files. */
 void hot_cleanup(void);
 
 /*
- * Compiles user-supplied C source code into a temporary shared library using
- * `clang -O2 -shared -fPIC` and loads it via dlopen().
- *   is_real = false -> expects a function body or definition for:
- *                      double complex user_fn(double complex z)
- *   is_real = true  -> expects a function body or definition for:
- *                      double user_real_fn(double x)
- * On error, writes compiler diagnostics into diag_out.
+ * Single-function convenience wrapper (legacy /api/compile compatibility).
  */
 bool hot_compile_code(bool is_real, const char *code, char *diag_out, size_t diag_cap,
                       double *elapsed_ms_out);
 
-/* Thread-safe evaluators for the active hot-compiled C functions. */
+/*
+ * Compiles an entire Desmos-style workspace of C expression cards + named
+ * slider parameters into a single native shared library via `clang -O2 -shared -fPIC`.
+ *   is_real = false -> Complex cards (z and s both bound to input double complex)
+ *   is_real = true  -> 2D Real cards (x bound to input double)
+ * Cards may reference earlier cards as f1(z), f2(z), ... (or f1(x), f2(x), ...)
+ * and any slider parameter by its identifier name (e.g. K, N, t, a, b).
+ */
+bool hot_compile_workspace(bool is_real, const char *const *card_codes, size_t card_count,
+                           const char *const *param_names, size_t param_count, char *diag_out,
+                           size_t diag_cap, double *elapsed_ms_out);
+
+/* Thread-safe status & evaluators. */
 bool hot_has_complex(void);
 bool hot_has_real(void);
+int hot_complex_slot_count(void);
+int hot_real_slot_count(void);
+
 double complex hot_eval_complex(double complex z);
 double hot_eval_real(double x);
 
-/* Retrieve current hot-compiled source snippet (empty string if none). */
-void hot_get_source(bool is_real, char *out, size_t out_cap);
+double complex hot_eval_complex_slot(int slot, double complex z, const EvalParams *params);
+double hot_eval_real_slot(int slot, double x, const EvalParams *params);
+double hot_eval_real2d_slot(int slot, double x, double y, const EvalParams *params);
+
+/* Multi-threaded batch sampling for a compiled 2D real slot. */
+void hot_sample_real_slot(int slot, const EvalParams *params, const double *xs, size_t count,
+                          double *ys_out);
+
+/* Multi-threaded 2D grid evaluation for implicit relations F(x, y) = 0. */
+void hot_sample_implicit_slot(int slot, const EvalParams *params, double xmin, double xmax,
+                              double ymin, double ymax, int nx, int ny, float *grid_out);
+
+/* Multi-threaded sampling for 2D parametric curves (x(t), y(t)), interleaved [x, y] floats. */
+void hot_sample_parametric_slot(int slot, const EvalParams *params, double tmin, double tmax,
+                                size_t count, float *xy_out);
 
 #endif /* HOT_COMPILE_H */
