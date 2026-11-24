@@ -740,6 +740,29 @@ static void handle_api_trace(int fd, const char *body, bool keep_alive) {
     sb_free(&sb);
 }
 
+static int parse_domain_scheme(const char *body) {
+    char scheme[64];
+    if (!json_get_string(body, "scheme", scheme, sizeof(scheme))) {
+        return DOMAIN_SCHEME_CLASSIC;
+    }
+    if (strcmp(scheme, "smooth_escape") == 0 || strcmp(scheme, "mandelbrot") == 0) {
+        return DOMAIN_SCHEME_SMOOTH_ESCAPE;
+    }
+    if (strcmp(scheme, "inferno") == 0) {
+        return DOMAIN_SCHEME_INFERNO;
+    }
+    if (strcmp(scheme, "ocean") == 0) {
+        return DOMAIN_SCHEME_OCEAN;
+    }
+    if (strcmp(scheme, "neon_prism") == 0 || strcmp(scheme, "neon") == 0) {
+        return DOMAIN_SCHEME_NEON_PRISM;
+    }
+    if (strcmp(scheme, "grayscale") == 0 || strcmp(scheme, "grayscale_contour") == 0) {
+        return DOMAIN_SCHEME_GRAYSCALE;
+    }
+    return DOMAIN_SCHEME_CLASSIC;
+}
+
 static void handle_api_domain(int fd, const char *body, bool keep_alive) {
     double cx = 0.0, cy = 0.0, half_w = 4.0, half_h = 4.0;
     int width = 200, height = 200;
@@ -750,6 +773,7 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
     json_get_double(body, "half_h", &half_h);
     json_get_int(body, "width", &width);
     json_get_int(body, "height", &height);
+    int scheme = parse_domain_scheme(body);
 
     int slot = -1;
     bool is_slot =
@@ -759,7 +783,7 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
 
     FunctionDef tmp_hot;
     const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
-    if (!fn || width < 16 || height < 16 || width > 400 || height > 400 || half_w <= 0.0 ||
+    if (!fn || width < 16 || height < 16 || width > 900 || height > 900 || half_w <= 0.0 ||
         half_h <= 0.0) {
         send_json_error(fd, 400, "Invalid domain parameters", keep_alive);
         return;
@@ -772,7 +796,11 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
         return;
     }
 
-    if (is_slot || is_dirichlet || fn == &tmp_hot) {
+    if (is_slot) {
+        EvalParams ep = {{0}, 0};
+        json_get_double_array(body, "params", ep.v, MAX_EVAL_PARAMS, &ep.count);
+        hot_render_domain_slot(slot, &ep, cx, cy, half_w, half_h, width, height, scheme, rgba);
+    } else if (is_dirichlet || fn == &tmp_hot) {
         /* Render TLS-backed evaluator on current thread so EvalParams/slot/N stay thread-safe. */
         double x0 = cx - half_w;
         double y0 = cy + half_h;
@@ -784,56 +812,16 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
                 double re = x0 + ((double)px + 0.5) * dx;
                 double complex w = fn->eval(c_make(re, im));
                 size_t idx = ((size_t)py * (size_t)width + (size_t)px) * 4;
-                if (!c_isfinite(w)) {
-                    rgba[idx + 0] = 240;
-                    rgba[idx + 1] = 245;
-                    rgba[idx + 2] = 255;
-                    rgba[idx + 3] = 255;
-                    continue;
-                }
-                double mag = cabs(w);
-                double arg = carg(w);
-                double h = (arg + 3.14159265358979323846) / (2.0 * 3.14159265358979323846);
-                double log2m = log2(mag + 1e-18);
-                double contour = 0.78 + 0.22 * (log2m - floor(log2m));
-                double light = 0.16 + 0.76 * (1.0 - 1.0 / (1.0 + 0.45 * pow(mag, 0.45)));
-                double val = fmin(0.96, light * contour);
-                double sat = 0.72 / (1.0 + 0.06 * log1p(mag));
-                double c = val * sat;
-                double hp = fmod(h * 6.0, 6.0);
-                if (hp < 0.0) {
-                    hp += 6.0;
-                }
-                double x = c * (1.0 - fabs(fmod(hp, 2.0) - 1.0));
-                double m = val - c;
-                double rf = 0, gf = 0, bf = 0;
-                if (hp < 1) {
-                    rf = c;
-                    gf = x;
-                } else if (hp < 2) {
-                    rf = x;
-                    gf = c;
-                } else if (hp < 3) {
-                    gf = c;
-                    bf = x;
-                } else if (hp < 4) {
-                    gf = x;
-                    bf = c;
-                } else if (hp < 5) {
-                    rf = x;
-                    bf = c;
-                } else {
-                    rf = c;
-                    bf = x;
-                }
-                rgba[idx + 0] = (uint8_t)fmin(255.0, fmax(0.0, (rf + m) * 255.0));
-                rgba[idx + 1] = (uint8_t)fmin(255.0, fmax(0.0, (gf + m) * 255.0));
-                rgba[idx + 2] = (uint8_t)fmin(255.0, fmax(0.0, (bf + m) * 255.0));
+                uint8_t r, g, b;
+                sampler_color_complex(w, scheme, &r, &g, &b);
+                rgba[idx + 0] = r;
+                rgba[idx + 1] = g;
+                rgba[idx + 2] = b;
                 rgba[idx + 3] = 255;
             }
         }
     } else {
-        sampler_render_domain(fn, cx, cy, half_w, half_h, width, height, rgba);
+        sampler_render_domain_ex(fn, cx, cy, half_w, half_h, width, height, scheme, rgba);
     }
     send_response(fd, 200, "OK", "application/octet-stream", rgba, nbytes, keep_alive);
     free(rgba);

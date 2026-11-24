@@ -1662,5 +1662,6 @@
         }
       }
     }
-  ]
+  ],
+  "description": "Interactive conformal mapping sandbox built around a morphable Joukowsky core J(z) = z + morph/z, showcasing circle-to-airfoil deformation and conformal grid preservation across four presets."
 }

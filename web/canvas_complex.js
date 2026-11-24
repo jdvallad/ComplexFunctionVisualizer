@@ -33,9 +33,18 @@
 
     showMesh: true,
     showDomain: false,
+    domainScheme: "classic",
+    domainOpacity: 0.72,
     showLandmarks: true,
     showCriticalLine: true,
     showDirichletWall: false,
+
+    /* Output space projection: "planar" | "sphere" | "stereographic" | "poincare" | "custom" */
+    projection: "planar",
+    projectionExpr: "(w - i) / (w + i)",
+
+    /* Unified Element Layering Order (back -> front): [{ kind: "shape"|"guide_line"|"point", id }] */
+    layerOrder: [],
 
     /* Desmos Domain Objects: Shapes (contours), Points & Landmark Lines (points & lines ignored for integrals!) */
     shapes: [],
@@ -94,7 +103,152 @@
   const outputTag = document.getElementById("output-tag");
   const outputSub = document.getElementById("output-sub");
   const btnToggleSphere = document.getElementById("btn-toggle-sphere");
+  const outProjSelect = document.getElementById("out-projection-select");
+  const customProjBar = document.getElementById("custom-proj-bar");
+  const customProjInput = document.getElementById("custom-proj-input");
+  const customProjErr = document.getElementById("custom-proj-err");
   const btnTracePlay = document.getElementById("btn-trace-play");
+
+  function isLightTheme() {
+    return typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
+  }
+
+  function normLineWidth(v, fallback = 2.2) {
+    if (v === undefined || v === null || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, n) : fallback;
+  }
+
+  function normOpacity(v, fallback = 1.0) {
+    if (v === undefined || v === null || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
+  }
+
+  function syncLayerOrder() {
+    const valid = new Map();
+    for (const s of state.shapes) valid.set(`shape:${s.id}`, { kind: "shape", id: s.id, item: s });
+    for (const l of state.lines) valid.set(`guide_line:${l.id}`, { kind: "guide_line", id: l.id, item: l });
+    for (const p of state.points) valid.set(`point:${p.id}`, { kind: "point", id: p.id, item: p });
+
+    const next = [];
+    const seen = new Set();
+    for (const entry of state.layerOrder || []) {
+      const k = `${entry.kind}:${entry.id}`;
+      if (valid.has(k) && !seen.has(k)) {
+        seen.add(k);
+        next.push({ kind: entry.kind, id: entry.id });
+      }
+    }
+    for (const [k, rec] of valid.entries()) {
+      if (!seen.has(k)) {
+        seen.add(k);
+        next.push({ kind: rec.kind, id: rec.id });
+      }
+    }
+    state.layerOrder = next;
+    return next;
+  }
+
+  function getOrderedElements() {
+    syncLayerOrder();
+    const sMap = new Map(state.shapes.map((s) => [s.id, s]));
+    const lMap = new Map(state.lines.map((l) => [l.id, l]));
+    const pMap = new Map(state.points.map((p) => [p.id, p]));
+    const out = [];
+    for (const e of state.layerOrder) {
+      const item = e.kind === "shape" ? sMap.get(e.id) : e.kind === "guide_line" ? lMap.get(e.id) : pMap.get(e.id);
+      if (item) out.push({ kind: e.kind, id: e.id, item });
+    }
+    return out;
+  }
+
+  function reorderElement(fromIdx, toIdx) {
+    syncLayerOrder();
+    const n = state.layerOrder.length;
+    if (fromIdx < 0 || fromIdx >= n || toIdx < 0 || toIdx >= n || fromIdx === toIdx) return false;
+    const [moved] = state.layerOrder.splice(fromIdx, 1);
+    state.layerOrder.splice(toIdx, 0, moved);
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+    return true;
+  }
+
+  function moveElementLayer(kind, id, action) {
+    syncLayerOrder();
+    const idx = state.layerOrder.findIndex((e) => e.kind === kind && e.id === id);
+    if (idx < 0) return false;
+    const n = state.layerOrder.length;
+    let target = idx;
+    if (action === "forward") target = Math.min(n - 1, idx + 1);
+    else if (action === "backward") target = Math.max(0, idx - 1);
+    else if (action === "front") target = n - 1;
+    else if (action === "back") target = 0;
+    return reorderElement(idx, target);
+  }
+
+  function activeParamsMap() {
+    return ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
+  }
+
+  function projectOutPt(pt) {
+    if (!pt || !window.CFVProjections || state.projection === "planar" || state.projection === "sphere") return pt;
+    return window.CFVProjections.projectPoint(state.projection, pt, state.projectionExpr, activeParamsMap());
+  }
+
+  function projectOutPts(pts) {
+    if (!pts || !window.CFVProjections || state.projection === "planar" || state.projection === "sphere") return pts;
+    return window.CFVProjections.projectPoints(state.projection, pts, state.projectionExpr, activeParamsMap());
+  }
+
+  function setProjection(mode, opts = {}) {
+    const valid = new Set(["planar", "sphere", "stereographic", "poincare", "custom"]);
+    const next = valid.has(mode) ? mode : "planar";
+    const prev = state.projection;
+    state.projection = next;
+    if (opts.expr !== undefined && typeof opts.expr === "string") {
+      state.projectionExpr = opts.expr;
+      if (customProjInput && customProjInput.value !== opts.expr) customProjInput.value = opts.expr;
+    }
+    const isSphere = next === "sphere";
+    if (window.RiemannSphere) {
+      window.RiemannSphere.state.enabled = isSphere;
+      if (isSphere && !opts.keepSphereView && prev !== "sphere") window.RiemannSphere.reset();
+    }
+    if (outProjSelect && outProjSelect.value !== next) outProjSelect.value = next;
+    if (btnToggleSphere) {
+      btnToggleSphere.classList.toggle("active", isSphere);
+      btnToggleSphere.textContent = isSphere ? "2D Plane" : "3D Sphere";
+    }
+    if (customProjBar) customProjBar.classList.toggle("hidden", next !== "custom");
+    if (next === "custom" && window.CFVProjections && customProjErr) {
+      const { err } = window.CFVProjections.getCustomProjector(state.projectionExpr);
+      customProjErr.textContent = err || "";
+      customProjErr.classList.toggle("hidden", !err);
+    }
+    if (outputTag) {
+      outputTag.textContent =
+        next === "sphere" ? "RIEMANN SPHERE" :
+        next === "stereographic" ? "STEREOGRAPHIC DISK" :
+        next === "poincare" ? "POINCARÉ DISK" :
+        next === "custom" ? "CUSTOM PROJECTION" :
+        state.mode === "integral" ? "INTEGRAL PLANE" : "OUTPUT PLANE";
+    }
+    if (outputSub && window.CFVProjections) {
+      outputSub.textContent =
+        next === "planar"
+          ? (state.mode === "integral" ? "I(t) = ∫ f(z) dz" : "w = f(z)")
+          : window.CFVProjections.getSubtitle(next, state.projectionExpr);
+    }
+    if (!opts.keepOutView && (next === "stereographic" || next === "poincare") && prev !== next) {
+      setSquareAspect("out", true);
+      setView(state.outView, canvasOut, 0, 0, 1.32);
+    }
+    ensureCanvasSize(canvasOut);
+    requestRender();
+    if (!opts.silent) notifyState(true, true);
+  }
 
   const integralPanel = document.getElementById("integral-panel");
   const integralPanelHdr = document.getElementById("integral-panel-hdr");
@@ -890,15 +1044,29 @@
     const reqId = ++state.domainReqId;
     const w = canvasIn.clientWidth, h = canvasIn.clientHeight;
     if (w < 20 || h < 20) return;
-    const tw = Math.min(260, Math.max(96, Math.round(w * 0.34)));
-    const th = Math.min(260, Math.max(96, Math.round(h * 0.34)));
-    const halfW = (w * 0.5) / state.inView.scale;
-    const halfH = (h * 0.5) / state.inView.scale;
+    const isFractal = state.domainScheme === "smooth_escape" || state.domainScheme === "inferno" || state.domainScheme === "ocean";
+    const scaleRes = isFractal ? 0.72 : 0.48;
+    const maxDim = isFractal ? 720 : 420;
+    const tw = Math.min(maxDim, Math.max(128, Math.round(w * scaleRes)));
+    const th = Math.min(maxDim, Math.max(128, Math.round(h * scaleRes)));
+    const scX = state.inView.scaleX || state.inView.scale;
+    const scY = state.inView.scaleY || state.inView.scale;
+    const halfW = (w * 0.5) / scX;
+    const halfH = (h * 0.5) / scY;
     const cx = state.inView.cx, cy = state.inView.cy;
     const res = await fetch("/api/domain", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...tgt, cx, cy, half_w: halfW, half_h: halfH, width: tw, height: th }),
+      body: JSON.stringify({
+        ...tgt,
+        cx,
+        cy,
+        half_w: halfW,
+        half_h: halfH,
+        width: tw,
+        height: th,
+        scheme: state.domainScheme || "classic",
+      }),
     });
     if (!res.ok || reqId !== state.domainReqId) return;
     const buf = await res.arrayBuffer();
@@ -1506,8 +1674,9 @@
     const scX = view.scaleX || view.scale, scY = view.scaleY || view.scale;
     const hw = (w * 0.5) / scX, hh = (h * 0.5) / scY;
     const xmin = view.cx - hw, xmax = view.cx + hw, ymin = view.cy - hh, ymax = view.cy + hh;
+    const light = isLightTheme();
 
-    ctx.fillStyle = "#0a0e17";
+    ctx.fillStyle = light ? "#f8fafc" : "#0a0e17";
     ctx.fillRect(0, 0, w, h);
 
     if (isInput && state.showDomain && state.domainImg) {
@@ -1515,14 +1684,14 @@
       const tl = worldToScreen(view, canvas, d.cx - d.halfW, d.cy + d.halfH);
       const br = worldToScreen(view, canvas, d.cx + d.halfW, d.cy - d.halfH);
       ctx.save();
-      ctx.globalAlpha = 0.62;
+      ctx.globalAlpha = normOpacity(state.domainOpacity, 0.72);
       ctx.drawImage(d.canvas, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
       ctx.restore();
     }
 
     const stepX = niceStep(78 / scX);
     const stepY = niceStep(78 / scY);
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.11)";
+    ctx.strokeStyle = light ? "rgba(15, 23, 42, 0.09)" : "rgba(148, 163, 184, 0.11)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = Math.floor(xmin / stepX) * stepX; x <= xmax; x += stepX) {
@@ -1535,62 +1704,28 @@
     }
     ctx.stroke();
 
-    /* Landmark Lines (Desmos-editable, strictly ignored in Integral mode!) */
-    if (isInput && state.showLandmarks && state.lines.length > 0) {
-      ctx.save();
-      ctx.font = '600 10.5px "JetBrains Mono", monospace';
-      for (const ln of state.lines) {
-        if (!ln.visible) continue;
-        const hi = ln.id === state.selectedLineId || ln.id === state.hoveredLineId;
-        const lw = (Number(ln.lineWidth) || 1.5) + (hi ? 0.8 : 0);
-        const col = ln.color || "#fbbf24";
-        ctx.strokeStyle = hi ? "#ffffff" : hexToRgba(col, 0.78);
-        ctx.lineWidth = lw;
-        applyLineStyle(ctx, ln.lineStyle || "dashed");
-
-        if (ln.orientation === "horizontal") {
-          const sy = worldToScreen(view, canvas, 0, ln.value).y;
-          if (sy >= -6 && sy <= h + 6) {
-            ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
-            if (ln.showLabel !== false && ln.label) {
-              ctx.setLineDash([]);
-              ctx.fillStyle = col;
-              ctx.fillText(ln.label, 12, Math.max(54, sy - 6));
-            }
-          }
-        } else {
-          const sx = worldToScreen(view, canvas, ln.value, 0).x;
-          if (sx >= -6 && sx <= w + 6) {
-            ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
-            if (ln.showLabel !== false && ln.label) {
-              ctx.setLineDash([]);
-              ctx.fillStyle = col;
-              ctx.fillText(ln.label, sx + 6, 58);
-            }
-          }
-        }
-      }
-      ctx.restore();
-    }
-
     const origin = worldToScreen(view, canvas, 0, 0);
-    ctx.strokeStyle = "rgba(203, 213, 225, 0.35)";
+    ctx.strokeStyle = light ? "rgba(15, 23, 42, 0.34)" : "rgba(203, 213, 225, 0.35)";
     ctx.lineWidth = 1.25;
     ctx.beginPath();
     if (origin.y >= 0 && origin.y <= h) { ctx.moveTo(0, origin.y); ctx.lineTo(w, origin.y); }
     if (origin.x >= 0 && origin.x <= w) { ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, h); }
     ctx.stroke();
 
+    if (!isInput && window.CFVProjections && (state.projection === "stereographic" || state.projection === "poincare")) {
+      window.CFVProjections.drawProjectionOverlay(ctx, canvas, view, worldToScreen, state.projection, light);
+    }
+
     if (!isInput && origin.x >= -20 && origin.x <= w + 20 && origin.y >= -20 && origin.y <= h + 20) {
       ctx.save();
-      ctx.strokeStyle = "rgba(52, 211, 153, 0.45)";
+      ctx.strokeStyle = light ? "rgba(5, 150, 105, 0.52)" : "rgba(52, 211, 153, 0.45)";
       ctx.beginPath(); ctx.arc(origin.x, origin.y, 7, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = "#34d399";
+      ctx.fillStyle = light ? "#059669" : "#34d399";
       ctx.beginPath(); ctx.arc(origin.x, origin.y, 2.2, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
 
-    ctx.fillStyle = "rgba(148, 163, 184, 0.65)";
+    ctx.fillStyle = light ? "rgba(51, 65, 85, 0.78)" : "rgba(148, 163, 184, 0.65)";
     ctx.font = '10px "JetBrains Mono", monospace';
     const ly = Math.min(h - 14, Math.max(40, origin.y + 14));
     const lx = Math.min(w - 40, Math.max(8, origin.x + 6));
@@ -1606,40 +1741,87 @@
     }
   }
 
-  function drawDomainPointsIn(ctx) {
+  function drawSingleGuideLineIn(ctx, ln) {
+    if (!state.showLandmarks || !ln.visible) return;
+    const op = normOpacity(ln.opacity, 1.0);
+    if (op <= 0.001) return;
     const w = canvasIn.clientWidth, h = canvasIn.clientHeight;
+    const hi = ln.id === state.selectedLineId || ln.id === state.hoveredLineId;
+    const lw = normLineWidth(ln.lineWidth, 1.5);
+    const col = ln.color || "#fbbf24";
+    const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
+
     ctx.save();
-    ctx.font = '10.5px "JetBrains Mono", monospace';
-    for (const p of state.points) {
-      if (!p.visible) continue;
-      const sp = worldToScreen(state.inView, canvasIn, p.x, p.y);
-      if (sp.x < -36 || sp.x > w + 36 || sp.y < -36 || sp.y > h + 36) continue;
-      const sel = isPointSelected(p.id) || p.id === state.hoveredPointId;
-      drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
-      if (p.showLabel !== false && p.label) {
-        ctx.fillStyle = p.color || "#e2e8f0";
-        ctx.fillText(p.label, sp.x + (p.size || 5) + 6, sp.y + 3);
+    ctx.globalAlpha = op;
+    ctx.font = '600 10.5px "JetBrains Mono", monospace';
+    ctx.strokeStyle = hi ? hiCol : hexToRgba(col, 0.78);
+    ctx.lineWidth = lw + (hi ? 0.8 : 0);
+    applyLineStyle(ctx, ln.lineStyle || "dashed");
+
+    if (ln.orientation === "horizontal") {
+      const sy = worldToScreen(state.inView, canvasIn, 0, ln.value).y;
+      if (sy >= -6 && sy <= h + 6) {
+        if (lw > 0 || hi) {
+          ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+        }
+        if (ln.showLabel !== false && ln.label) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = col;
+          ctx.fillText(ln.label, 12, Math.max(54, sy - 6));
+        }
+      }
+    } else {
+      const sx = worldToScreen(state.inView, canvasIn, ln.value, 0).x;
+      if (sx >= -6 && sx <= w + 6) {
+        if (lw > 0 || hi) {
+          ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+        }
+        if (ln.showLabel !== false && ln.label) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = col;
+          ctx.fillText(ln.label, sx + 6, 58);
+        }
       }
     }
     ctx.restore();
   }
 
-  function drawDomainPointsOut(ctx) {
-    if (state.mode !== "map") return; /* Points are ignored in Integral mode! */
-    const w = canvasOut.clientWidth, h = canvasOut.clientHeight;
+  function drawSinglePointIn(ctx, p) {
+    if (!p.visible) return;
+    const op = normOpacity(p.opacity, 1.0);
+    if (op <= 0.001) return;
+    const w = canvasIn.clientWidth, h = canvasIn.clientHeight;
+    const sp = worldToScreen(state.inView, canvasIn, p.x, p.y);
+    if (sp.x < -36 || sp.x > w + 36 || sp.y < -36 || sp.y > h + 36) return;
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.font = '10.5px "JetBrains Mono", monospace';
-    for (const p of state.points) {
-      /* Locked Landmarks stay strictly on the Input Plane (never clutter the Output Graph!) */
-      if (!p.visible || p.locked || !p.outPt) continue;
-      const sp = worldToScreen(state.outView, canvasOut, p.outPt.x, p.outPt.y);
-      if (sp.x < -36 || sp.x > w + 36 || sp.y < -36 || sp.y > h + 36) continue;
-      const sel = isPointSelected(p.id) || p.id === state.hoveredPointId;
-      drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
-      if (p.showLabel !== false && p.label) {
-        ctx.fillStyle = hexToRgba(p.color || "#e2e8f0", 0.95);
-        ctx.fillText(p.label, sp.x + (p.size || 5) + 6, sp.y + 3);
-      }
+    const sel = isPointSelected(p.id) || p.id === state.hoveredPointId;
+    drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
+    if (p.showLabel !== false && p.label) {
+      ctx.fillStyle = p.color || (isLightTheme() ? "#0f172a" : "#e2e8f0");
+      ctx.fillText(p.label, sp.x + (p.size || 5) + 6, sp.y + 3);
+    }
+    ctx.restore();
+  }
+
+  function drawSinglePointOut(ctx, p) {
+    if (state.mode !== "map" || !p.visible || p.locked || !p.outPt) return;
+    const op = normOpacity(p.opacity, 1.0);
+    if (op <= 0.001) return;
+    const projPt = projectOutPt(p.outPt);
+    if (!projPt || !Number.isFinite(projPt.x) || !Number.isFinite(projPt.y)) return;
+    const w = canvasOut.clientWidth, h = canvasOut.clientHeight;
+    const sp = worldToScreen(state.outView, canvasOut, projPt.x, projPt.y);
+    if (sp.x < -36 || sp.x > w + 36 || sp.y < -36 || sp.y > h + 36) return;
+    ctx.save();
+    ctx.globalAlpha = op;
+    ctx.font = '10.5px "JetBrains Mono", monospace';
+    const sel = isPointSelected(p.id) || p.id === state.hoveredPointId;
+    drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
+    if (p.showLabel !== false && p.label) {
+      ctx.fillStyle = hexToRgba(p.color || (isLightTheme() ? "#0f172a" : "#e2e8f0"), 0.95);
+      ctx.fillText(p.label, sp.x + (p.size || 5) + 6, sp.y + 3);
     }
     ctx.restore();
   }
@@ -1684,16 +1866,20 @@
 
   function drawShapeIn(ctx, s) {
     if (!s.visible) return;
+    const op = normOpacity(s.opacity, 1.0);
+    if (op <= 0.001) return;
     const pts = s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts;
     const hi = isShapeSelected(s.id) || s.id === state.hoveredShapeId;
-    const lw = Number(s.lineWidth) || 2.2;
+    const lw = normLineWidth(s.lineWidth, 2.2);
+    const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
 
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
 
     if (s.closed) {
       ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, true);
-      ctx.fillStyle = hexToRgba(s.color, state.mode === "integral" ? 0.11 : 0.15);
+      ctx.fillStyle = hexToRgba(s.color, state.mode === "integral" ? 0.14 : 0.22);
       ctx.fill("nonzero");
     }
     if (state.mode === "map" && s.closed && state.showMesh && s.mesh) {
@@ -1703,15 +1889,21 @@
       ctx.stroke();
     }
 
-    applyLineStyle(ctx, s.lineStyle || "solid");
-    ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, s.closed);
-    ctx.strokeStyle = hexToRgba(s.color, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
-    ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, s.closed);
-    ctx.strokeStyle = hi ? "#ffffff" : s.color; ctx.lineWidth = hi ? lw + 0.6 : lw; ctx.stroke();
-    ctx.setLineDash([]);
+    if (lw > 0 || hi) {
+      applyLineStyle(ctx, s.lineStyle || "solid");
+      if (lw > 0) {
+        ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, s.closed);
+        ctx.strokeStyle = hexToRgba(s.color, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
+      }
+      ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, s.closed);
+      ctx.strokeStyle = hi ? hiCol : s.color; ctx.lineWidth = lw > 0 ? (hi ? lw + 0.6 : lw) : 1.4; ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
-    drawDirArrow(ctx, canvasIn, state.inView, pts, s.color, 0.28);
-    if (state.mode === "integral" || s.closed) drawDirArrow(ctx, canvasIn, state.inView, pts, s.color, 0.72);
+    if (lw > 0) {
+      drawDirArrow(ctx, canvasIn, state.inView, pts, s.color, 0.28);
+      if (state.mode === "integral" || s.closed) drawDirArrow(ctx, canvasIn, state.inView, pts, s.color, 0.72);
+    }
 
     if (state.playing && pts.length > 1) {
       const p = pts[Math.floor(state.playPhase * (pts.length - 1)) % pts.length];
@@ -1814,46 +2006,57 @@
 
   function drawShapeMapOut(ctx, s) {
     if (!s.visible || !s.boundary) return;
-    const pts = s.boundary.outPts;
-    if (!pts || pts.length < 2) return;
+    const op = normOpacity(s.opacity, 1.0);
+    if (op <= 0.001) return;
+    const rawOut = s.boundary.outPts;
+    if (!rawOut || rawOut.length < 2) return;
+    const pts = projectOutPts(rawOut);
     const col = s.primaryColor || s.color;
     const hi = isShapeSelected(s.id) || s.id === state.hoveredShapeId;
-    const lw = Number(s.lineWidth) || 2.2;
+    const lw = normLineWidth(s.lineWidth, 2.2);
+    const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
 
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     if (s.closed && pts.every((p) => p !== null)) {
-      if (shouldShadeExterior(s, pts)) {
+      if (state.projection === "planar" && shouldShadeExterior(s, pts)) {
         drawExteriorShade(ctx, pts, col, 0.16);
       } else {
         ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, true);
-        ctx.fillStyle = hexToRgba(col, 0.19); ctx.fill("nonzero");
+        ctx.fillStyle = hexToRgba(col, 0.24); ctx.fill("nonzero");
       }
     }
     if (s.closed && state.showMesh && s.mesh) {
       ctx.strokeStyle = hexToRgba(col, 0.28); ctx.lineWidth = 1;
       ctx.beginPath();
-      for (const m of s.mesh) tracePts(ctx, canvasOut, state.outView, m.outPts, false);
+      for (const m of s.mesh) tracePts(ctx, canvasOut, state.outView, projectOutPts(m.outPts), false);
       ctx.stroke();
     }
 
-    applyLineStyle(ctx, s.lineStyle || "solid");
-    ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, s.closed);
-    ctx.strokeStyle = hexToRgba(col, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
-    ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, s.closed);
-    ctx.strokeStyle = hi ? "#ffffff" : col; ctx.lineWidth = hi ? lw + 0.6 : lw; ctx.stroke();
-    ctx.setLineDash([]);
+    if (lw > 0 || hi) {
+      applyLineStyle(ctx, s.lineStyle || "solid");
+      if (lw > 0) {
+        ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, s.closed);
+        ctx.strokeStyle = hexToRgba(col, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
+      }
+      ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, s.closed);
+      ctx.strokeStyle = hi ? hiCol : col; ctx.lineWidth = lw > 0 ? (hi ? lw + 0.6 : lw) : 1.4; ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     for (const ex of s.extraCurves || []) {
+      const exLw = normLineWidth(ex.lineWidth, 2.0);
+      if (exLw <= 0) continue;
       ctx.save();
       applyLineStyle(ctx, ex.lineStyle || "solid");
-      ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, ex.curve.outPts, s.closed);
-      ctx.strokeStyle = ex.color; ctx.lineWidth = Number(ex.lineWidth) || 2.0; ctx.stroke();
+      ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, projectOutPts(ex.curve.outPts), s.closed);
+      ctx.strokeStyle = ex.color; ctx.lineWidth = exLw; ctx.stroke();
       ctx.restore();
     }
 
     if (state.taylor.enabled && state.taylor.coeffs.length >= 2) {
-      const tPts = s.boundary.inPts.map((p) => evalTaylor(p.x, p.y));
+      const tPts = projectOutPts(s.boundary.inPts.map((p) => evalTaylor(p.x, p.y)));
       ctx.save();
       ctx.setLineDash([5, 4]); ctx.strokeStyle = "#fde047"; ctx.lineWidth = 2;
       ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, tPts, s.closed); ctx.stroke();
@@ -1874,22 +2077,31 @@
 
   function drawShapeIntegralOut(ctx, s) {
     if (!s.visible || !s.integral) return;
+    const op = normOpacity(s.opacity, 1.0);
+    if (op <= 0.001) return;
     const ig = s.integral;
-    const pts = ig.cumPts;
-    if (!pts || pts.length < 2) return;
+    const rawPts = ig.cumPts;
+    if (!rawPts || rawPts.length < 2) return;
+    const pts = projectOutPts(rawPts);
     const hi = isShapeSelected(s.id) || s.id === state.hoveredShapeId;
-    const lw = Number(s.lineWidth) || 2.0;
+    const lw = normLineWidth(s.lineWidth, 2.0);
+    const light = isLightTheme();
 
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    applyLineStyle(ctx, s.lineStyle || "solid");
-    ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, false);
-    ctx.strokeStyle = hexToRgba(s.color, hi ? 0.98 : 0.78); ctx.lineWidth = hi ? lw + 0.6 : lw; ctx.stroke();
-    ctx.setLineDash([]);
-    drawDirArrow(ctx, canvasOut, state.outView, pts, s.color, 0.5);
+    if (lw > 0 || hi) {
+      applyLineStyle(ctx, s.lineStyle || "solid");
+      ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, false);
+      ctx.strokeStyle = hexToRgba(s.color, hi ? 0.98 : 0.78); ctx.lineWidth = lw > 0 ? (hi ? lw + 0.6 : lw) : 1.4; ctx.stroke();
+      ctx.setLineDash([]);
+      drawDirArrow(ctx, canvasOut, state.outView, pts, s.color, 0.5);
+    }
 
-    const oSp = worldToScreen(state.outView, canvasOut, 0, 0);
-    const eSp = worldToScreen(state.outView, canvasOut, ig.total.x, ig.total.y);
+    const origP = projectOutPt({ x: 0, y: 0 }) || { x: 0, y: 0 };
+    const endP = projectOutPt(ig.total) || ig.total;
+    const oSp = worldToScreen(state.outView, canvasOut, origP.x, origP.y);
+    const eSp = worldToScreen(state.outView, canvasOut, endP.x, endP.y);
     if (Math.hypot(eSp.x - oSp.x, eSp.y - oSp.y) > 8) {
       ctx.setLineDash([5, 4]); ctx.strokeStyle = hexToRgba(s.color, 0.72); ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(oSp.x, oSp.y); ctx.lineTo(eSp.x, eSp.y); ctx.stroke();
@@ -1907,9 +2119,9 @@
     const tag = fmtCompact(ig.total.x, ig.total.y);
     ctx.font = '600 11px "JetBrains Mono", monospace';
     const tw = ctx.measureText(tag).width;
-    ctx.fillStyle = "rgba(10,14,23,0.9)"; ctx.strokeStyle = hexToRgba(s.color, 0.6); ctx.lineWidth = 1;
+    ctx.fillStyle = light ? "rgba(255,255,255,0.92)" : "rgba(10,14,23,0.9)"; ctx.strokeStyle = hexToRgba(s.color, 0.6); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.roundRect(eSp.x + 8, eSp.y - 20, tw + 10, 18, 4); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#ffffff"; ctx.fillText(tag, eSp.x + 13, eSp.y - 8);
+    ctx.fillStyle = light ? "#0f172a" : "#ffffff"; ctx.fillText(tag, eSp.x + 13, eSp.y - 8);
 
     if (state.playing && pts.length > 1) {
       const p = pts[Math.floor(state.playPhase * (pts.length - 1)) % pts.length];
@@ -1940,8 +2152,12 @@
     ctxIn.scale(dpr, dpr);
     drawGrid(ctxIn, canvasIn, state.inView, true);
     drawInputOverlays(ctxIn);
-    for (const s of state.shapes) drawShapeIn(ctxIn, s);
-    drawDomainPointsIn(ctxIn);
+    /* Unified Element Layering Order (back -> front) */
+    for (const el of getOrderedElements()) {
+      if (el.kind === "shape") drawShapeIn(ctxIn, el.item);
+      else if (el.kind === "guide_line") drawSingleGuideLineIn(ctxIn, el.item);
+      else if (el.kind === "point") drawSinglePointIn(ctxIn, el.item);
+    }
 
     /* Multi-Selection Group Bounding Box & Resize Handles */
     const gBox = getGroupBox();
@@ -2067,8 +2283,11 @@
     if (okOut) {
     ctxOut.save();
     ctxOut.scale(dpr, dpr);
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) {
-      window.RiemannSphere.render(ctxOut, canvasOut, state.shapes, {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
+      const orderedEls = getOrderedElements();
+      const orderedShapes = orderedEls.filter((e) => e.kind === "shape").map((e) => e.item);
+      const orderedPoints = orderedEls.filter((e) => e.kind === "point").map((e) => e.item);
+      window.RiemannSphere.render(ctxOut, canvasOut, orderedShapes, {
         mode: state.mode,
         showMesh: state.showMesh,
         getPts: (s) => (state.mode === "integral" ? (s.integral ? s.integral.cumPts : null) : s.boundary ? s.boundary.outPts : null),
@@ -2077,25 +2296,33 @@
         playPhase: state.playPhase,
         playing: state.playing,
         probe: state.mode === "map" ? state.probe : null,
-        points: state.points,
+        points: orderedPoints,
       });
     } else {
       drawGrid(ctxOut, canvasOut, state.outView, false);
+      const orderedEls = getOrderedElements();
       if (state.mode === "integral") {
-        for (const s of state.shapes) drawShapeIntegralOut(ctxOut, s);
+        for (const el of orderedEls) {
+          if (el.kind === "shape") drawShapeIntegralOut(ctxOut, el.item);
+        }
       } else {
-        for (const s of state.shapes) drawShapeMapOut(ctxOut, s);
-        drawDomainPointsOut(ctxOut);
+        for (const el of orderedEls) {
+          if (el.kind === "shape") drawShapeMapOut(ctxOut, el.item);
+          else if (el.kind === "point") drawSinglePointOut(ctxOut, el.item);
+        }
         if (state.drawing && state.drawing.liveOut && state.drawing.liveOut.length >= 2) {
           ctxOut.save(); ctxOut.strokeStyle = state.drawing.color; ctxOut.lineWidth = 2.1;
-          ctxOut.beginPath(); tracePts(ctxOut, canvasOut, state.outView, state.drawing.liveOut, state.drawing.closed || state.drawing.snapActive);
+          ctxOut.beginPath(); tracePts(ctxOut, canvasOut, state.outView, projectOutPts(state.drawing.liveOut), state.drawing.closed || state.drawing.snapActive);
           ctxOut.stroke(); ctxOut.restore();
         }
       }
       if (state.mode === "map" && state.probe.active && state.probe.w) {
-        const sp = worldToScreen(state.outView, canvasOut, state.probe.w.x, state.probe.w.y);
-        ctxOut.fillStyle = "#fff"; ctxOut.strokeStyle = "#a78bfa"; ctxOut.lineWidth = 2;
-        ctxOut.beginPath(); ctxOut.arc(sp.x, sp.y, 4, 0, Math.PI * 2); ctxOut.fill(); ctxOut.stroke();
+        const pw = projectOutPt(state.probe.w);
+        if (pw) {
+          const sp = worldToScreen(state.outView, canvasOut, pw.x, pw.y);
+          ctxOut.fillStyle = "#fff"; ctxOut.strokeStyle = "#a78bfa"; ctxOut.lineWidth = 2;
+          ctxOut.beginPath(); ctxOut.arc(sp.x, sp.y, 4, 0, Math.PI * 2); ctxOut.fill(); ctxOut.stroke();
+        }
       }
     }
     ctxOut.restore();
@@ -2366,11 +2593,92 @@
   canvasIn.addEventListener("contextmenu", (e) => e.preventDefault());
   canvasOut.addEventListener("contextmenu", (e) => e.preventDefault());
 
+  /* Layer-aware hit-testing for right-click context menu (topmost visible element first) */
+  function hitElementIn(sx, sy) {
+    const els = getOrderedElements();
+    const wpt = screenToWorld(state.inView, canvasIn, sx, sy);
+    for (let i = els.length - 1; i >= 0; i--) {
+      const el = els[i];
+      if (!el.item || !el.item.visible) continue;
+      if (el.kind === "point") {
+        const sp = worldToScreen(state.inView, canvasIn, el.item.x, el.item.y);
+        if (Math.hypot(sx - sp.x, sy - sp.y) <= Math.max(10, (el.item.size || 5) + 6)) return el;
+      } else if (el.kind === "guide_line") {
+        if (!state.showLandmarks) continue;
+        if (el.item.orientation === "horizontal") {
+          if (Math.abs(sy - worldToScreen(state.inView, canvasIn, 0, el.item.value).y) <= 8) return el;
+        } else {
+          if (Math.abs(sx - worldToScreen(state.inView, canvasIn, el.item.value, 0).x) <= 8) return el;
+        }
+      } else if (el.kind === "shape") {
+        const s = el.item;
+        const pts = s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts;
+        if (!pts || pts.length < 2) continue;
+        const segs = s.closed ? pts.length : pts.length - 1;
+        let hit = false;
+        for (let k = 0; k < segs; k++) {
+          const a = pts[k], b = pts[(k + 1) % pts.length];
+          if (!a || !b) continue;
+          const sa = worldToScreen(state.inView, canvasIn, a.x, a.y);
+          const sb = worldToScreen(state.inView, canvasIn, b.x, b.y);
+          if (distSegSq(sx, sy, sa.x, sa.y, sb.x, sb.y) <= 100) { hit = true; break; }
+        }
+        if (!hit && s.closed && pts.length >= 3 && ptInPoly(wpt.x, wpt.y, pts)) hit = true;
+        if (hit) return el;
+      }
+    }
+    return null;
+  }
+
+  function hitElementOut(sx, sy) {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) return null;
+    const els = getOrderedElements();
+    const wpt = screenToWorld(state.outView, canvasOut, sx, sy);
+    for (let i = els.length - 1; i >= 0; i--) {
+      const el = els[i];
+      if (!el.item || !el.item.visible) continue;
+      if (el.kind === "point") {
+        if (state.mode !== "map" || el.item.locked || !el.item.outPt) continue;
+        const pp = projectOutPt(el.item.outPt);
+        if (!pp) continue;
+        const sp = worldToScreen(state.outView, canvasOut, pp.x, pp.y);
+        if (Math.hypot(sx - sp.x, sy - sp.y) <= Math.max(10, (el.item.size || 5) + 6)) return el;
+      } else if (el.kind === "shape") {
+        const s = el.item;
+        const rawPts = state.mode === "integral" ? (s.integral ? s.integral.cumPts : null) : (s.boundary ? s.boundary.outPts : null);
+        if (!rawPts || rawPts.length < 2) continue;
+        const pts = projectOutPts(rawPts);
+        const closed = state.mode === "map" && Boolean(s.closed);
+        const segs = closed ? pts.length : pts.length - 1;
+        let hit = false;
+        for (let k = 0; k < segs; k++) {
+          const a = pts[k], b = pts[(k + 1) % pts.length];
+          if (!a || !b) continue;
+          const sa = worldToScreen(state.outView, canvasOut, a.x, a.y);
+          const sb = worldToScreen(state.outView, canvasOut, b.x, b.y);
+          if (distSegSq(sx, sy, sa.x, sa.y, sb.x, sb.y) <= 100) { hit = true; break; }
+        }
+        if (!hit && closed && pts.length >= 3 && pts.every((p) => p !== null) && polyWindingNumber(wpt.x, wpt.y, pts) !== 0) hit = true;
+        if (hit) return el;
+      }
+    }
+    return null;
+  }
+
   canvasIn.addEventListener("pointerdown", (e) => {
     canvasIn.setPointerCapture(e.pointerId);
     const pos = localPos(canvasIn, e);
     if (e.button === 1 || e.button === 2 || state.spaceHeld || state.tool === "pan") {
-      state.pan = { which: "in", startX: pos.x, startY: pos.y, origCx: state.inView.cx, origCy: state.inView.cy };
+      state.pan = {
+        which: "in",
+        startX: pos.x,
+        startY: pos.y,
+        origCx: state.inView.cx,
+        origCy: state.inView.cy,
+        rightClick: e.button === 2,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      };
       inCard.classList.add("panning");
       return;
     }
@@ -2852,10 +3160,27 @@
     requestRender();
   });
 
-  canvasIn.addEventListener("pointerup", async () => {
+  canvasIn.addEventListener("pointerup", async (e) => {
     state.snapHint = null;
     if (state.taylor.draggingZ0) { state.taylor.draggingZ0 = false; fetchTaylor(); return; }
-    if (state.pan && state.pan.which === "in") { state.pan = null; inCard.classList.remove("panning"); notifyState(false, false); return; }
+    if (state.pan && state.pan.which === "in") {
+      const p = state.pan;
+      state.pan = null;
+      inCard.classList.remove("panning");
+      const pos = localPos(canvasIn, e);
+      if (p.rightClick && Math.hypot(pos.x - p.startX, pos.y - p.startY) < 5) {
+        const hit = hitElementIn(pos.x, pos.y);
+        if (hit && ws() && typeof ws().openItemSettingsAt === "function") {
+          if (hit.kind === "shape") selectShape(hit.id);
+          else if (hit.kind === "point") selectPoint(hit.id);
+          else if (hit.kind === "guide_line") selectGuideLine(hit.id);
+          ws().openItemSettingsAt(hit.kind, hit.id, e.clientX, e.clientY);
+          return;
+        }
+      }
+      notifyState(false, false);
+      return;
+    }
     if (state.dragRotate) {
       const drag = state.dragRotate;
       state.dragRotate = null;
@@ -3006,28 +3331,43 @@
     e.preventDefault();
     const pos = localPos(canvasIn, e);
     const f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    if (state.inSquare) {
-      zoomAt(state.inView, canvasIn, pos.x, pos.y, f, f);
+    const scaleXOnly = e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const scaleYOnly = (e.ctrlKey || e.metaKey || e.altKey) && !e.shiftKey;
+    if (scaleXOnly) {
+      if (state.inSquare) { state.inSquare = false; const b = document.getElementById("in-square"); if (b) b.classList.remove("active"); }
+      zoomAt(state.inView, canvasIn, pos.x, pos.y, f, 1);
+    } else if (scaleYOnly) {
+      if (state.inSquare) { state.inSquare = false; const b = document.getElementById("in-square"); if (b) b.classList.remove("active"); }
+      zoomAt(state.inView, canvasIn, pos.x, pos.y, 1, f);
     } else {
-      zoomAt(state.inView, canvasIn, pos.x, pos.y, e.altKey ? 1 : f, e.shiftKey ? 1 : f);
+      zoomAt(state.inView, canvasIn, pos.x, pos.y, f, f);
     }
     notifyState(false, false);
   }, { passive: false });
 
-  /* Output canvas pan / zoom / 3D sphere orbit */
+  /* Output canvas pan / zoom / 3D sphere orbit / right-click context menu */
   canvasOut.addEventListener("pointerdown", (e) => {
     canvasOut.setPointerCapture(e.pointerId);
     const pos = localPos(canvasOut, e);
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
       window.RiemannSphere.onPointerDown(pos.x, pos.y);
       outCard.classList.add("panning"); return;
     }
-    state.pan = { which: "out", startX: pos.x, startY: pos.y, origCx: state.outView.cx, origCy: state.outView.cy };
+    state.pan = {
+      which: "out",
+      startX: pos.x,
+      startY: pos.y,
+      origCx: state.outView.cx,
+      origCy: state.outView.cy,
+      rightClick: e.button === 2,
+      clientX: e.clientX,
+      clientY: e.clientY,
+    };
     outCard.classList.add("panning");
   });
   canvasOut.addEventListener("pointermove", (e) => {
     const pos = localPos(canvasOut, e);
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
       if (window.RiemannSphere.onPointerMove(pos.x, pos.y)) requestRender();
       return;
     }
@@ -3036,19 +3376,39 @@
     state.outView.cy = state.pan.origCy + (pos.y - state.pan.startY) / (state.outView.scaleY || state.outView.scale);
     requestRender();
   });
-  canvasOut.addEventListener("pointerup", () => {
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) { window.RiemannSphere.onPointerUp(); outCard.classList.remove("panning"); return; }
-    state.pan = null; outCard.classList.remove("panning"); notifyState(false, false);
+  canvasOut.addEventListener("pointerup", (e) => {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) { window.RiemannSphere.onPointerUp(); outCard.classList.remove("panning"); return; }
+    const p = state.pan;
+    state.pan = null; outCard.classList.remove("panning");
+    if (p && p.which === "out" && p.rightClick) {
+      const pos = localPos(canvasOut, e);
+      if (Math.hypot(pos.x - p.startX, pos.y - p.startY) < 5) {
+        const hit = hitElementOut(pos.x, pos.y);
+        if (hit && ws() && typeof ws().openItemSettingsAt === "function") {
+          if (hit.kind === "shape") selectShape(hit.id);
+          else if (hit.kind === "point") selectPoint(hit.id);
+          ws().openItemSettingsAt(hit.kind, hit.id, e.clientX, e.clientY);
+          return;
+        }
+      }
+    }
+    notifyState(false, false);
   });
   canvasOut.addEventListener("wheel", (e) => {
     e.preventDefault();
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) { window.RiemannSphere.onWheel(e.deltaY); requestRender(); return; }
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) { window.RiemannSphere.onWheel(e.deltaY); requestRender(); return; }
     const pos = localPos(canvasOut, e);
     const f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    if (state.outSquare) {
-      zoomAt(state.outView, canvasOut, pos.x, pos.y, f, f);
+    const scaleXOnly = e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const scaleYOnly = (e.ctrlKey || e.metaKey || e.altKey) && !e.shiftKey;
+    if (scaleXOnly) {
+      if (state.outSquare) { state.outSquare = false; const b = document.getElementById("out-square"); if (b) b.classList.remove("active"); }
+      zoomAt(state.outView, canvasOut, pos.x, pos.y, f, 1);
+    } else if (scaleYOnly) {
+      if (state.outSquare) { state.outSquare = false; const b = document.getElementById("out-square"); if (b) b.classList.remove("active"); }
+      zoomAt(state.outView, canvasOut, pos.x, pos.y, 1, f);
     } else {
-      zoomAt(state.outView, canvasOut, pos.x, pos.y, e.altKey ? 1 : f, e.shiftKey ? 1 : f);
+      zoomAt(state.outView, canvasOut, pos.x, pos.y, f, f);
     }
     notifyState(false, false);
   }, { passive: false });
@@ -3266,37 +3626,109 @@
     updateIntegralPanel(); notifyDomain(); notifyState(true); requestRender();
   });
 
-  btnToggleSphere.addEventListener("click", () => {
-    if (!window.RiemannSphere) return;
-    const on = !window.RiemannSphere.state.enabled;
-    window.RiemannSphere.state.enabled = on;
-    btnToggleSphere.classList.toggle("active", on);
-    btnToggleSphere.textContent = on ? "2D Plane" : "3D Sphere";
-    outputTag.textContent = on ? "RIEMANN SPHERE" : state.mode === "integral" ? "INTEGRAL PLANE" : "OUTPUT PLANE";
-    ensureCanvasSize(canvasOut);
-    requestRender();
+  if (btnToggleSphere) {
+    btnToggleSphere.addEventListener("click", () => {
+      setProjection(state.projection === "sphere" ? "planar" : "sphere");
+    });
+  }
+  if (outProjSelect) {
+    outProjSelect.addEventListener("change", () => {
+      setProjection(outProjSelect.value);
+    });
+  }
+  if (customProjInput) {
+    customProjInput.addEventListener("input", () => {
+      state.projectionExpr = customProjInput.value;
+      if (state.projection === "custom" && window.CFVProjections) {
+        const { err } = window.CFVProjections.getCustomProjector(state.projectionExpr);
+        if (customProjErr) {
+          customProjErr.textContent = err || "";
+          customProjErr.classList.toggle("hidden", !err);
+        }
+        if (outputSub) outputSub.textContent = window.CFVProjections.getSubtitle("custom", state.projectionExpr);
+        requestRender();
+        notifyState(false, true);
+      }
+    });
+  }
+  document.querySelectorAll(".proj-chip[data-proj-expr]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const expr = btn.dataset.projExpr || "(w - i) / (w + i)";
+      if (customProjInput) customProjInput.value = expr;
+      setProjection("custom", { expr });
+    });
   });
+
+  const optDomainScheme = document.getElementById("opt-domain-scheme");
+  const optDomainOpacity = document.getElementById("opt-domain-opacity");
+  const optDomainOpacityVal = document.getElementById("opt-domain-opacity-val");
+  if (optDomainScheme) {
+    optDomainScheme.addEventListener("change", () => {
+      state.domainScheme = optDomainScheme.value || "classic";
+      if (!state.showDomain) {
+        state.showDomain = true;
+        const cb = document.getElementById("opt-domain");
+        if (cb) cb.checked = true;
+      }
+      fetchDomain();
+      notifyState(true, true);
+    });
+  }
+  if (optDomainOpacity) {
+    optDomainOpacity.addEventListener("input", () => {
+      state.domainOpacity = normOpacity(optDomainOpacity.value, 0.72);
+      if (optDomainOpacityVal) optDomainOpacityVal.textContent = `${Math.round(state.domainOpacity * 100)}%`;
+      requestRender();
+      notifyState(false, true);
+    });
+  }
 
   const btnInSquare = document.getElementById("in-square");
   if (btnInSquare) btnInSquare.addEventListener("click", () => setSquareAspect("in", !state.inSquare));
   const btnOutSquare = document.getElementById("out-square");
   if (btnOutSquare) btnOutSquare.addEventListener("click", () => setSquareAspect("out", !state.outSquare));
 
+  const scaleAxisIn = (fx, fy) => {
+    if (state.inSquare) { state.inSquare = false; if (btnInSquare) btnInSquare.classList.remove("active"); }
+    zoomAt(state.inView, canvasIn, canvasIn.clientWidth * 0.5, canvasIn.clientHeight * 0.5, fx, fy);
+    notifyState(false, false);
+  };
+  const scaleAxisOut = (fx, fy) => {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) return;
+    if (state.outSquare) { state.outSquare = false; if (btnOutSquare) btnOutSquare.classList.remove("active"); }
+    zoomAt(state.outView, canvasOut, canvasOut.clientWidth * 0.5, canvasOut.clientHeight * 0.5, fx, fy);
+    notifyState(false, false);
+  };
+  const bindBtn = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("click", fn); };
+  bindBtn("in-zoom-x-in", () => scaleAxisIn(1.3, 1));
+  bindBtn("in-zoom-x-out", () => scaleAxisIn(1 / 1.3, 1));
+  bindBtn("in-zoom-y-in", () => scaleAxisIn(1, 1.3));
+  bindBtn("in-zoom-y-out", () => scaleAxisIn(1, 1 / 1.3));
+  bindBtn("out-zoom-x-in", () => scaleAxisOut(1.3, 1));
+  bindBtn("out-zoom-x-out", () => scaleAxisOut(1 / 1.3, 1));
+  bindBtn("out-zoom-y-in", () => scaleAxisOut(1, 1.3));
+  bindBtn("out-zoom-y-out", () => scaleAxisOut(1, 1 / 1.3));
+
   document.getElementById("in-zoom-in").addEventListener("click", () => zoomAt(state.inView, canvasIn, canvasIn.clientWidth * 0.5, canvasIn.clientHeight * 0.5, 1.35));
   document.getElementById("in-zoom-out").addEventListener("click", () => zoomAt(state.inView, canvasIn, canvasIn.clientWidth * 0.5, canvasIn.clientHeight * 0.5, 1 / 1.35));
   document.getElementById("in-reset").addEventListener("click", () => setView(state.inView, canvasIn, state.defaultInView.cx, state.defaultInView.cy, state.defaultInView.r));
   document.getElementById("out-autofit").addEventListener("click", () => {
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
       window.RiemannSphere.focusOnShapes(state.shapes, (s) =>
         state.mode === "integral" ? (s.integral ? s.integral.cumPts : null) : s.boundary ? s.boundary.outPts : null
       );
       requestRender();
       return;
     }
+    if (state.projection === "stereographic" || state.projection === "poincare") {
+      setSquareAspect("out", true);
+      setView(state.outView, canvasOut, 0, 0, 1.32);
+      return;
+    }
     autoFitOutput();
   });
   document.getElementById("out-zoom-in").addEventListener("click", () => {
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
       window.RiemannSphere.zoomBy(1.22);
       requestRender();
       return;
@@ -3304,7 +3736,7 @@
     zoomAt(state.outView, canvasOut, canvasOut.clientWidth * 0.5, canvasOut.clientHeight * 0.5, 1.35);
   });
   document.getElementById("out-zoom-out").addEventListener("click", () => {
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) {
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
       window.RiemannSphere.zoomBy(1 / 1.22);
       requestRender();
       return;
@@ -3312,7 +3744,12 @@
     zoomAt(state.outView, canvasOut, canvasOut.clientWidth * 0.5, canvasOut.clientHeight * 0.5, 1 / 1.35);
   });
   document.getElementById("out-reset").addEventListener("click", () => {
-    if (window.RiemannSphere && window.RiemannSphere.state.enabled) { window.RiemannSphere.reset(); requestRender(); return; }
+    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) { window.RiemannSphere.reset(); requestRender(); return; }
+    if (state.projection === "stereographic" || state.projection === "poincare") {
+      setSquareAspect("out", true);
+      setView(state.outView, canvasOut, 0, 0, 1.32);
+      return;
+    }
     setView(state.outView, canvasOut, state.defaultOutView.cx, state.defaultOutView.cy, state.defaultOutView.r);
   });
 
@@ -3621,13 +4058,28 @@
 
   function exportSnapshot() {
     const sp = window.RiemannSphere && window.RiemannSphere.state;
+    const ordered = getOrderedElements();
+    const shapeIdxById = new Map(state.shapes.map((s, i) => [s.id, i]));
+    const pointIdxById = new Map(state.points.map((p, i) => [p.id, i]));
+    const lineIdxById = new Map(state.lines.map((l, i) => [l.id, i]));
+    const layerRefs = ordered.map((e) => {
+      if (e.kind === "shape") return `s:${shapeIdxById.get(e.id)}`;
+      if (e.kind === "point") return `p:${pointIdxById.get(e.id)}`;
+      return `l:${lineIdxById.get(e.id)}`;
+    });
     return {
       iv: [r4(state.inView.cx), r4(state.inView.cy), r4(viewRadius(state.inView, canvasIn))],
       ov: [r4(state.outView.cx), r4(state.outView.cy), r4(viewRadius(state.outView, canvasOut))],
       isq: state.inSquare ? 1 : 0,
       osq: state.outSquare ? 1 : 0,
-      sph: sp && sp.enabled ? 1 : 0,
+      sph: state.projection === "sphere" || (sp && sp.enabled) ? 1 : 0,
+      proj: state.projection || "planar",
+      pexpr: state.projection === "custom" ? (state.projectionExpr || "") : undefined,
       spv: sp ? [r4(sp.yaw), r4(sp.pitch), r4(sp.zoom)] : [-0.58, 0.22, 1.0],
+      dom: state.showDomain ? 1 : 0,
+      dscm: state.domainScheme || "classic",
+      dop: r4(normOpacity(state.domainOpacity, 0.72)),
+      lo: layerRefs,
       sh: state.shapes.map((s) => {
         const pts = downsamplePts(s.rawPts, 84);
         const flat = [];
@@ -3636,7 +4088,8 @@
           k: s.kind,
           l: s.label || "",
           c: s.color || "#38bdf8",
-          w: Number(s.lineWidth) || 2.2,
+          w: normLineWidth(s.lineWidth, 2.2),
+          op: r4(normOpacity(s.opacity, 1.0)),
           st: s.lineStyle || "solid",
           lk: s.locked ? 1 : 0,
           cl: s.closed ? 1 : 0,
@@ -3653,6 +4106,7 @@
         i: p.icon || "dot",
         c: p.color || "#34d399",
         s: Number(p.size) || 5,
+        op: r4(normOpacity(p.opacity, 1.0)),
         lk: p.locked ? 1 : 0,
         v: p.visible !== false ? 1 : 0,
         sl: p.showLabel !== false ? 1 : 0,
@@ -3662,13 +4116,37 @@
         val: r4(ln.value),
         l: ln.label || "",
         c: ln.color || "#fbbf24",
-        w: Number(ln.lineWidth) || 1.5,
+        w: normLineWidth(ln.lineWidth, 1.5),
+        op: r4(normOpacity(ln.opacity, 1.0)),
         st: ln.lineStyle || "dashed",
         lk: ln.locked ? 1 : 0,
         v: ln.visible !== false ? 1 : 0,
         sl: ln.showLabel !== false ? 1 : 0,
       })),
     };
+  }
+
+  function applyLayerRefs(refs) {
+    state.layerOrder = [];
+    if (Array.isArray(refs) && refs.length > 0) {
+      for (const r of refs) {
+        const parts = String(r).split(":");
+        if (parts.length !== 2) continue;
+        const idx = parseInt(parts[1], 10);
+        if (parts[0] === "s" && state.shapes[idx]) state.layerOrder.push({ kind: "shape", id: state.shapes[idx].id });
+        else if (parts[0] === "p" && state.points[idx]) state.layerOrder.push({ kind: "point", id: state.points[idx].id });
+        else if (parts[0] === "l" && state.lines[idx]) state.layerOrder.push({ kind: "guide_line", id: state.lines[idx].id });
+      }
+    }
+    syncLayerOrder();
+  }
+
+  function syncDomainControlsUI() {
+    const domCb = document.getElementById("opt-domain");
+    if (domCb) domCb.checked = Boolean(state.showDomain);
+    if (optDomainScheme) optDomainScheme.value = state.domainScheme || "classic";
+    if (optDomainOpacity) optDomainOpacity.value = String(normOpacity(state.domainOpacity, 0.72));
+    if (optDomainOpacityVal) optDomainOpacityVal.textContent = `${Math.round(normOpacity(state.domainOpacity, 0.72) * 100)}%`;
   }
 
   async function restoreSnapshot(snap) {
@@ -3678,28 +4156,26 @@
     ensureCanvasSize(canvasOut);
     setSquareAspect("in", snap.isq !== undefined ? Boolean(snap.isq) : true);
     setSquareAspect("out", snap.osq !== undefined ? Boolean(snap.osq) : true);
-    if (window.RiemannSphere) {
-      const on = Boolean(snap.sph);
-      window.RiemannSphere.state.enabled = on;
-      if (Array.isArray(snap.spv) && snap.spv.length >= 3) {
-        window.RiemannSphere.state.yaw = Number(snap.spv[0]) || 0;
-        window.RiemannSphere.state.pitch = Number(snap.spv[1]) || 0;
-        window.RiemannSphere.state.zoom = Math.max(0.45, Number(snap.spv[2]) || 1.0);
-      }
-      if (btnToggleSphere) {
-        btnToggleSphere.classList.toggle("active", on);
-        btnToggleSphere.textContent = on ? "2D Plane" : "3D Sphere";
-      }
-      if (outputTag) {
-        outputTag.textContent = on ? "RIEMANN SPHERE" : state.mode === "integral" ? "INTEGRAL PLANE" : "OUTPUT PLANE";
-      }
+    const projMode = snap.proj || (snap.sph ? "sphere" : "planar");
+    if (window.RiemannSphere && Array.isArray(snap.spv) && snap.spv.length >= 3) {
+      window.RiemannSphere.state.yaw = Number(snap.spv[0]) || 0;
+      window.RiemannSphere.state.pitch = Number(snap.spv[1]) || 0;
+      window.RiemannSphere.state.zoom = Math.max(0.45, Number(snap.spv[2]) || 1.0);
     }
+    setProjection(projMode, { expr: snap.pexpr, keepOutView: true, keepSphereView: true, silent: true });
+
+    state.showDomain = Boolean(snap.dom);
+    state.domainScheme = snap.dscm || "classic";
+    state.domainOpacity = normOpacity(snap.dop, state.domainScheme === "classic" ? 0.72 : 1.0);
+    if (!state.showDomain) state.domainImg = null;
+    syncDomainControlsUI();
+
     if (Array.isArray(snap.iv) && snap.iv.length >= 3) {
-      state.defaultInView = { cx: Number(snap.iv[0]), cy: Number(snap.iv[1]), r: Math.max(0.01, Number(snap.iv[2])) };
+      state.defaultInView = { cx: Number(snap.iv[0]), cy: Number(snap.iv[1]), r: Math.max(0.0001, Number(snap.iv[2])) };
       setView(state.inView, canvasIn, state.defaultInView.cx, state.defaultInView.cy, state.defaultInView.r);
     }
     if (Array.isArray(snap.ov) && snap.ov.length >= 3) {
-      state.defaultOutView = { cx: Number(snap.ov[0]), cy: Number(snap.ov[1]), r: Math.max(0.01, Number(snap.ov[2])) };
+      state.defaultOutView = { cx: Number(snap.ov[0]), cy: Number(snap.ov[1]), r: Math.max(0.0001, Number(snap.ov[2])) };
       setView(state.outView, canvasOut, state.defaultOutView.cx, state.defaultOutView.cy, state.defaultOutView.r);
     }
     state.points = (snap.pt || []).map((p) => ({
@@ -3711,6 +4187,7 @@
       icon: p.i || "dot",
       color: p.c || "#34d399",
       size: Number(p.s) || 5,
+      opacity: normOpacity(p.op, 1.0),
       locked: Boolean(p.lk),
       visible: p.v !== 0,
       showLabel: p.sl !== 0,
@@ -3723,7 +4200,8 @@
       value: Number(ln.val) || 0,
       label: ln.l || "",
       color: ln.c || "#fbbf24",
-      lineWidth: Number(ln.w) || 1.5,
+      lineWidth: normLineWidth(ln.w, 1.5),
+      opacity: normOpacity(ln.op, 1.0),
       lineStyle: ln.st || "dashed",
       locked: Boolean(ln.lk),
       visible: ln.v !== 0,
@@ -3740,7 +4218,8 @@
         kind: sh.k || "freehand",
         label: sh.l || "Shape",
         color: sh.c || "#38bdf8",
-        lineWidth: Number(sh.w) || 2.2,
+        lineWidth: normLineWidth(sh.w, 2.2),
+        opacity: normOpacity(sh.op, 1.0),
         lineStyle: sh.st || "solid",
         locked: Boolean(sh.lk),
         closed: Boolean(sh.cl),
@@ -3752,6 +4231,7 @@
         extraCurves: [],
       };
     });
+    applyLayerRefs(snap.lo);
     state.selectedShapeId = null;
     state.selectedPointId = null;
     state.selectedLineId = null;
@@ -3800,6 +4280,10 @@
     evalParamExpr,
     findSnapTarget,
     setSquareAspect,
+    setProjection,
+    getOrderedElements,
+    reorderElement,
+    moveElementLayer,
     shouldShadeExterior,
     exportSnapshot,
     restoreSnapshot,
@@ -3855,19 +4339,25 @@
       state.foundZeros = [];
       state.undoStack = [];
 
+      const projMode = pr.projection || ex.defaultProjection || (pr.enableSphere ? "sphere" : "planar");
       if (window.RiemannSphere) {
-        const on = Boolean(pr.enableSphere);
-        window.RiemannSphere.state.enabled = on;
-        if (on) window.RiemannSphere.reset();
+        if (projMode === "sphere") window.RiemannSphere.reset();
         if (pr.sphereView) {
           if (Number.isFinite(pr.sphereView.yaw)) window.RiemannSphere.state.yaw = pr.sphereView.yaw;
           if (Number.isFinite(pr.sphereView.pitch)) window.RiemannSphere.state.pitch = pr.sphereView.pitch;
           if (Number.isFinite(pr.sphereView.zoom)) window.RiemannSphere.state.zoom = pr.sphereView.zoom;
         }
-        btnToggleSphere.classList.toggle("active", on);
-        btnToggleSphere.textContent = on ? "2D Plane" : "3D Sphere";
-        outputTag.textContent = on ? "RIEMANN SPHERE" : state.mode === "integral" ? "INTEGRAL PLANE" : "OUTPUT PLANE";
       }
+      setProjection(projMode, { expr: pr.projectionExpr || ex.projectionExpr, keepOutView: true, keepSphereView: true, silent: true });
+
+      state.showDomain = Boolean(pr.showDomain !== undefined ? pr.showDomain : ex.showDomain);
+      state.domainScheme = pr.domainScheme || ex.domainScheme || "classic";
+      state.domainOpacity = normOpacity(
+        pr.domainOpacity !== undefined ? pr.domainOpacity : ex.domainOpacity,
+        state.domainScheme === "classic" ? 0.72 : 1.0
+      );
+      if (!state.showDomain) state.domainImg = null;
+      syncDomainControlsUI();
 
       ensureCanvasSize(canvasIn);
       ensureCanvasSize(canvasOut);
@@ -3888,6 +4378,7 @@
         icon: pt.icon || "ring",
         color: pt.color || "#34d399",
         size: pt.size || 5,
+        opacity: normOpacity(pt.opacity, 1.0),
         locked: pt.locked !== undefined ? Boolean(pt.locked) : true,
         visible: pt.visible !== undefined ? Boolean(pt.visible) : true,
         showLabel: pt.showLabel !== undefined ? Boolean(pt.showLabel) : true,
@@ -3902,7 +4393,8 @@
         value: Number(ln.value) || 0,
         label: ln.label || "",
         color: ln.color || "#fbbf24",
-        lineWidth: Number(ln.lineWidth) || 1.5,
+        lineWidth: normLineWidth(ln.lineWidth, 1.5),
+        opacity: normOpacity(ln.opacity, 1.0),
         lineStyle: ln.lineStyle || "dashed",
         locked: ln.locked !== undefined ? Boolean(ln.locked) : true,
         visible: ln.visible !== undefined ? Boolean(ln.visible) : true,
@@ -3914,7 +4406,8 @@
         kind: sh.kind || (sh.formula && sh.formula.kind) || "circle",
         label: sh.label,
         color: sh.color || "#38bdf8",
-        lineWidth: sh.lineWidth || 2.2,
+        lineWidth: normLineWidth(sh.lineWidth, 2.2),
+        opacity: normOpacity(sh.opacity, 1.0),
         lineStyle: sh.lineStyle || "solid",
         locked: Boolean(sh.locked),
         closed: Boolean(sh.closed),
@@ -3925,6 +4418,8 @@
         mesh: [],
         extraCurves: [],
       }));
+      state.layerOrder = [];
+      syncLayerOrder();
       clearSelection();
       await recomputeAll(1.0);
     },
@@ -3932,20 +4427,19 @@
       state.shapes = [];
       state.points = [];
       state.lines = [];
+      state.layerOrder = [];
       state.foundZeros = [];
       state.undoStack = [];
       clearSelection();
+      state.showDomain = false;
+      state.domainScheme = "classic";
+      state.domainOpacity = 0.72;
       state.domainImg = null;
+      syncDomainControlsUI();
+      setProjection("planar", { keepOutView: true, silent: true });
       if (window.RiemannSphere) {
         window.RiemannSphere.state.enabled = false;
         window.RiemannSphere.reset();
-        if (btnToggleSphere) {
-          btnToggleSphere.classList.remove("active");
-          btnToggleSphere.textContent = "3D Sphere";
-        }
-        if (outputTag) {
-          outputTag.textContent = state.mode === "integral" ? "INTEGRAL PLANE" : "OUTPUT PLANE";
-        }
       }
       ensureCanvasSize(canvasIn);
       ensureCanvasSize(canvasOut);

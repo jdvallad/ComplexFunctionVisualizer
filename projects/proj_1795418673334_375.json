@@ -43,5 +43,6 @@
     "showPrimes": false,
     "showZeros": false
   },
-  "presets": []
+  "presets": [],
+  "description": "Compares Bhaskara I’s 7th-century rational sine approximation against exact sin(x) in 2D Real mode."
 }

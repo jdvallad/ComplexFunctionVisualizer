@@ -364,6 +364,7 @@ typedef struct {
     int height;
     int y_start;
     int y_end;
+    int scheme;
     uint8_t *rgba;
 } DomainJob;
 
@@ -402,6 +403,135 @@ static void hsv_to_rgb(double h, double s, double v, uint8_t *r, uint8_t *g, uin
     *b = (uint8_t)fmin(255.0, fmax(0.0, (bf + m) * 255.0));
 }
 
+static void eval_palette_stops(double t, const double (*stops)[4], int count, uint8_t *r,
+                               uint8_t *g, uint8_t *b) {
+    t = fmod(t, 1.0);
+    if (t < 0.0) {
+        t += 1.0;
+    }
+    int seg = 0;
+    for (int i = 0; i < count - 1; i++) {
+        if (t >= stops[i][0] && t <= stops[i + 1][0]) {
+            seg = i;
+            break;
+        }
+    }
+    double t0 = stops[seg][0];
+    double t1 = stops[seg + 1][0];
+    double u = (t1 > t0) ? (t - t0) / (t1 - t0) : 0.0;
+    /* Smoothstep Hermite interpolation for silky-smooth fractal gradients */
+    u = u * u * (3.0 - 2.0 * u);
+    double rv = stops[seg][1] + (stops[seg + 1][1] - stops[seg][1]) * u;
+    double gv = stops[seg][2] + (stops[seg + 1][2] - stops[seg][2]) * u;
+    double bv = stops[seg][3] + (stops[seg + 1][3] - stops[seg][3]) * u;
+    *r = (uint8_t)fmin(255.0, fmax(0.0, rv));
+    *g = (uint8_t)fmin(255.0, fmax(0.0, gv));
+    *b = (uint8_t)fmin(255.0, fmax(0.0, bv));
+}
+
+void sampler_color_complex(double complex w, int scheme, uint8_t *r, uint8_t *g, uint8_t *b) {
+    if (scheme == DOMAIN_SCHEME_SMOOTH_ESCAPE) {
+        if (!c_isfinite(w) || creal(w) < 0.0) {
+            *r = 5;
+            *g = 7;
+            *b = 15;
+            return;
+        }
+        static const double UF_STOPS[6][4] = {
+            {0.0000, 0.0, 7.0, 100.0},   {0.1600, 32.0, 107.0, 203.0},
+            {0.4200, 237.0, 255.0, 255.0}, {0.6425, 255.0, 170.0, 0.0},
+            {0.8575, 110.0, 22.0, 56.0}, {1.0000, 0.0, 7.0, 100.0},
+        };
+        double nu = (fabs(cimag(w)) > 1e-12) ? (log1p(cabs(w)) * 8.0) : creal(w);
+        double phase = 0.085 * sqrt(fmax(0.0, nu)) + 0.012 * nu;
+        eval_palette_stops(phase, UF_STOPS, 6, r, g, b);
+        return;
+    }
+
+    if (scheme == DOMAIN_SCHEME_INFERNO) {
+        if (!c_isfinite(w) || creal(w) < 0.0) {
+            *r = 4;
+            *g = 4;
+            *b = 10;
+            return;
+        }
+        static const double INF_STOPS[7][4] = {
+            {0.00, 8.0, 6.0, 28.0},     {0.18, 86.0, 16.0, 110.0},
+            {0.38, 187.0, 55.0, 84.0},  {0.58, 249.0, 140.0, 10.0},
+            {0.78, 252.0, 246.0, 164.0}, {0.92, 180.0, 62.0, 104.0},
+            {1.00, 8.0, 6.0, 28.0},
+        };
+        double nu = (fabs(cimag(w)) > 1e-12) ? (log1p(cabs(w)) * 7.0) : creal(w);
+        double phase = 0.09 * sqrt(fmax(0.0, nu)) + 0.010 * nu;
+        eval_palette_stops(phase, INF_STOPS, 7, r, g, b);
+        return;
+    }
+
+    if (scheme == DOMAIN_SCHEME_OCEAN) {
+        if (!c_isfinite(w) || creal(w) < 0.0) {
+            *r = 4;
+            *g = 8;
+            *b = 18;
+            return;
+        }
+        static const double OCN_STOPS[6][4] = {
+            {0.00, 4.0, 18.0, 56.0},    {0.22, 12.0, 114.0, 186.0},
+            {0.46, 56.0, 224.0, 248.0}, {0.66, 236.0, 252.0, 255.0},
+            {0.84, 248.0, 196.0, 72.0}, {1.00, 4.0, 18.0, 56.0},
+        };
+        double nu = (fabs(cimag(w)) > 1e-12) ? (log1p(cabs(w)) * 7.5) : creal(w);
+        double phase = 0.095 * sqrt(fmax(0.0, nu)) + 0.011 * nu;
+        eval_palette_stops(phase, OCN_STOPS, 6, r, g, b);
+        return;
+    }
+
+    if (!c_isfinite(w)) {
+        *r = 240;
+        *g = 245;
+        *b = 255;
+        return;
+    }
+
+    double mag = cabs(w);
+    double arg = carg(w);
+    double hue = (arg + M_PI) / (2.0 * M_PI);
+    double log2_mag = log2(mag + 1e-18);
+    double frac = log2_mag - floor(log2_mag);
+
+    if (scheme == DOMAIN_SCHEME_NEON_PRISM) {
+        double t = (fabs(cimag(w)) < 1e-12 && creal(w) >= 0.0)
+                       ? (0.08 * sqrt(creal(w)) + 0.014 * creal(w))
+                       : hue;
+        double contour = 0.80 + 0.20 * frac;
+        double rf = (0.5 + 0.5 * cos(6.28318530718 * (t + 0.00))) * contour;
+        double gf = (0.5 + 0.5 * cos(6.28318530718 * (t + 0.33))) * contour;
+        double bf = (0.5 + 0.5 * cos(6.28318530718 * (t + 0.67))) * contour;
+        *r = (uint8_t)fmin(255.0, fmax(0.0, rf * 255.0));
+        *g = (uint8_t)fmin(255.0, fmax(0.0, gf * 255.0));
+        *b = (uint8_t)fmin(255.0, fmax(0.0, bf * 255.0));
+        return;
+    }
+
+    if (scheme == DOMAIN_SCHEME_GRAYSCALE) {
+        double contour = 0.72 + 0.28 * frac;
+        double phase_grid = 0.90 + 0.10 * fabs(sin(arg * 6.0));
+        double lum = (0.14 + 0.80 * (1.0 - 1.0 / (1.0 + 0.50 * pow(mag, 0.45)))) * contour *
+                     phase_grid;
+        uint8_t v = (uint8_t)fmin(255.0, fmax(0.0, lum * 255.0));
+        *r = v;
+        *g = v;
+        *b = v;
+        return;
+    }
+
+    /* Default: DOMAIN_SCHEME_CLASSIC */
+    double contour = 0.78 + 0.22 * frac;
+    double lightness = 0.16 + 0.76 * (1.0 - 1.0 / (1.0 + 0.45 * pow(mag, 0.45)));
+    double val = fmin(0.96, lightness * contour);
+    double sat = 0.72 * (1.0 / (1.0 + 0.06 * log1p(mag)));
+    hsv_to_rgb(hue, sat, val, r, g, b);
+}
+
 static void *domain_worker(void *arg) {
     DomainJob *job = (DomainJob *)arg;
     double x0 = job->cx - job->half_w;
@@ -415,31 +545,8 @@ static void *domain_worker(void *arg) {
             double re = x0 + ((double)px + 0.5) * dx;
             double complex w = job->eval(c_make(re, im));
             size_t idx = ((size_t)py * (size_t)job->width + (size_t)px) * 4;
-
-            if (!c_isfinite(w)) {
-                job->rgba[idx + 0] = 240;
-                job->rgba[idx + 1] = 245;
-                job->rgba[idx + 2] = 255;
-                job->rgba[idx + 3] = 255;
-                continue;
-            }
-
-            double mag = cabs(w);
-            double arg = carg(w);
-            double hue = (arg + M_PI) / (2.0 * M_PI);
-
-            /* Dark-mode friendly domain coloring with subtle log2 contour bands */
-            double log2_mag = log2(mag + 1e-18);
-            double frac = log2_mag - floor(log2_mag);
-            double contour = 0.78 + 0.22 * frac;
-
-            /* Smooth luminance: zeros go dark, large magnitudes glow bright */
-            double lightness = 0.16 + 0.76 * (1.0 - 1.0 / (1.0 + 0.45 * pow(mag, 0.45)));
-            double val = fmin(0.96, lightness * contour);
-            double sat = 0.72 * (1.0 / (1.0 + 0.06 * log1p(mag)));
-
             uint8_t r, g, b;
-            hsv_to_rgb(hue, sat, val, &r, &g, &b);
+            sampler_color_complex(w, job->scheme, &r, &g, &b);
             job->rgba[idx + 0] = r;
             job->rgba[idx + 1] = g;
             job->rgba[idx + 2] = b;
@@ -449,8 +556,9 @@ static void *domain_worker(void *arg) {
     return NULL;
 }
 
-bool sampler_render_domain(const FunctionDef *fn, double cx, double cy, double half_w,
-                           double half_h, int width, int height, uint8_t *rgba_out) {
+bool sampler_render_domain_ex(const FunctionDef *fn, double cx, double cy, double half_w,
+                              double half_h, int width, int height, int scheme,
+                              uint8_t *rgba_out) {
     if (!fn || !rgba_out || width <= 0 || height <= 0) {
         return false;
     }
@@ -481,6 +589,7 @@ bool sampler_render_domain(const FunctionDef *fn, double cx, double cy, double h
             .height = height,
             .y_start = ys,
             .y_end = ye,
+            .scheme = scheme,
             .rgba = rgba_out,
         };
         if (pthread_create(&threads[t], NULL, domain_worker, &jobs[t]) == 0) {
@@ -495,6 +604,12 @@ bool sampler_render_domain(const FunctionDef *fn, double cx, double cy, double h
     }
 
     return true;
+}
+
+bool sampler_render_domain(const FunctionDef *fn, double cx, double cy, double half_w,
+                           double half_h, int width, int height, uint8_t *rgba_out) {
+    return sampler_render_domain_ex(fn, cx, cy, half_w, half_h, width, height,
+                                    DOMAIN_SCHEME_CLASSIC, rgba_out);
 }
 
 /* ----------------------------------------------------------------------------

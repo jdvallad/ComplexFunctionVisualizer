@@ -1028,6 +1028,7 @@
       category: "Complex Map",
       title: "Riemann Zeta ζ(s)",
       subtitle: "Full analytic continuation across C \\ {1}",
+      description: "Explores the full analytic continuation of Riemann’s zeta function ζ(s) across ℂ \\ {1}, including the critical line Re(s)=1/2, non-trivial zeros, simple pole at s=1 (Res=1), and functional-equation bridge into the left half-plane.",
       showCriticalLine: true,
       fnCards: [
         { title: "Riemann Zeta ζ(s)", code: "c_zeta(s)", color: "#38bdf8", visible: true, builtin: { fn: 0 } },
@@ -1093,6 +1094,7 @@
       category: "Complex Map",
       title: "Dirichlet Partial Sums Sₙ(s) vs ζ(s)",
       subtitle: "Compare naive sum against full analytic continuation across Re(s)=1",
+      description: "Visualizes the truncated Dirichlet series S_N(s) = Σ_{n=1}^N n^(-s) with an interactive N slider, contrasting convergence in Re(s) > 1 with violent divergence across the Re(s) = 1 abscissa wall.",
       showCriticalLine: true,
       showDirichletWall: true,
       fnCards: [
@@ -1129,6 +1131,7 @@
       category: "Complex Map",
       title: "Completed Zeta ξ(s)",
       subtitle: "Entire function satisfying ξ(s) = ξ(1 − s), real on Re(s) = 1/2",
+      description: "Demonstrates Riemann’s entire completed zeta function ξ(s) = ½ s(s−1)π^(-s/2)Γ(s/2)ζ(s), highlighting its exact reflection symmetry ξ(s) = ξ(1−s), real values along Re(s) = 1/2, and removable singularity at s = 1.",
       showCriticalLine: true,
       fnCards: [
         { title: "Completed Zeta ξ(s)", code: "c_xi(s)", color: "#a78bfa", visible: true, builtin: { fn: 1 } },
@@ -1178,6 +1181,7 @@
       category: "Complex Map",
       title: "Homotopy Morph: z → ζ(z)",
       subtitle: "Press ▶ on slider t to continuously bend the identity plane into ζ(z)",
+      description: "Smoothly morphs between the identity map z and the analytic continuation of ζ(s) via a live homotopy slider t ∈ [0, 1], showing how regions bend around the pole at s = 1.",
       showCriticalLine: true,
       fnCards: [
         { title: "Morph (1 − t)z + t·ζ(z)", code: "(1.0 - t) * z + t * c_zeta(z)", color: "#a78bfa", visible: true, builtin: { fn: 0 } },
@@ -1202,6 +1206,7 @@
       category: "Complex Map",
       title: "Joukowsky Airfoil Map",
       subtitle: "Conformal aerodynamic transform (z + 1/z) / 2",
+      description: "Classic aerodynamic conformal map w = z + 1/z transforming off-center circles passing through z = −1 into realistic Joukowsky airfoil profiles while preserving orthogonal streamlines.",
       fnCards: [
         { title: "Joukowsky (z + 1/z)/2", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : 0.5 * (z + 1.0 / z)", color: "#38bdf8", visible: true, builtin: { fn: 6 } },
       ],
@@ -1239,6 +1244,7 @@
       category: "Complex Map",
       title: "Essential Singularity exp(1/z)",
       subtitle: "Try toggling 3D Sphere on the output plane!",
+      description: "Visualizes the essential singularity of e^(1/z) at the origin, illustrating Picard’s Great Theorem as tiny loops around z = 0 explode across the entire punctured w-plane.",
       fnCards: [
         { title: "exp(1 / z)", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : cexp(1.0 / z)", color: "#fbbf24", visible: true, builtin: { fn: 9 } },
       ],
@@ -1262,6 +1268,7 @@
       category: "Complex Map",
       title: "World Map on the Riemann Sphere",
       subtitle: "70 high-detail landmasses, lakes & secret Easter Eggs + 23 labeled cities/mysteries on S² — driven at 60 FPS by sphere_yaw, sphere_pitch & sphere_zoom!",
+      description: "Maps a detailed vector world map and major cities onto the 3D Riemann Sphere via stereographic projection, with live longitude/latitude Möbius spin and flat stereographic presets.",
       fnCards: [
         {
           title: "Identity Globe w = z",
@@ -1383,6 +1390,7 @@
       category: "Complex Map",
       title: "Blaschke Product & Hyperbolic Disk Kaleidoscope",
       subtitle: "3-fold proper holomorphic self-map of the unit disk: f(z) = e^(iθ) z² (z − a) / (1 − a z) with winding number W = +3!",
+      description: "Composes finite Blaschke products (z−a)/(1−āz) to create conformal n-fold branched coverings of the unit disk and 3D Riemann Sphere with live zero-position and rotation sliders.",
       fnCards: [
         {
           title: "3-Fold Blaschke Product B(z)",
@@ -1439,6 +1447,92 @@
         },
       ],
     },
+    {
+      id: "map_mandelbrot",
+      mode: "map",
+      category: "Complex Maps",
+      title: "Mandelbrot & Multibrot Set (Smooth C11 Coloring)",
+      subtitle: "4-thread native C11 smooth escape-time fractal with Ultra-Fractal, Inferno & Ocean palettes — zoom into Seahorse or Elephant Valley!",
+      description: "Computes the continuous smooth escape-time potential ν = k + 1 − log₂(log₂|z|) for z_{n+1} = z_n^p + c across 4 native C11 threads. Interior bounded points return Re(w) = −1 (deep black), while exterior points map to silky-smooth cyclic fractal gradients. Try scrubbing the exponent p to morph into Multibrot fractals or switching palettes in Tools!",
+      showDomain: true,
+      domainScheme: "smooth_escape",
+      domainOpacity: 1.0,
+      fnCards: [
+        {
+          title: "Smooth Escape Potential ν(c) for z^p + c",
+          code: "double complex c = z, w = c_make(0.0, 0.0);\nint lim = (int)floor(max_iter + 0.5);\nif (lim < 16) lim = 16;\nif (lim > 600) lim = 600;\ndouble p = power;\nfor (int k = 0; k < lim; k++) {\n  if (fabs(p - 2.0) < 1e-6) {\n    w = w * w + c;\n  } else {\n    double r = cabs(w);\n    w = (r < 1e-15 ? c_make(0.0, 0.0) : cpow(w, c_make(p, 0.0))) + c;\n  }\n  double r2 = creal(w) * creal(w) + cimag(w) * cimag(w);\n  if (r2 > 256.0) {\n    double lp = log(fmax(1.5, p));\n    double nu = (double)k + 1.0 - log(0.5 * log(r2) / log(2.0)) / lp;\n    return c_make(fmax(0.0, nu + shift), 0.0);\n  }\n}\nreturn c_make(-1.0, 0.0);",
+          color: "#38bdf8",
+          visible: true,
+          active: true,
+        },
+      ],
+      sliders: [
+        { name: "max_iter", label: "Max Iterations", value: 180, min: 24, max: 500, step: 8, speed: 0.5 },
+        { name: "power", label: "Exponent p (z^p + c)", value: 2.0, min: 1.5, max: 6.0, step: 0.05, speed: 0.4 },
+        { name: "shift", label: "Palette Phase Shift", value: 0.0, min: 0.0, max: 40.0, step: 0.5, speed: 1.0 },
+      ],
+      defaultPoints: [
+        pt(-0.746, 0.105, "Seahorse Valley", "star", "#fbbf24", 4.5, true),
+        pt(0.285, 0.012, "Elephant Valley", "diamond", "#fb7185", 4.5, true),
+        pt(-1.0, 0.0, "Period-2 Bulb", "ring", "#34d399", 4.5, true),
+      ],
+      presets: [
+        {
+          id: "mandelbrot_full",
+          name: "Full Mandelbrot (Ultra-Fractal)",
+          showDomain: true,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -0.55, cy: 0.0, r: 1.45 },
+          outView: { cx: 12.0, cy: 0.0, r: 18.0 },
+          sliderValues: { max_iter: 180, power: 2.0, shift: 0.0 },
+          shapes: [
+            { kind: "circle", label: "Probe Loop", color: "#fbbf24", lineWidth: 1.6, opacity: 0.85, closed: true, rawPts: circlePts(-0.75, 0.0, 0.25, 72) },
+          ],
+        },
+        {
+          id: "mandelbrot_seahorse",
+          name: "Seahorse Valley Zoom",
+          showDomain: true,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -0.746, cy: 0.105, r: 0.075 },
+          outView: { cx: 25.0, cy: 0.0, r: 30.0 },
+          sliderValues: { max_iter: 300, power: 2.0, shift: 2.0 },
+          shapes: [],
+        },
+        {
+          id: "mandelbrot_elephant",
+          name: "Elephant Valley (Inferno Flame)",
+          showDomain: true,
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.282, cy: 0.011, r: 0.055 },
+          outView: { cx: 25.0, cy: 0.0, r: 30.0 },
+          sliderValues: { max_iter: 280, power: 2.0, shift: 0.0 },
+          shapes: [],
+        },
+        {
+          id: "multibrot_cubic",
+          name: "Multibrot z³ + c (Electric Ocean)",
+          showDomain: true,
+          domainScheme: "ocean",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.45 },
+          outView: { cx: 12.0, cy: 0.0, r: 18.0 },
+          sliderValues: { max_iter: 160, power: 3.0, shift: 0.0 },
+          shapes: [],
+        },
+      ],
+    },
 
     /* =====================================================================
      * CONTOUR INTEGRAL EXAMPLES (Every contour shows its own integral value!)
@@ -1449,6 +1543,7 @@
       category: "Contour Integrals",
       title: "Riemann Zero Counter: ζ'(s) / ζ(s)",
       subtitle: "Argument Principle: (1/2πi) ∮ ζ'/ζ ds = Z − P inside each contour!",
+      description: "Applies Cauchy’s Argument Principle to ζ′(s)/ζ(s): integrating around closed loops returns (1/2πi)∮ ζ′/ζ ds = Z − P, counting exact Riemann zeros minus the pole at s = 1.",
       showCriticalLine: true,
       fnCards: [
         { title: "Log-Derivative ζ'(s)/ζ(s)", code: "c_zeta_log_deriv(s)", color: "#34d399", visible: true, builtin: { fn: 2 } },
@@ -1493,6 +1588,7 @@
       category: "Contour Integrals",
       title: "Riemann Zeta Residue ∮ ζ(s) ds",
       subtitle: "Pole at s = 1 has residue 1 (2πi); holomorphic loops integrate to 0",
+      description: "Evaluates complex contour integrals of ζ(s) via adaptive C11 Gauss-Legendre quadrature, contrasting ∮ ζ(s) ds = 2πi around the pole at s = 1 against 0 on holomorphic loops.",
       showCriticalLine: true,
       fnCards: [
         { title: "Riemann Zeta ζ(s)", code: "c_zeta(s)", color: "#38bdf8", visible: true, builtin: { fn: 0 } },
@@ -1528,6 +1624,7 @@
       category: "Contour Integrals",
       title: "Two Poles: 1 / (z² + 1)",
       subtitle: "Residues at +i (+π) and −i (−π) cancel when both are enclosed!",
+      description: "Demonstrates Cauchy’s Residue Theorem on 1/(z²+1) with simple poles at +i and −i, showing individual non-zero residues that cancel to zero when both poles are enclosed together.",
       fnCards: [
         { title: "1 / (z² + 1)", code: "1.0 / (z * z + 1.0)", color: "#38bdf8", visible: true, builtin: { fn: 4 } },
       ],
@@ -1565,6 +1662,7 @@
       category: "Contour Integrals",
       title: "Euler Gamma Residue Ladder Γ(z)",
       subtitle: "Poles at z = 0, −1, −2, … with alternating residues (−1)ⁿ / n!",
+      description: "Integrates Euler’s meromorphic Gamma function Γ(z) around its negative integer poles z = 0, −1, −2, … verifying the exact residue ladder Res(Γ, −n) = (−1)^n / n!.",
       fnCards: [
         { title: "Euler Gamma Γ(z)", code: "c_gamma(z)", color: "#38bdf8", visible: true, builtin: { fn: 5 } },
       ],
@@ -1595,6 +1693,7 @@
       category: "Contour Integrals",
       title: "Path Independence (Entire sin z)",
       subtitle: "Two completely different paths from A to B land on the EXACT same integral!",
+      description: "Illustrates Cauchy’s Integral Theorem by comparing two different open paths with the same endpoints through an entire function, producing identical net contour integrals.",
       fnCards: [
         { title: "Complex Sine sin(z)", code: "csin(z)", color: "#38bdf8", visible: true, builtin: { fn: 8 } },
       ],
@@ -1622,6 +1721,7 @@
       category: "Contour Integrals",
       title: "Keyhole (Pac-Man) Contour · Branch Cut",
       subtitle: "1 master slider t drives R → ∞, r → 0, and ε → 0 simultaneously across 4 variable pieces!",
+      description: "Interactive variable Pac-Man keyhole contour around a branch cut on [0, ∞) with a master slider t that simultaneously drives outer radius R → ∞, inner radius r → 0, and slit gap ε → 0.",
       fnCards: [
         {
           title: "z^(a−1) / (z + 1)  [cut on ℝ⁺]",
@@ -1779,6 +1879,7 @@
       category: "Contour Integrals",
       title: "Fresnel & Gaussian 45° Sector: ∮ exp(−z²) dz = 0",
       subtitle: "Deforming the Gaussian integral [0, R] onto the 45° ray z = r·e^(iπ/4) proves ∫₀^∞ cos(x²) dx = ∫₀^∞ sin(x²) dx = √(2π)/4!",
+      description: "Wedge-sector contour for evaluating the classic Fresnel integral ∫₀^∞ e^(ix²) dx via a 45° pie-slice contour split into real-axis, arc, and diagonal return pieces.",
       fnCards: [
         {
           title: "Gaussian Kernel exp(−z²)",
@@ -1880,6 +1981,7 @@
       category: "2D Real & Primes",
       title: "Prime Counting π(x) — Explicit Formula",
       subtitle: "Riemann's 1859 formula converging to the prime staircase as zeros increase",
+      description: "Plots exact prime-counting π(x), logarithmic integral li(x), and Riemann’s 1859 explicit formula π_K(x) summed over up to 200 non-trivial zeta zeros in native C11.",
       showPrimes: true,
       fnCards: [
         { title: "Exact π(x)", code: "real_pi_exact(x)", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 0, kind: "exact" } },
@@ -1937,6 +2039,7 @@
       category: "2D Real & Primes",
       title: "Riemann Prime-Power J(x)",
       subtitle: "Jumps by +1 at primes, +1/2 at p², +1/3 at p³",
+      description: "Compares Riemann’s prime-power counting function J(x) = Σ (1/n)π(x^(1/n)) against its explicit zero-sum formula J_K(x) as harmonic zero waves reconstruct every prime-power jump.",
       showPrimes: true,
       fnCards: [
         { title: "Exact J(x)", code: "real_J_exact(x)", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 1, kind: "exact" } },
@@ -1958,6 +2061,7 @@
       category: "2D Real & Primes",
       title: "Chebyshev ψ(x) — Von Mangoldt",
       subtitle: "ψ(x) = x − Σ x^ρ/ρ − ln(2π) − ½ln(1 − x⁻²)",
+      description: "Visualizes Chebyshev’s second function ψ(x) = Σ_{p^k ≤ x} ln(p) alongside von Mangoldt’s explicit formula, showing how the zeta zeros carve sharp logarithmic steps out of the line y = x.",
       showPrimes: true,
       fnCards: [
         { title: "Exact ψ(x)", code: "real_psi_exact(x)", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 2, kind: "exact" } },
@@ -1978,6 +2082,7 @@
       category: "2D Real & Primes",
       title: "Hardy's Z(t) — Critical Line Signal",
       subtitle: "Every zero crossing is a non-trivial Riemann zero γₖ!",
+      description: "Graphs Hardy’s real-valued critical-line function Z(t) = e^(iθ(t))ζ(1/2 + it), whose real sign changes occur at the exact imaginary heights γ_k of the non-trivial Riemann zeros.",
       showZeros: true,
       fnCards: [
         { title: "Hardy Z(t)", code: "c_hardy_z(x)", color: "#38bdf8", visible: true, builtin: { fn: 3, kind: "exact" } },
@@ -2002,6 +2107,7 @@
       category: "2D Real & Primes",
       title: "Completed Zeta ξ(x) on ℝ",
       subtitle: "Perfect reflection symmetry ξ(x) = ξ(1 − x)",
+      description: "Plots the real slice of completed zeta ξ(x) along the real axis and inside the critical strip [0, 1], visually confirming its mirror symmetry around x = 1/2.",
       fnCards: [
         { title: "Completed Zeta ξ(x)", code: "creal(c_xi(c_make(x, 0.0)))", color: "#a78bfa", visible: true, builtin: { fn: 4, kind: "exact" } },
       ],
@@ -2022,6 +2128,7 @@
       category: "2D Real & Primes",
       title: "Fourier Square Wave (Gibbs Phenomenon)",
       subtitle: "Inline C loop with live harmonic slider K",
+      description: "Synthesizes a square wave from N odd Fourier harmonics with a live slider, revealing Gibbs phenomenon overshoot near every jump discontinuity.",
       fnCards: [
         { title: "Exact Square Wave", code: "sin(x) >= 0.0 ? 1.0 : -1.0", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 5, kind: "exact" } },
         {
@@ -2045,6 +2152,7 @@
       category: "2D Real & Primes",
       title: "Vertical Lines & Implicit Relations",
       subtitle: "Non-functions in 2D Real: x = c, x = g(y), and F(x, y) = 0",
+      description: "Showcases 2D Real non-function capabilities simultaneously: implicit relations F(x,y)=0 (circles, elliptic curves), vertical lines x=c, and inverted curves x=g(y).",
       fnCards: [
         { title: "Circle x² + y² = r²", code: "x*x + y*y = r*r", color: "#38bdf8", visible: true },
         { title: "Right Vertical Tangent", code: "x = r", color: "#fb7185", visible: true, lineStyle: "dashed" },
@@ -2081,6 +2189,7 @@
       category: "2D Real & Fractals",
       title: "Weierstrass Fractal W(x)",
       subtitle: "Continuous everywhere, differentiable nowhere: Σ aⁿ cos(bⁿ π x) — zoom in forever!",
+      description: "Graphs the continuous, nowhere-differentiable Weierstrass fractal function Σ a^k cos(b^k π x) with deep zoom presets and harmonic depth slider.",
       fnCards: [
         {
           title: "Weierstrass W(x)",
@@ -2142,6 +2251,7 @@
       category: "2D Real & Fractals",
       title: "Takagi Blancmange Fractal",
       subtitle: "Another continuous nowhere-differentiable curve: Σ 2⁻ⁿ dist(2ⁿ x, ℤ)",
+      description: "Displays the Takagi (Blancmange) fractal curve constructed from dyadic triangle waves, exhibiting exact self-similarity across scales.",
       fnCards: [
         {
           title: "Blancmange T(x)",
@@ -2191,6 +2301,7 @@
       category: "2D Real & Parametric",
       title: "Parametric Gallery: Butterfly, Heart & Rose",
       subtitle: "Continuous non-function 4-thread C11 parametric curves — try clicking 1:1!",
+      description: "Gallery of non-function 2D parametric curves (Temple Fay Butterfly, Heart, and Spirograph) evaluated across 4 native C11 threads.",
       fnCards: [
         {
           title: "Temple Fay Butterfly Curve",
@@ -2243,6 +2354,7 @@
       category: "2D Real & Parametric",
       title: "Fresnel Cornu Spiral (Clothoid)",
       subtitle: "Optical diffraction spiral (C(t), S(t)) = (∫ cos(πu²/2) du, ∫ sin(πu²/2) du) converging to ±(½, ½)",
+      description: "Traces the Cornu (Euler) spiral defined by Fresnel cosine and sine integrals C(t) and S(t), converging symmetrically onto its two focal eyes (±1/2, ±1/2).",
       fnCards: [
         {
           title: "Cornu Spiral (C(t), S(t))",
@@ -2275,6 +2387,7 @@
       category: "2D Real & Cellular Automata",
       title: "Conway's Game of Life — Centered [-R, R]² Sandbox",
       subtitle: "Single radius parameter R sets how many blocks out from (0, 0) the boundary goes! Begins in 1:1 mode at (0, 0) with a symmetric Pulsar Cathedral centerpiece!",
+      description: "Interactive Conway’s Game of Life (B3/S23) cellular automaton running in native C11 on a centered [−R, R]² cell grid with paintable seed polygons and live generation scrubbing.",
       fnCards: [
         {
           title: "Conway's Game of Life ([-R, R]² · Gen G)",
@@ -2406,6 +2519,7 @@
       category: "2D Real & Parametric",
       title: "Fourier Epicycle Drawing Machine & Harmonic Synthesis",
       subtitle: "Rotating phasor chain Σ c_k e^(i k θ) tracing a closed star curve at (0, 0) in 1:1 mode — scrub phase phi or harmonic count N!",
+      description: "Rotating phasor chain Σ c_k e^(i k θ) drawing a closed 5-fold star curve with live animated epicycle circles, phasor arms, and harmonic count N slider.",
       fnCards: [
         {
           title: "Synthesized Fourier Curve (N Epicycles)",

@@ -4,6 +4,7 @@
 #include <complex.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define MAX_HOT_SLOTS 24
 #define MAX_EVAL_PARAMS 16
@@ -61,5 +62,9 @@ void hot_sample_implicit_slot(int slot, const EvalParams *params, double xmin, d
 /* Multi-threaded sampling for 2D parametric curves (x(t), y(t)), interleaved [x, y] floats. */
 void hot_sample_parametric_slot(int slot, const EvalParams *params, double tmin, double tmax,
                                 size_t count, float *xy_out);
+
+/* Multi-threaded RGBA domain / fractal field rendering for a compiled complex slot. */
+void hot_render_domain_slot(int slot, const EvalParams *params, double cx, double cy, double half_w,
+                            double half_h, int width, int height, int scheme, uint8_t *rgba_out);
 
 #endif /* HOT_COMPILE_H */

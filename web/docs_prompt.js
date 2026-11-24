@@ -265,17 +265,31 @@
           mode: "both",
         },
         {
-          sig: "Unlocked Domain Points (`\"locked\": false`) on 2D Output & 3D Riemann Sphere",
-          desc: "In Complex Map mode, unlocked points (`\"locked\": false`) are mapped through w = f(z) and rendered WITH their text labels on both the 2D Output Plane and the 3D Riemann Sphere! Locked points (`\"locked\": true`) stay pinned to the Landmarks tab on the Input Plane.",
-          notes: "Great for labeling cities, Easter eggs, or tracked test points on the 3D sphere",
-          example: "{ \"x\": 0.0, \"y\": 1.0, \"label\": \"City / Marker\", \"icon\": \"star\", \"color\": \"#fbbf24\", \"locked\": false }",
+          sig: "Unlocked Domain Points (`\"locked\": false`) & Unified Element Layering (`\"layerOrder\"`)",
+          desc: "Shapes, points, and guide lines live in a single unified Elements & Layers stack (drawn back-to-front in list order). Drag cards in the sidebar to reorder layers, or right-click any element directly on a graph to adjust color, opacity (0–100%, applies to both input & output space), lineWidth (down to 0 for fill-only shapes!), layer order, or lock status. Locked elements show a clear LOCKED badge and stay pinned to the Input Plane.",
+          notes: "layerOrder uses refs like [\"s:0\", \"l:0\", \"p:0\"] (s=shape, l=line, p=point)",
+          example: "{ \"kind\": \"circle\", \"cx\": 0, \"cy\": 0, \"r\": 1.5, \"color\": \"#38bdf8\", \"lineWidth\": 0, \"opacity\": 0.45, \"closed\": true }",
+          mode: "both",
+        },
+        {
+          sig: "Output Projections (`planar`, `sphere`, `stereographic`, `poincare`, `custom` + `projectionExpr`)",
+          desc: "Switch the Complex Output Space between flat Planar ℂ, 3D Riemann Sphere S², Stereographic Finite Disk ((2/π)atan(|w|)e^(iθ) mapping all of ℂ ∪ {∞} into |W| ≤ 1), Poincaré Disk (w / (1 + √(1+|w|²)) with orthogonal hyperbolic geodesics), or Custom P(w) where users enter any complex expression in w, u, v, r, theta, i, pi, e, and slider variables.",
+          notes: "Set viewport.projection and optional viewport.projectionExpr in cfv_project_v1 JSON",
+          example: "\"viewport\": { \"projection\": \"poincare\", \"inView\": { \"cx\": 0, \"cy\": 0, \"r\": 3 }, \"outView\": { \"cx\": 0, \"cy\": 0, \"r\": 1.32 } }",
           mode: "complex",
         },
         {
-          sig: "Full Project JSON (`\"format\": \"cfv_project_v1\"`) & Repo Persistence (`projects/*.json`)",
-          desc: "Every saved or exported project is encoded as a complete, human-readable `cfv_project_v1` JSON object containing `name`, `subtitle`, `mode`, `cards`, `sliders` (with `speed`), `vars`, `shapes` / `seedCells`, `points`, `lines`, `viewport` (1:1 origin-centered by default), and `presets[]` (each preset storing its own full viewport & slider state). Saved projects persist directly in `projects/*.json` in the repo!",
-          notes: "Use Import / Export in the left sidebar or Tab 2 (Project Import & Export JSON)",
-          example: "{ \"format\": \"cfv_project_v1\", \"name\": \"My Project\", \"mode\": \"map\", \"cards\": [...], \"viewport\": {...}, \"presets\": [...] }",
+          sig: "4-Thread C11 Domain & Fractal Color Schemes (`showDomain`, `domainScheme`, `domainOpacity`)",
+          desc: "Renders up to 900×900 native C11 color fields over the Complex Input Plane. Supports 6 palettes: `classic` (phase + log₂|w|), `smooth_escape` (Mandelbrot Ultra-Fractal smooth cyclic gradient where Re(w) < 0 renders black), `inferno`, `ocean`, `neon_prism`, and `grayscale`.",
+          notes: "For Mandelbrot/Julia fractals return c_make(nu, 0.0) for escaped points and c_make(-1.0, 0.0) for interior points",
+          example: "\"viewport\": { \"showDomain\": true, \"domainScheme\": \"smooth_escape\", \"domainOpacity\": 1.0 }",
+          mode: "complex",
+        },
+        {
+          sig: "Full Project JSON (`\"format\": \"cfv_project_v1\"`), Descriptions, `#json=` URLs & Repo Persistence",
+          desc: "Every saved or exported project is encoded as a complete, human-readable `cfv_project_v1` JSON object containing `name`, `subtitle`, `description`, `mode`, `cards`, `sliders` (with `speed`), `vars`, `shapes` / `seedCells`, `points`, `lines`, `layerOrder`, `viewport` (including projections & color schemes), and `presets[]`. Live shareable URLs use readable `#json={...}` encoding, and saved projects persist in `projects/*.json` with custom folder creation directly in Save As.",
+          notes: "Use Shift+Scroll (X-axis) or Ctrl+Scroll (Y-axis) or X±/Y± buttons for independent axis scaling; click 1:1 to reset",
+          example: "{ \"format\": \"cfv_project_v1\", \"name\": \"My Project\", \"description\": \"Math notes...\", \"mode\": \"map\", \"cards\": [...], \"viewport\": {...}, \"presets\": [...] }",
           mode: "both",
         },
       ],
@@ -289,6 +303,8 @@
       "Möbius transform (a*z + b) / (c*z + 1) with sliders a, b, c and 2 circles",
       "Dirichlet L-function L(s, chi_4) partial sum with slider N, critical line Re=1/2, and test rectangle",
       "Essential singularity exp(1/(z-a)) with movable slider a and small loop around the singularity",
+      "Mandelbrot / Burning Ship smooth escape-time fractal using showDomain: true and domainScheme: smooth_escape or inferno",
+      "Poincaré Disk or Stereographic finite projection of a Möbius / Blaschke map with opacity-layered shapes",
     ],
     integral: [
       "Pac-Man / Keyhole contour in 4 separate slider-driven pieces (R, r, eps, a) to evaluate ∫₀^∞ x^(a-1)/(x+1) dx via residue at z = -1",
@@ -308,6 +324,36 @@
   };
 
   const COOKBOOK_RECIPES = [
+    {
+      title: "Mandelbrot Set Smooth Fractal Field (C11 4-Thread Palette)",
+      badge: "Map · Smooth Fractal Coloring",
+      desc: "Computes smooth escape potential ν = k + 1 − log₂(log₂|z|) for z² + c in native C11 and renders it with the Ultra-Fractal smooth_escape palette at high resolution.",
+      bundle: {
+        mode: "map",
+        name: "Mandelbrot Smooth Escape Field",
+        description: "Smooth continuous escape-time Mandelbrot set evaluated natively across 4 C11 threads.",
+        cards: [
+          {
+            title: "Mandelbrot ν(c)",
+            code: "double complex c = z, w = c_make(0.0, 0.0);\nint lim = (int)floor(max_iter + 0.5);\nif (lim < 16) lim = 16;\nfor (int k = 0; k < lim; k++) {\n  w = w * w + c;\n  double r2 = creal(w)*creal(w) + cimag(w)*cimag(w);\n  if (r2 > 256.0) return c_make((double)k + 1.0 - log2(0.5 * log2(r2)), 0.0);\n}\nreturn c_make(-1.0, 0.0);",
+            color: "#38bdf8",
+            active: true,
+          },
+        ],
+        sliders: [
+          { name: "max_iter", label: "Max Iterations", value: 180, min: 32, max: 400, step: 8, speed: 0.5 },
+        ],
+        viewport: {
+          inView: { cx: -0.55, cy: 0.0, r: 1.45 },
+          outView: { cx: 12.0, cy: 0.0, r: 18.0 },
+          inSquare: true,
+          outSquare: true,
+          showDomain: true,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+        },
+      },
+    },
     {
       title: "Pac-Man / Keyhole Residue Contour (4 Variable Pieces)",
       badge: "Integral · Residue Theory",
@@ -640,6 +686,7 @@
   - \`c_zeta_partial(s, int N)\` — truncated Dirichlet partial sum Σ_{n=1}^N n^(−s)
   - \`c_gamma(z)\`, \`c_lgamma(z)\` — Euler Gamma Γ(z) (poles at 0, −1, −2, … with Res = (−1)^n/n!) and principal ln Γ(z)
   - \`c_ei(z)\`, \`c_e1_real(x)\`, \`c_hardy_z(t)\`
+  - **Standard `<stdlib.h>`** is also included (`abs`, `labs`, etc.).
   - Standard \`<complex.h>\` & \`<math.h>\`: \`cexp, clog, csin, ccos, ctan, csinh, ccosh, ctanh, cpow, csqrt, cabs, carg, creal, cimag, conj, sin, cos, tan, exp, log, pow, sqrt, fabs, M_PI, M_E, NAN, INFINITY\`.`;
 
     const varsAndContoursSpec = `=== 2. SLIDERS (WITH SPEED), COMPUTED VARIABLES ("vars") & VIEWPORT GLOBALS ===
@@ -866,16 +913,22 @@ ${varsAndContoursSpec}
   - \`"format": "cfv_project_v1"\`
   - \`"name"\`: Descriptive project title (e.g. \`"Keyhole Residue Integrator"\`).
   - \`"subtitle"\`: Concise 1-line summary shown in the project selector folder.
+  - \`"description"\`: Clear 1–3 sentence mathematical description shown in the sidebar Description bar and library tooltips.
   - \`"mode"\`: \`"${mode}"\` (\`"map"\` | \`"integral"\` | \`"real"\`).
   - \`"viewport"\`: Full initial viewport state, beginning in **1:1 square aspect ratio mode centered at \`(0, 0)\`**:
-    - For \`"map"\` / \`"integral"\`: \`{ "inView": { "cx": 0, "cy": 0, "r": 4 }, "outView": { "cx": 0, "cy": 0, "r": 4 }, "inSquare": true, "outSquare": true, "showSphere": false, "sphereView": { "yaw": -0.58, "pitch": 0.22, "zoom": 1.0 } }\`
+    - For \`"map"\` / \`"integral"\`: \`{ "inView": { "cx": 0, "cy": 0, "r": 4 }, "outView": { "cx": 0, "cy": 0, "r": 4 }, "inSquare": true, "outSquare": true, "projection": "planar", "projectionExpr": "", "showSphere": false, "sphereView": { "yaw": -0.58, "pitch": 0.22, "zoom": 1.0 }, "showDomain": false, "domainScheme": "classic", "domainOpacity": 0.72 }\`
+      - Valid \`"projection"\`: \`"planar"\` | \`"sphere"\` | \`"stereographic"\` (full finite disk) | \`"poincare"\` (Poincaré unit disk) | \`"custom"\` (uses \`"projectionExpr"\`, e.g. \`"(w - i) / (w + i)"\`).
+      - Valid \`"domainScheme"\`: \`"classic"\` | \`"smooth_escape"\` (Mandelbrot/fractal Ultra-Fractal gradient: return \`c_make(nu, 0)\` outside, \`c_make(-1, 0)\` inside) | \`"inferno"\` | \`"ocean"\` | \`"neon_prism"\` | \`"grayscale"\`.
     - For \`"real"\`: \`{ "view": { "xmin": -10, "xmax": 10, "ymin": -10, "ymax": 10 }, "squareAspect": true }\`
+  - **Element Styling & Unified Layering**:
+    - Shapes, points, guide lines, and cards support \`"opacity"\` (\`0.0\`–\`1.0\`, applied in both input & output space) and \`"lineWidth"\` down to \`0\` (fill-only shapes with no border!).
+    - Elements render in unified back-to-front layer order (\`"layerOrder"\`: e.g. \`["s:0", "l:0", "p:0"]\`; locked elements stay right in the unified list with a visible LOCKED badge).
   - \`"presets"\`: Array of **2 to 4 curated presets** for the bottom Presets bar! Each preset object supports:
     - \`"id"\`: unique slug (e.g. \`"default_origin"\`), \`"name"\`: button label.
     - \`"sliderValues"\`: \`{ "sliderName": number }\` overrides for that preset.
     - \`"startSlider"\` (optional): slider name to auto-animate when the preset is clicked.
     - \`"visibleFnIndices"\` (optional, 2D Real): array of 0-based card indices visible in that preset.
-    - \`"viewport"\`: full viewport settings for that preset (including \`inView\`, \`outView\`, \`inSquare\`, \`outSquare\`, \`showSphere\`, \`sphereView\` or \`view\`, \`squareAspect\`).
+    - \`"viewport"\`: full viewport settings for that preset (including \`inView\`, \`outView\`, \`inSquare\`, \`outSquare\`, \`projection\`, \`projectionExpr\`, \`showSphere\`, \`sphereView\`, \`showDomain\`, \`domainScheme\`, \`domainOpacity\` or \`view\`, \`squareAspect\`).
 - Colors: use crisp high-contrast dark-mode hex palette: \`#38bdf8\` (sky), \`#34d399\` (emerald), \`#a78bfa\` (violet), \`#fbbf24\` (amber), \`#fb7185\` (rose), \`#fb923c\` (orange), \`#f8fafc\` (white).
 - Valid \`lineStyle\`: \`"solid"\`, \`"dashed"\`, \`"dotted"\`.
 - Valid \`points\` icons: \`"dot"\`, \`"ring"\` (zeros/foci), \`"cross"\` (poles!), \`"diamond"\` (branch points / special points), \`"star"\`.

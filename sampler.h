@@ -49,6 +49,18 @@ void trace_result_free(TraceResult *res);
 bool sampler_trace(const FunctionDef *fn, const Point2D *input_pts, size_t input_count,
                    const TraceOptions *opts, TraceResult *out);
 
+typedef enum {
+    DOMAIN_SCHEME_CLASSIC = 0,
+    DOMAIN_SCHEME_SMOOTH_ESCAPE = 1,
+    DOMAIN_SCHEME_INFERNO = 2,
+    DOMAIN_SCHEME_OCEAN = 3,
+    DOMAIN_SCHEME_NEON_PRISM = 4,
+    DOMAIN_SCHEME_GRAYSCALE = 5
+} DomainColorScheme;
+
+/* Maps a complex value w to an RGB triple using the chosen DomainColorScheme. */
+void sampler_color_complex(double complex w, int scheme, uint8_t *r, uint8_t *g, uint8_t *b);
+
 /*
  * Renders a domain-coloring RGBA buffer (width * height * 4 bytes) over the
  * rectangle [cx - half_w, cx + half_w] x [cy - half_h, cy + half_h] using
@@ -56,6 +68,9 @@ bool sampler_trace(const FunctionDef *fn, const Point2D *input_pts, size_t input
  */
 bool sampler_render_domain(const FunctionDef *fn, double cx, double cy, double half_w,
                            double half_h, int width, int height, uint8_t *rgba_out);
+
+bool sampler_render_domain_ex(const FunctionDef *fn, double cx, double cy, double half_w,
+                              double half_h, int width, int height, int scheme, uint8_t *rgba_out);
 
 typedef struct {
     Point2D *in_pts;

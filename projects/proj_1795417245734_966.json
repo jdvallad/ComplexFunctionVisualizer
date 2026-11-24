@@ -768,5 +768,6 @@
         }
       }
     }
-  ]
+  ],
+  "description": "Demonstrates Picard’s Great Theorem near the essential singularity of exp(1/z) at z = 0, where arbitrarily small neighborhoods wrap over the entire punctured complex plane infinitely often."
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>C11 Function Studio</title>
-  <link rel="stylesheet" href="/style.css?v=30" />
+  <link rel="stylesheet" href="/style.css?v=31" />
 </head>
 <body>
   <div class="app-shell">
@@ -89,6 +89,17 @@
             <div class="save-pop-row">
               <label class="save-pop-lbl" for="save-project-folder">Folder</label>
               <select id="save-project-folder" class="save-folder-select flex-1"></select>
+              <button id="btn-save-add-folder" type="button" class="dd-tool-btn emerald-tint save-add-folder-btn" title="Create a new folder">+ Folder</button>
+            </div>
+            <div id="save-new-folder-row" class="save-pop-row save-new-folder-row hidden">
+              <label class="save-pop-lbl" for="save-new-folder-input">New</label>
+              <input type="text" id="save-new-folder-input" class="save-preset-input flex-1" placeholder="Folder name..." maxlength="36" autocomplete="off" />
+              <button id="btn-save-confirm-folder" type="button" class="preset-save-confirm">Add</button>
+              <button id="btn-save-cancel-folder" type="button" class="preset-save-cancel">&times;</button>
+            </div>
+            <div class="save-pop-row save-pop-desc-row">
+              <label class="save-pop-lbl" for="save-project-desc">Desc</label>
+              <textarea id="save-project-desc" class="save-desc-input flex-1" rows="2" placeholder="Optional project description or math notes..." maxlength="400"></textarea>
             </div>
             <div class="save-pop-actions">
               <button id="btn-confirm-save-project" class="preset-save-confirm flex-1">Save Project</button>
@@ -167,6 +178,20 @@
             </svg>
             <span>PNG</span>
           </button>
+
+          <button id="btn-toggle-theme" class="btn-header-pill theme-toggle-btn" title="Toggle Light / Dark Mode">
+            <svg id="theme-icon-sun" class="hidden" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4" />
+              <line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" />
+              <line x1="4.22" y1="4.22" x2="6.34" y2="6.34" /><line x1="17.66" y1="17.66" x2="19.78" y2="19.78" />
+              <line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" />
+              <line x1="4.22" y1="19.78" x2="6.34" y2="17.66" /><line x1="17.66" y1="6.34" x2="19.78" y2="4.22" />
+            </svg>
+            <svg id="theme-icon-moon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+            <span id="theme-toggle-label">Light</span>
+          </button>
         </div>
       </div>
     </header>
@@ -201,9 +226,21 @@
         </div>
         <pre id="compile-diag" class="compile-diag hidden"></pre>
 
-        <!-- Scrollable 3-Tab Vertical Accordion -->
+        <!-- Collapsible Project Description / Notes Strip -->
+        <div id="project-desc-bar" class="project-desc-bar">
+          <button id="btn-toggle-desc" class="project-desc-toggle" type="button" aria-expanded="false" title="View or edit this project's description">
+            <span class="desc-chev">&#9656;</span>
+            <span class="desc-lbl">Description</span>
+            <span id="project-desc-preview" class="desc-preview">Add project description…</span>
+          </button>
+          <div id="project-desc-editor" class="project-desc-editor hidden">
+            <textarea id="project-desc-input" class="project-desc-textarea" rows="3" maxlength="500" placeholder="Describe the math, sliders, presets, or goals of this project..."></textarea>
+          </div>
+        </div>
+
+        <!-- Scrollable 2-Tab Vertical Accordion (Unified Elements & Layers!) -->
         <div class="sidebar-scroll">
-          <!-- TAB 1: Function Tab (with integrated +Fn, +Slider, +Var quick-add bar!) -->
+          <!-- TAB 1: Function Tab (with integrated Library, Syntax Guide, +Fn, +Slider, +Var!) -->
           <div class="vtab-section" id="vtab-fn">
             <div class="sidebar-section-hdr vtab-hdr" id="tab-fn-hdr" role="button" tabindex="0" aria-expanded="true">
               <span class="vtab-title">
@@ -212,21 +249,35 @@
                 <span class="vtab-count" id="fn-tab-count">0</span>
               </span>
               <div class="domain-quick-adds fn-quick-adds" id="fn-quick-adds">
+                <div class="fn-lib-wrap">
+                  <button class="mini-hdr-btn fn-lib-btn" id="btn-fn-library" type="button" title="Browse prewritten C11 functions for this graph mode">&#402; Library &#9662;</button>
+                  <div id="fn-library-dropdown" class="fn-library-dropdown hidden" role="menu">
+                    <div class="fn-lib-head">
+                      <span id="fn-lib-title" class="fn-lib-title">Complex Function Library</span>
+                      <input type="text" id="fn-lib-search" class="fn-lib-search" placeholder="Search functions..." autocomplete="off" />
+                    </div>
+                    <div id="fn-lib-cats" class="fn-lib-cats"></div>
+                    <div id="fn-lib-list" class="fn-lib-list"></div>
+                  </div>
+                </div>
+                <button class="mini-hdr-btn fn-guide-btn" id="btn-fn-guide" type="button" title="Show strict C11 syntax rules, parameter names &amp; input examples">? Guide</button>
                 <button class="mini-hdr-btn fn-hdr-btn" id="btn-add-fn" title="Add a C11 function / auxiliary card">+ Fn</button>
                 <button class="mini-hdr-btn" id="btn-add-slider" title="Add interactive parameter slider">+ Slider</button>
                 <button class="mini-hdr-btn" id="btn-add-var" title="Add computed variable (e.g. R = 2.2 + 18*t*t)">+ Var</button>
               </div>
             </div>
+            <div id="fn-syntax-guide" class="fn-syntax-guide hidden"></div>
             <div id="fn-cards" class="expr-cards vtab-body"></div>
           </div>
 
-          <!-- TAB 2: Domain Shapes Tab (with +Circle, +Arc, +Rect, +Seg, +Pt, +Line, Join!) -->
+          <!-- TAB 2: Unified Elements & Layers Tab (Shapes, Points, Lines — Locked & Unlocked together in exact layer order!) -->
           <div class="vtab-section" id="vtab-domain">
             <div class="sidebar-section-hdr domain-hdr vtab-hdr" id="tab-domain-hdr" role="button" tabindex="0" aria-expanded="true">
               <span class="vtab-title">
                 <span class="vtab-chev">&#9662;</span>
-                <span id="domain-section-label">Domain Shapes</span>
+                <span id="domain-section-label">Elements &amp; Layers</span>
                 <span class="vtab-count" id="domain-tab-count">0</span>
+                <span class="layer-order-hint" title="Elements draw in list order (top = back, bottom = front). Drag cards to reorder layers.">Back&rarr;Front</span>
               </span>
               <div class="domain-quick-adds" id="domain-quick-adds">
                 <button class="mini-hdr-btn complex-only-add" id="btn-quick-circle" title="Add circle contour">+ Circle</button>
@@ -239,18 +290,6 @@
               </div>
             </div>
             <div id="domain-cards" class="expr-cards vtab-body"></div>
-          </div>
-
-          <!-- TAB 3: Landmarks Tab (All Locked Shapes, Points & Lines!) -->
-          <div class="vtab-section" id="vtab-landmarks">
-            <div class="sidebar-section-hdr landmarks-hdr vtab-hdr" id="tab-landmarks-hdr" role="button" tabindex="0" aria-expanded="true">
-              <span class="vtab-title">
-                <span class="vtab-chev">&#9662;</span>
-                <span id="landmarks-tab-label">Landmarks (Locked)</span>
-                <span class="vtab-count" id="landmarks-tab-count">0</span>
-              </span>
-            </div>
-            <div id="landmark-cards" class="expr-cards vtab-body"></div>
           </div>
         </div>
       </aside>
@@ -273,7 +312,15 @@
                 <span class="plane-sub" id="input-sub">z = x + iy</span>
               </div>
               <div class="plane-hud top-right">
-                <button class="hud-btn square-btn active" id="in-square" title="1:1 equal axes (click to unlock independent Shift/Alt+scroll X/Y stretch)">1:1</button>
+                <button class="hud-btn square-btn active" id="in-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
+                <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
+                  <button class="hud-btn axis-btn" id="in-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
+                  <button class="hud-btn axis-btn" id="in-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
+                </span>
+                <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
+                  <button class="hud-btn axis-btn" id="in-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
+                  <button class="hud-btn axis-btn" id="in-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
+                </span>
                 <button class="hud-btn" id="in-zoom-in" title="Zoom in">+</button>
                 <button class="hud-btn" id="in-zoom-out" title="Zoom out">&minus;</button>
                 <button class="hud-btn" id="in-reset" title="Reset view">Reset</button>
@@ -302,13 +349,41 @@
                 <span class="plane-sub" id="output-sub">w = f(z)</span>
               </div>
               <div class="plane-hud top-right">
-                <button class="hud-btn sphere-btn" id="btn-toggle-sphere" title="Toggle 3D Riemann Sphere">3D Sphere</button>
-                <button class="hud-btn square-btn active" id="out-square" title="1:1 equal axes (click to unlock independent Shift/Alt+scroll X/Y stretch &amp; non-uniform Fit)">1:1</button>
+                <select id="out-projection-select" class="hud-select proj-select" title="Output space projection (Planar, 3D Riemann Sphere, Stereographic Finite Disk, Poincaré Disk, or Custom P(w))">
+                  <option value="planar">Planar &#8450;</option>
+                  <option value="sphere">3D Sphere</option>
+                  <option value="stereographic">Stereographic Disk</option>
+                  <option value="poincare">Poincar&eacute; Disk</option>
+                  <option value="custom">Custom P(w)</option>
+                </select>
+                <button class="hud-btn sphere-btn hidden" id="btn-toggle-sphere" title="Toggle 3D Riemann Sphere">3D Sphere</button>
+                <button class="hud-btn square-btn active" id="out-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
+                <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
+                  <button class="hud-btn axis-btn" id="out-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
+                  <button class="hud-btn axis-btn" id="out-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
+                </span>
+                <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
+                  <button class="hud-btn axis-btn" id="out-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
+                  <button class="hud-btn axis-btn" id="out-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
+                </span>
                 <button class="hud-btn accent-btn" id="out-autofit" title="Auto-fit output">Fit</button>
                 <button class="hud-btn" id="out-zoom-in" title="Zoom in">+</button>
                 <button class="hud-btn" id="out-zoom-out" title="Zoom out">&minus;</button>
                 <button class="hud-btn" id="out-reset" title="Reset output view">Reset</button>
                 <button class="hud-btn panel-hide-btn" id="btn-hide-output" title="Hide Output Plane (Input fills remaining space)">&times;</button>
+              </div>
+
+              <!-- Custom Arbitrary Projection Bar (visible when Custom P(w) projection is active) -->
+              <div class="custom-proj-bar hidden" id="custom-proj-bar">
+                <span class="custom-proj-lbl">P(w) =</span>
+                <input type="text" id="custom-proj-input" class="custom-proj-input" spellcheck="false" value="(w - i) / (w + i)" placeholder="e.g. (w - i)/(w + i), log(w), w/(1+r), tanh(r)*w/r" />
+                <div class="custom-proj-chips">
+                  <button type="button" class="proj-chip" data-proj-expr="(w - i) / (w + i)" title="Cayley map: upper half-plane -> unit disk">Cayley</button>
+                  <button type="button" class="proj-chip" data-proj-expr="w / (1 + r)" title="Radial disk compactification">Disk</button>
+                  <button type="button" class="proj-chip" data-proj-expr="log(w)" title="Log-polar / Mercator projection">Log-Polar</button>
+                  <button type="button" class="proj-chip" data-proj-expr="1 / w" title="Complex inversion around infinity">1/w</button>
+                </div>
+                <span id="custom-proj-err" class="custom-proj-err hidden"></span>
               </div>
 
               <!-- Multi-Contour Integral Results Panel (draggable & minimizable; points & landmark lines ignored!) -->
@@ -344,7 +419,15 @@
                 <span class="plane-sub" id="real-plane-sub">y = f(x)</span>
               </div>
               <div class="plane-hud top-right">
-                <button class="hud-btn square-btn active" id="real-square" title="Toggle 1:1 square aspect ratio &amp; equal axes">1:1</button>
+                <button class="hud-btn square-btn active" id="real-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
+                <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
+                  <button class="hud-btn axis-btn" id="real-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
+                  <button class="hud-btn axis-btn" id="real-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
+                </span>
+                <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
+                  <button class="hud-btn axis-btn" id="real-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
+                  <button class="hud-btn axis-btn" id="real-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
+                </span>
                 <button class="hud-btn accent-btn" id="real-fit-y" title="Auto-fit Y range">Fit Y</button>
                 <button class="hud-btn" id="real-zoom-in" title="Zoom in">+</button>
                 <button class="hud-btn" id="real-zoom-out" title="Zoom out">&minus;</button>
@@ -375,18 +458,8 @@
       </section>
     </div>
 
-    <!-- Full-Width Bottom Footer Bar: Bottom-Left Panel Restore Pills + Add Preset + Presets List -->
+    <!-- Full-Width Bottom Footer Bar: Add Preset + Presets List + Bottom-Right Panel Restore Pills -->
     <footer class="preset-bar" id="preset-bar">
-      <!-- Hidden Panel Restore Pills (Appear in Bottom-Left when Sidebar, Input, Output, or 2D Plane are hidden) -->
-      <div id="panel-restore-bar" class="panel-restore-bar hidden">
-        <button id="btn-show-sidebar" class="panel-restore-pill hidden" title="Show Full Sidebar">+ Sidebar</button>
-        <button id="btn-show-input" class="panel-restore-pill hidden" title="Show Input Plane">+ Input</button>
-        <button id="btn-show-output" class="panel-restore-pill hidden" title="Show Output Plane">+ Output</button>
-        <button id="btn-show-real" class="panel-restore-pill hidden" title="Show 2D Real Plane">+ 2D Plane</button>
-      </div>
-
-      <span id="bottom-restore-sep" class="topbar-vsep hidden" aria-hidden="true"></span>
-
       <!-- Add Preset placed directly to the LEFT of the "Presets" label -->
       <div class="preset-save-wrap preset-save-left">
         <button id="btn-save-preset" class="preset-save-btn" title="Add current view &amp; shapes as a preset inside this project">+ Add Preset</button>
@@ -399,6 +472,16 @@
 
       <span class="preset-bar-label">Presets</span>
       <div id="preset-bar-list" class="preset-bar-list"></div>
+
+      <span id="bottom-restore-sep" class="topbar-vsep hidden" aria-hidden="true"></span>
+
+      <!-- Hidden Panel Restore Pills (Appear in Bottom-Right when Sidebar, Input, Output, or 2D Plane are hidden) -->
+      <div id="panel-restore-bar" class="panel-restore-bar hidden">
+        <button id="btn-show-sidebar" class="panel-restore-pill hidden" title="Show Full Sidebar">+ Sidebar</button>
+        <button id="btn-show-input" class="panel-restore-pill hidden" title="Show Input Plane">+ Input</button>
+        <button id="btn-show-output" class="panel-restore-pill hidden" title="Show Output Plane">+ Output</button>
+        <button id="btn-show-real" class="panel-restore-pill hidden" title="Show 2D Real Plane">+ 2D Plane</button>
+      </div>
     </footer>
 
     <!-- =================================================================
@@ -423,10 +506,28 @@
 
       <div id="tools-complex-body" class="tools-body">
         <div class="tools-section">
-          <div class="tools-sec-label">Display Overlays</div>
+          <div class="tools-sec-label">Display Overlays &amp; Color Field</div>
           <label class="toggle-row"><span>Interior Conformal Grid</span><input type="checkbox" id="opt-mesh" checked /></label>
-          <label class="toggle-row"><span>Domain Coloring (C pthreads)</span><input type="checkbox" id="opt-domain" /></label>
-          <label class="toggle-row"><span>Show Landmark Guides</span><input type="checkbox" id="opt-landmarks" checked /></label>
+          <label class="toggle-row"><span>Domain / Fractal Coloring (C11)</span><input type="checkbox" id="opt-domain" /></label>
+          <div class="tools-subrow">
+            <label class="mini-field">
+              <span>Color Scheme</span>
+              <select id="opt-domain-scheme" class="tools-select">
+                <option value="classic">Classic Domain (Phase + log₂|w|)</option>
+                <option value="smooth_escape">Mandelbrot Smooth (Ultra-Fractal)</option>
+                <option value="inferno">Inferno Flame (Fractal / Field)</option>
+                <option value="ocean">Electric Ocean (Fractal / Field)</option>
+                <option value="neon_prism">Neon Prism Cosine</option>
+                <option value="grayscale">Grayscale Iso-Contours</option>
+              </select>
+            </label>
+          </div>
+          <div class="slider-row">
+            <span>Field Opacity</span>
+            <input type="range" id="opt-domain-opacity" min="0.1" max="1.0" step="0.05" value="0.72" />
+            <code id="opt-domain-opacity-val">72%</code>
+          </div>
+          <label class="toggle-row"><span>Show Guide Lines</span><input type="checkbox" id="opt-landmarks" checked /></label>
         </div>
 
         <div class="tools-section">
@@ -619,11 +720,13 @@
     </div>
   </div>
 
-  <script src="/sphere3d.js?v=30"></script>
-  <script src="/examples.js?v=30"></script>
-  <script src="/docs_prompt.js?v=30"></script>
-  <script src="/canvas_complex.js?v=30"></script>
-  <script src="/canvas_real.js?v=30"></script>
-  <script src="/workspace.js?v=30"></script>
+  <script src="/sphere3d.js?v=31"></script>
+  <script src="/projections.js?v=31"></script>
+  <script src="/function_library.js?v=31"></script>
+  <script src="/examples.js?v=31"></script>
+  <script src="/docs_prompt.js?v=31"></script>
+  <script src="/canvas_complex.js?v=31"></script>
+  <script src="/canvas_real.js?v=31"></script>
+  <script src="/workspace.js?v=31"></script>
 </body>
 </html>

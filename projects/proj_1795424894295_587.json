@@ -22492,5 +22492,6 @@
         }
       }
     }
-  ]
+  ],
+  "description": "Vector portrait mapped through complex transformations (identity, inversion 1/z, and conformal warps) across four interactive presets."
 }

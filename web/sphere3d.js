@@ -299,13 +299,14 @@
     const cy = h * 0.5;
     const R = Math.min(w, h) * 0.38 * sphere.zoom;
     const rimR = R * 1.018;
+    const isLight = typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
 
-    /* Deep space backdrop */
-    ctx.fillStyle = "#080c14";
+    /* Backdrop */
+    ctx.fillStyle = isLight ? "#f1f5f9" : "#080c14";
     ctx.fillRect(0, 0, w, h);
 
-    /* Base dark sphere silhouette */
-    ctx.fillStyle = "#0c1322";
+    /* Base sphere silhouette */
+    ctx.fillStyle = isLight ? "#e2e8f0" : "#0c1322";
     ctx.beginPath();
     ctx.arc(cx, cy, rimR, 0, Math.PI * 2);
     ctx.fill();
@@ -317,7 +318,12 @@
       const pts = opts.getPts ? opts.getPts(s) : (s.boundary ? s.boundary.outPts : null);
       if (!pts || pts.length < 2) continue;
       const col = s.primaryColor || s.color || "#38bdf8";
-      const lw = Number(s.lineWidth) || 2.3;
+      const lw = (s.lineWidth !== undefined && s.lineWidth !== null && Number.isFinite(Number(s.lineWidth)))
+        ? Math.max(0, Number(s.lineWidth))
+        : 2.3;
+      const op = (s.opacity !== undefined && s.opacity !== null && Number.isFinite(Number(s.opacity)))
+        ? Math.max(0, Math.min(1, Number(s.opacity)))
+        : 1.0;
       const isHi = s.id === opts.selectedShapeId || s.id === opts.hoveredShapeId;
       const closed = opts.mode === "integral" ? false : Boolean(s.closed);
       const chains = projectCurveChains(pts, closed, cx, cy, R);
@@ -331,34 +337,44 @@
           }
         }
       }
-      prepared.push({ shape: s, color: col, lw, isHi, chains, meshChains });
+      prepared.push({ shape: s, color: col, lw, op, isHi, chains, meshChains });
     }
 
     /* ================= PASS 1: BACK HEMISPHERE ================= */
-    for (const lat of GRID.latitudes) drawWireArcPass(ctx, lat.pts, cx, cy, R, false, lat.back, lat.lw * 0.8);
-    for (const mer of GRID.meridians) drawWireArcPass(ctx, mer.pts, cx, cy, R, false, mer.back, mer.lw * 0.8);
+    for (const lat of GRID.latitudes) drawWireArcPass(ctx, lat.pts, cx, cy, R, false, isLight ? "rgba(71,85,105,0.14)" : lat.back, lat.lw * 0.8);
+    for (const mer of GRID.meridians) drawWireArcPass(ctx, mer.pts, cx, cy, R, false, isLight ? "rgba(71,85,105,0.12)" : mer.back, mer.lw * 0.8);
 
     for (const item of prepared) {
+      if (item.op <= 0.001) continue;
       if (item.meshChains.length > 0) {
-        strokeHemisphereChains(ctx, item.meshChains, false, item.color, 0.9, 0.14, null);
+        strokeHemisphereChains(ctx, item.meshChains, false, item.color, 0.9, 0.14 * item.op, null);
       }
-      strokeHemisphereChains(ctx, item.chains, false, item.color, Math.max(1.4, item.lw * 0.72), 0.36, [4, 4]);
+      if (item.lw > 0) {
+        strokeHemisphereChains(ctx, item.chains, false, item.color, Math.max(1.2, item.lw * 0.72), 0.36 * item.op, [4, 4]);
+      }
     }
 
     /* ================= PASS 2: FROSTED GLASS SPHERE BODY ================= */
     ctx.save();
     const glassGrad = ctx.createRadialGradient(cx - R * 0.34, cy - R * 0.34, R * 0.08, cx, cy, rimR * 1.05);
-    glassGrad.addColorStop(0, "rgba(56, 86, 136, 0.28)");
-    glassGrad.addColorStop(0.55, "rgba(15, 23, 42, 0.36)");
-    glassGrad.addColorStop(0.88, "rgba(8, 12, 22, 0.56)");
-    glassGrad.addColorStop(1, "rgba(56, 189, 248, 0.14)");
+    if (isLight) {
+      glassGrad.addColorStop(0, "rgba(255, 255, 255, 0.65)");
+      glassGrad.addColorStop(0.55, "rgba(226, 232, 240, 0.38)");
+      glassGrad.addColorStop(0.88, "rgba(148, 163, 184, 0.28)");
+      glassGrad.addColorStop(1, "rgba(2, 132, 199, 0.16)");
+    } else {
+      glassGrad.addColorStop(0, "rgba(56, 86, 136, 0.28)");
+      glassGrad.addColorStop(0.55, "rgba(15, 23, 42, 0.36)");
+      glassGrad.addColorStop(0.88, "rgba(8, 12, 22, 0.56)");
+      glassGrad.addColorStop(1, "rgba(56, 189, 248, 0.14)");
+    }
     ctx.fillStyle = glassGrad;
     ctx.beginPath();
     ctx.arc(cx, cy, rimR, 0, Math.PI * 2);
     ctx.fill();
 
     /* Crisp spherical rim glow */
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.34)";
+    ctx.strokeStyle = isLight ? "rgba(71, 85, 105, 0.38)" : "rgba(148, 163, 184, 0.34)";
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.arc(cx, cy, rimR, 0, Math.PI * 2);
@@ -366,21 +382,24 @@
     ctx.restore();
 
     /* ================= PASS 3: FRONT HEMISPHERE ================= */
-    for (const lat of GRID.latitudes) drawWireArcPass(ctx, lat.pts, cx, cy, R, true, lat.front, lat.lw);
-    for (const mer of GRID.meridians) drawWireArcPass(ctx, mer.pts, cx, cy, R, true, mer.front, mer.lw);
+    for (const lat of GRID.latitudes) drawWireArcPass(ctx, lat.pts, cx, cy, R, true, isLight ? (lat.r === 1 ? "rgba(2,132,199,0.52)" : "rgba(71,85,105,0.28)") : lat.front, lat.lw);
+    for (const mer of GRID.meridians) drawWireArcPass(ctx, mer.pts, cx, cy, R, true, isLight ? "rgba(71,85,105,0.28)" : mer.front, mer.lw);
 
     for (const item of prepared) {
+      if (item.op <= 0.001) continue;
       const dash =
         item.shape.lineStyle === "dashed" ? [7, 5] :
         item.shape.lineStyle === "dotted" ? [2, 4] : null;
 
       if (item.meshChains.length > 0) {
-        strokeHemisphereChains(ctx, item.meshChains, true, item.color, 1.0, 0.30, null);
+        strokeHemisphereChains(ctx, item.meshChains, true, item.color, 1.0, 0.30 * item.op, null);
       }
-      /* Outer soft glow */
-      strokeHemisphereChains(ctx, item.chains, true, item.color, item.lw + (item.isHi ? 6 : 4), item.isHi ? 0.42 : 0.28, dash);
-      /* Core bright curve */
-      strokeHemisphereChains(ctx, item.chains, true, item.isHi ? "#ffffff" : item.color, item.isHi ? item.lw + 0.7 : item.lw, 1.0, dash);
+      if (item.lw > 0) {
+        /* Outer soft glow */
+        strokeHemisphereChains(ctx, item.chains, true, item.color, item.lw + (item.isHi ? 6 : 4), (item.isHi ? 0.42 : 0.28) * item.op, dash);
+        /* Core bright curve */
+        strokeHemisphereChains(ctx, item.chains, true, item.isHi ? (isLight ? "#0f172a" : "#ffffff") : item.color, item.isHi ? item.lw + 0.7 : item.lw, item.op, dash);
+      }
 
       /* Direction arrow along front hemisphere if available */
       const mainChain = item.chains[0];
@@ -463,10 +482,14 @@
         const isFront = c.depth >= -0.04;
         const col = p.color || "#34d399";
         const sz = Math.max(3.5, Number(p.size) || 4.5);
+        const pop = (p.opacity !== undefined && p.opacity !== null && Number.isFinite(Number(p.opacity)))
+          ? Math.max(0, Math.min(1, Number(p.opacity)))
+          : 1.0;
+        if (pop <= 0.001) continue;
         ctx.save();
-        ctx.globalAlpha = isFront ? 1.0 : 0.22;
+        ctx.globalAlpha = (isFront ? 1.0 : 0.22) * pop;
         ctx.fillStyle = col;
-        ctx.strokeStyle = "#080c14";
+        ctx.strokeStyle = isLight ? "#ffffff" : "#080c14";
         ctx.lineWidth = 1.6;
         ctx.beginPath();
         ctx.arc(c.sx, c.sy, isFront ? sz : sz * 0.8, 0, Math.PI * 2);
@@ -485,7 +508,7 @@
           const ly = c.sy + 3.5;
           if (isFront) {
             const tw = ctx.measureText(p.label).width;
-            ctx.fillStyle = "rgba(8, 12, 20, 0.78)";
+            ctx.fillStyle = isLight ? "rgba(255, 255, 255, 0.86)" : "rgba(8, 12, 20, 0.78)";
             ctx.strokeStyle = hexToRgba(col, 0.45);
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -497,7 +520,7 @@
             ctx.fill();
             ctx.stroke();
           }
-          ctx.fillStyle = isFront ? "#f8fafc" : col;
+          ctx.fillStyle = isFront ? (isLight ? "#0f172a" : "#f8fafc") : col;
           ctx.fillText(p.label, lx, ly);
         }
         ctx.restore();

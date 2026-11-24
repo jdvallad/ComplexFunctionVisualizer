@@ -36,6 +36,7 @@
     mode: "map", /* "map" | "integral" | "real" */
     activeProjectId: null,       /* null | built-in example id | custom "proj_..." id */
     activeProjectName: "New Project",
+    activeProjectDescription: "",
     activeProjectIsCustom: false,
     activeProjectFolder: "my",   /* "my" | "examples" | custom folder id */
     sourceExampleId: null,       /* tracks origin example so inherited presets remain loadable */
@@ -98,8 +99,25 @@
   const domainTabCount = document.getElementById("domain-tab-count");
   const domainQuickAdds = document.getElementById("domain-quick-adds");
   const domainCardsEl = document.getElementById("domain-cards");
-  const landmarksTabCount = document.getElementById("landmarks-tab-count");
-  const landmarkCardsEl = document.getElementById("landmark-cards");
+  const btnFnLibrary = document.getElementById("btn-fn-library");
+  const fnLibraryDropdown = document.getElementById("fn-library-dropdown");
+  const fnLibTitle = document.getElementById("fn-lib-title");
+  const fnLibSearch = document.getElementById("fn-lib-search");
+  const fnLibCats = document.getElementById("fn-lib-cats");
+  const fnLibList = document.getElementById("fn-lib-list");
+  const btnFnGuide = document.getElementById("btn-fn-guide");
+  const fnSyntaxGuide = document.getElementById("fn-syntax-guide");
+
+  const projectDescBar = document.getElementById("project-desc-bar");
+  const btnToggleDesc = document.getElementById("btn-toggle-desc");
+  const projectDescPreview = document.getElementById("project-desc-preview");
+  const projectDescEditor = document.getElementById("project-desc-editor");
+  const projectDescInput = document.getElementById("project-desc-input");
+
+  const btnToggleTheme = document.getElementById("btn-toggle-theme");
+  const themeIconSun = document.getElementById("theme-icon-sun");
+  const themeIconMoon = document.getElementById("theme-icon-moon");
+  const themeToggleLabel = document.getElementById("theme-toggle-label");
 
   const btnNewProject = document.getElementById("btn-new-project");
   const btnSaveProject = document.getElementById("btn-save-project");
@@ -117,6 +135,12 @@
   const saveProjectForm = document.getElementById("save-project-form");
   const saveProjectName = document.getElementById("save-project-name");
   const saveProjectFolder = document.getElementById("save-project-folder");
+  const btnSaveAddFolder = document.getElementById("btn-save-add-folder");
+  const saveNewFolderRow = document.getElementById("save-new-folder-row");
+  const saveNewFolderInput = document.getElementById("save-new-folder-input");
+  const btnSaveConfirmFolder = document.getElementById("btn-save-confirm-folder");
+  const btnSaveCancelFolder = document.getElementById("btn-save-cancel-folder");
+  const saveProjectDesc = document.getElementById("save-project-desc");
   const btnConfirmSaveProject = document.getElementById("btn-confirm-save-project");
   const btnCancelSaveProject = document.getElementById("btn-cancel-save-project");
 
@@ -751,12 +775,36 @@
    * Snapshots, Projects Storage (Project -> Presets[]), & Live URL (#s=...)
    * ------------------------------------------------------------------------- */
 
+  function normLineWidthWs(v, fallback = 2.2) {
+    if (v === undefined || v === null || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, n) : fallback;
+  }
+
+  function normOpacityWs(v, fallback = 1.0) {
+    if (v === undefined || v === null || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
+  }
+
+  function encodeJsonForHash(obj) {
+    return encodeURIComponent(JSON.stringify(obj))
+      .replace(/%7B/g, "{")
+      .replace(/%7D/g, "}")
+      .replace(/%5B/g, "[")
+      .replace(/%5D/g, "]")
+      .replace(/%3A/g, ":")
+      .replace(/%2C/g, ",");
+  }
+
   function buildWorkspaceSnapshot() {
     const fns = fnCards();
     const primaryIdx = Math.max(0, fns.findIndex((c) => c.id === state.primaryCardId));
     return {
       v: 1,
       m: state.mode,
+      nm: state.activeProjectName || "",
+      desc: state.activeProjectDescription || "",
       ex: (!state.activeProjectIsCustom && state.activeProjectId) ? state.activeProjectId : "",
       pr: state.activePresetId || "",
       sp: isRealMode() ? undefined : Math.round(state.splitPct * 10) / 10,
@@ -765,7 +813,8 @@
         t: c.title || "",
         cd: c.code || "",
         col: c.color || "#38bdf8",
-        w: Number(c.lineWidth) || 2.2,
+        w: normLineWidthWs(c.lineWidth, 2.2),
+        op: normOpacityWs(c.opacity, 1.0),
         st: c.lineStyle || "solid",
         stp: c.step ? 1 : 0,
         lk: c.locked ? 1 : 0,
@@ -802,9 +851,18 @@
     const queryStr = qs.toString();
     let hashStr = "";
     if (withStateHash) {
-      const encoded = encodeStateB64(buildWorkspaceSnapshot());
-      if (encoded && encoded.length <= 16000) {
-        hashStr = "#s=" + encoded;
+      const readable = snapshotToReadableState(buildWorkspaceSnapshot());
+      if (readable) {
+        const urlObj = {
+          format: "cfv_project_v1",
+          ...(state.activeProjectName ? { name: state.activeProjectName } : {}),
+          ...(state.activeProjectDescription ? { description: state.activeProjectDescription } : {}),
+          ...readable,
+        };
+        const encoded = encodeJsonForHash(urlObj);
+        if (encoded && encoded.length <= 48000) {
+          hashStr = "#json=" + encoded;
+        }
       }
     }
     const targetUrl = `${base}${queryStr ? "?" + queryStr : ""}${hashStr}`;
@@ -870,10 +928,28 @@
 
   function parseUrlStateHash() {
     const h = window.location.hash || "";
-    if (!h.startsWith("#s=")) return null;
-    const snap = decodeStateB64(h.slice(3));
-    if (!snap || snap.v !== 1 || !Array.isArray(snap.fn)) return null;
-    return snap;
+    if (h.startsWith("#json=")) {
+      try {
+        const raw = decodeURIComponent(h.slice(6));
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj === "object") {
+          const snap = readableStateToSnapshot(obj);
+          if (snap && snap.v === 1 && Array.isArray(snap.fn)) {
+            if (obj.name) snap.nm = String(obj.name);
+            if (obj.description) snap.desc = String(obj.description);
+            return snap;
+          }
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+    if (h.startsWith("#s=")) {
+      const snap = decodeStateB64(h.slice(3));
+      if (!snap || snap.v !== 1 || !Array.isArray(snap.fn)) return null;
+      return snap;
+    }
+    return null;
   }
 
   function parseUrlRoute() {
@@ -994,12 +1070,14 @@
     const pi = typeof snap.pi === "number" ? snap.pi : 0;
     const out = {
       mode,
+      ...(snap.desc ? { description: snap.desc } : {}),
       splitPct: mode === "real" ? undefined : (typeof snap.sp === "number" ? snap.sp : 50),
       cards: (snap.fn || []).map((c, idx) => ({
         title: c.t || `Function ${idx + 1}`,
         code: c.cd || "",
         color: c.col || COLORS[idx % COLORS.length],
-        lineWidth: Number(c.w) || 2.2,
+        lineWidth: normLineWidthWs(c.w, 2.2),
+        opacity: normOpacityWs(c.op, 1.0),
         lineStyle: c.st || "solid",
         step: Boolean(c.stp),
         locked: Boolean(c.lk),
@@ -1030,6 +1108,7 @@
         icon: p.i || "diamond",
         color: p.c || "#34d399",
         size: Number(p.s) || 5,
+        opacity: normOpacityWs(p.op, 1.0),
         locked: Boolean(p.lk),
         visible: p.v !== 0,
         showLabel: p.sl !== 0,
@@ -1039,12 +1118,14 @@
         value: Number(ln.val) || 0,
         label: ln.l || "",
         color: ln.c || "#fbbf24",
-        lineWidth: Number(ln.w) || 1.5,
+        lineWidth: normLineWidthWs(ln.w, 1.5),
+        opacity: normOpacityWs(ln.op, 1.0),
         lineStyle: ln.st || "dashed",
         locked: Boolean(ln.lk),
         visible: ln.v !== 0,
         showLabel: ln.sl !== 0,
       }));
+      if (Array.isArray(c.lo) && c.lo.length > 0) out.layerOrder = [...c.lo];
       if (Array.isArray(c.pg) && c.pg.length >= 2) {
         const cells = [];
         for (let i = 0; i + 1 < c.pg.length; i += 2) cells.push([c.pg[i], c.pg[i + 1]]);
@@ -1063,7 +1144,8 @@
           kind: s.k || "freehand",
           label: s.l || "Shape",
           color: s.c || "#38bdf8",
-          lineWidth: Number(s.w) || 2.2,
+          lineWidth: normLineWidthWs(s.w, 2.2),
+          opacity: normOpacityWs(s.op, 1.0),
           lineStyle: s.st || "solid",
           locked: Boolean(s.lk),
           closed: Boolean(s.cl),
@@ -1088,6 +1170,7 @@
         icon: p.i || "dot",
         color: p.c || "#34d399",
         size: Number(p.s) || 5,
+        opacity: normOpacityWs(p.op, 1.0),
         locked: Boolean(p.lk),
         visible: p.v !== 0,
         showLabel: p.sl !== 0,
@@ -1097,12 +1180,14 @@
         value: Number(ln.val) || 0,
         label: ln.l || "",
         color: ln.c || "#fbbf24",
-        lineWidth: Number(ln.w) || 1.5,
+        lineWidth: normLineWidthWs(ln.w, 1.5),
+        opacity: normOpacityWs(ln.op, 1.0),
         lineStyle: ln.st || "dashed",
         locked: Boolean(ln.lk),
         visible: ln.v !== 0,
         showLabel: ln.sl !== 0,
       }));
+      if (Array.isArray(c.lo) && c.lo.length > 0) out.layerOrder = [...c.lo];
       const iv = Array.isArray(c.iv) && c.iv.length >= 3 ? c.iv : [0, 0, 4];
       const ov = Array.isArray(c.ov) && c.ov.length >= 3 ? c.ov : [0, 0, 4];
       const spv = Array.isArray(c.spv) && c.spv.length >= 3 ? c.spv : [-0.58, 0.22, 1.0];
@@ -1111,8 +1196,11 @@
         outView: { cx: Number(ov[0]), cy: Number(ov[1]), r: Number(ov[2]) },
         inSquare: c.isq !== undefined ? Boolean(c.isq) : true,
         outSquare: c.osq !== undefined ? Boolean(c.osq) : true,
-        showSphere: Boolean(c.sph),
+        showSphere: c.proj === "sphere" || Boolean(c.sph),
+        projection: c.proj || (c.sph ? "sphere" : "planar"),
+        ...(c.pexpr ? { projectionExpr: c.pexpr } : {}),
         sphereView: { yaw: Number(spv[0]), pitch: Number(spv[1]), zoom: Number(spv[2]) },
+        ...(c.dom ? { showDomain: true, domainScheme: c.dscm || "classic", domainOpacity: normOpacityWs(c.dop, 0.72) } : {}),
       };
     }
     return out;
@@ -1150,7 +1238,8 @@
         t: (isObj && c.title) ? c.title : `Function ${idx + 1}`,
         cd: code,
         col: (isObj && c.color) ? c.color : COLORS[idx % COLORS.length],
-        w: (isObj && Number(c.lineWidth)) || 2.2,
+        w: isObj ? normLineWidthWs(c.lineWidth, 2.2) : 2.2,
+        op: isObj ? normOpacityWs(c.opacity, 1.0) : 1.0,
         st: (isObj && c.lineStyle) || "solid",
         stp: isObj && c.step ? 1 : 0,
         lk: isObj && c.locked ? 1 : 0,
@@ -1224,6 +1313,7 @@
       i: p.icon || (mode === "real" ? "diamond" : "dot"),
       c: p.color || "#34d399",
       s: Number(p.size) || 5,
+      op: normOpacityWs(p.opacity ?? p.op, 1.0),
       lk: p.locked ? 1 : 0,
       v: p.visible !== false ? 1 : 0,
       sl: p.showLabel !== false ? 1 : 0,
@@ -1233,12 +1323,15 @@
       val: Number(l.value ?? l.val ?? 0),
       l: l.label || "",
       c: l.color || "#fbbf24",
-      w: Number(l.lineWidth ?? l.w) || 1.5,
+      w: normLineWidthWs(l.lineWidth ?? l.w, 1.5),
+      op: normOpacityWs(l.opacity ?? l.op, 1.0),
       st: l.lineStyle || l.st || "dashed",
       lk: l.locked ? 1 : 0,
       v: l.visible !== false ? 1 : 0,
       sl: l.showLabel !== false ? 1 : 0,
     }));
+
+    const layerRefs = Array.isArray(obj.layerOrder) ? obj.layerOrder : (Array.isArray(base.layerOrder) ? base.layerOrder : undefined);
 
     let cSnap = null;
     if (mode === "real") {
@@ -1251,6 +1344,7 @@
         sq: vpObj.squareAspect !== undefined ? (vpObj.squareAspect ? 1 : 0) : 1,
         sp: vpObj.showPrimes ? 1 : 0,
         sz: vpObj.showZeros ? 1 : 0,
+        ...(layerRefs ? { lo: [...layerRefs] } : {}),
         pt,
         ln,
       };
@@ -1291,7 +1385,8 @@
           k: s.kind || (s.formula && s.formula.kind) || "circle",
           l: s.label || s.kind || `Shape ${idx + 1}`,
           c: s.color || COLORS[idx % COLORS.length],
-          w: Number(s.lineWidth) || 2.2,
+          w: normLineWidthWs(s.lineWidth, 2.2),
+          op: normOpacityWs(s.opacity ?? s.op, 1.0),
           st: s.lineStyle || "solid",
           lk: s.locked ? 1 : 0,
           cl: built.closed ? 1 : 0,
@@ -1301,13 +1396,22 @@
         if (s.formula) rec.f = { ...s.formula };
         return rec;
       });
+      const projMode = vpObj.projection || obj.projection || (vpObj.showSphere ? "sphere" : "planar");
+      const projExpr = vpObj.projectionExpr || obj.projectionExpr || "";
+      const showDom = vpObj.showDomain !== undefined ? Boolean(vpObj.showDomain) : Boolean(obj.showDomain);
+      const domScheme = vpObj.domainScheme || obj.domainScheme || "classic";
+      const domOp = normOpacityWs(vpObj.domainOpacity ?? obj.domainOpacity, domScheme === "classic" ? 0.72 : 1.0);
       cSnap = {
         iv,
         ov,
         isq: vpObj.inSquare !== undefined ? (vpObj.inSquare ? 1 : 0) : 1,
         osq: vpObj.outSquare !== undefined ? (vpObj.outSquare ? 1 : 0) : 1,
-        sph: vpObj.showSphere ? 1 : 0,
+        sph: projMode === "sphere" || vpObj.showSphere ? 1 : 0,
+        proj: projMode,
+        ...(projExpr ? { pexpr: projExpr } : {}),
         spv,
+        ...(showDom ? { dom: 1, dscm: domScheme, dop: domOp } : {}),
+        ...(layerRefs ? { lo: [...layerRefs] } : {}),
         sh,
         pt,
         ln,
@@ -1317,6 +1421,7 @@
     return {
       v: 1,
       m: mode,
+      desc: String(obj.description ?? base.description ?? ""),
       ex: "",
       pr: obj.id || "",
       sp: mode === "real" ? undefined : (Number(obj.splitPct ?? base.splitPct) || 50),
@@ -1392,6 +1497,7 @@
       name: projName,
       folder: state.activeProjectFolder || "my",
       subtitle: (ex && ex.subtitle) || `${readable.cards.length} card${readable.cards.length === 1 ? "" : "s"} · ${presetsOut.length} preset${presetsOut.length === 1 ? "" : "s"}`,
+      description: state.activeProjectDescription || (ex && ex.description) || "",
       mode: readable.mode,
       ...(readable.splitPct !== undefined ? { splitPct: readable.splitPct } : {}),
       cards: readable.cards,
@@ -1401,6 +1507,7 @@
       ...(readable.seedCells ? { seedCells: readable.seedCells } : {}),
       points: readable.points || [],
       lines: readable.lines || [],
+      ...(readable.layerOrder ? { layerOrder: readable.layerOrder } : {}),
       viewport: readable.viewport,
       presets: presetsOut,
     };
@@ -1702,6 +1809,7 @@
       name,
       folder,
       subtitle: rawProj.subtitle || `${(readableBase.cards || []).length} cards · ${presets.length} presets`,
+      description: String(rawProj.description || ""),
       mode,
       isCustom: true,
       sourceExampleId: rawProj.sourceExampleId || null,
@@ -1713,6 +1821,7 @@
       ...(readableBase.seedCells ? { seedCells: readableBase.seedCells } : {}),
       points: readableBase.points || [],
       lines: readableBase.lines || [],
+      ...(readableBase.layerOrder ? { layerOrder: readableBase.layerOrder } : {}),
       viewport: readableBase.viewport || {},
       baseState,
       presets,
@@ -1755,6 +1864,7 @@
       name: projObj.name,
       folder: projObj.folder || "my",
       subtitle: projObj.subtitle || "",
+      description: projObj.description || "",
       mode: projObj.mode,
       ...(projObj.splitPct !== undefined ? { splitPct: projObj.splitPct } : {}),
       cards: projObj.cards || [],
@@ -1764,6 +1874,7 @@
       ...(projObj.seedCells ? { seedCells: projObj.seedCells } : {}),
       points: projObj.points || [],
       lines: projObj.lines || [],
+      ...(projObj.layerOrder ? { layerOrder: projObj.layerOrder } : {}),
       viewport: projObj.viewport || {},
       presets: (projObj.presets || []).map((p, idx) => {
         const rs = p.snapshot ? snapshotToReadableState(p.snapshot) : null;
@@ -2085,6 +2196,7 @@
     const ok = await restoreWorkspaceSnapshot(targetSnap, pushHistory, {
       projectId: proj.id,
       projectName: proj.name,
+      projectDescription: proj.description || "",
       isCustomProject: true,
       sourceExampleId: proj.sourceExampleId || null,
       presets: state.projectPresets,
@@ -2118,18 +2230,21 @@
       if (meta) {
         state.activeProjectId = meta.projectId ?? null;
         state.activeProjectName = meta.projectName || "Unsaved Project";
+        state.activeProjectDescription = meta.projectDescription !== undefined ? String(meta.projectDescription || "") : String(snap.desc || "");
         state.activeProjectIsCustom = Boolean(meta.isCustomProject);
         if (meta.sourceExampleId !== undefined) state.sourceExampleId = meta.sourceExampleId;
         if (Array.isArray(meta.presets)) state.projectPresets = meta.presets;
         state.activePresetId = meta.activePresetId ?? null;
       } else {
         state.activeProjectId = null;
-        state.activeProjectName = "Shared Project";
+        state.activeProjectName = snap.nm || "Shared Project";
+        state.activeProjectDescription = String(snap.desc || "");
         state.activeProjectIsCustom = false;
         state.sourceExampleId = null;
         state.projectPresets = [];
         state.activePresetId = null;
       }
+      syncDescriptionUI();
       state.hasUnsavedWork = false;
 
       for (const s of sliderCards()) s.playing = false;
@@ -2146,7 +2261,8 @@
         title: c.t || `Function ${idx + 1}`,
         code: c.cd || (targetMode === "real" ? "sin(x)" : "c_zeta(s)"),
         color: c.col || COLORS[idx % COLORS.length],
-        lineWidth: Number(c.w) || 2.2,
+        lineWidth: normLineWidthWs(c.w, 2.2),
+        opacity: normOpacityWs(c.op, 1.0),
         lineStyle: c.st || "solid",
         step: Boolean(c.stp),
         locked: Boolean(c.lk),
@@ -2572,6 +2688,7 @@
       return;
     }
 
+    let dragFnFromIdx = -1;
     let fnSeq = 0;
     state.cards.forEach((c, idx) => {
       const isActiveComplex = !realMode && c.kind === "fn" && c.id === state.primaryCardId;
@@ -2583,9 +2700,56 @@
         (isActiveComplex ? " active-primary" : "") +
         (isAuxComplex ? " aux-card" : "") +
         (c.locked ? " locked-item" : "");
+      row.draggable = true;
+      row.addEventListener("dragstart", (ev) => {
+        if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA" || ev.target.tagName === "SELECT")) {
+          ev.preventDefault();
+          return;
+        }
+        dragFnFromIdx = idx;
+        row.classList.add("dragging-card");
+        if (ev.dataTransfer) { ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(idx)); }
+      });
+      row.addEventListener("dragover", (ev) => {
+        if (dragFnFromIdx < 0 || dragFnFromIdx === idx) return;
+        ev.preventDefault();
+        const rect = row.getBoundingClientRect();
+        const before = ev.clientY < rect.top + rect.height * 0.5;
+        row.classList.toggle("drop-before", before);
+        row.classList.toggle("drop-after", !before);
+      });
+      row.addEventListener("dragleave", () => {
+        row.classList.remove("drop-before", "drop-after");
+      });
+      row.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        row.classList.remove("drop-before", "drop-after");
+        if (dragFnFromIdx < 0 || dragFnFromIdx === idx) return;
+        const rect = row.getBoundingClientRect();
+        const before = ev.clientY < rect.top + rect.height * 0.5;
+        let toIdx = before ? idx : idx + 1;
+        if (dragFnFromIdx < toIdx) toIdx--;
+        if (toIdx !== dragFnFromIdx) {
+          const [moved] = state.cards.splice(dragFnFromIdx, 1);
+          state.cards.splice(toIdx, 0, moved);
+          dragFnFromIdx = -1;
+          renderFnCards();
+          compileWorkspace(true, false);
+          notifyStateChanged(true, true);
+        }
+      });
+      row.addEventListener("dragend", () => {
+        dragFnFromIdx = -1;
+        row.classList.remove("dragging-card", "drop-before", "drop-after");
+      });
 
       const gutter = document.createElement("div");
       gutter.className = "expr-gutter";
+      const grip = document.createElement("span");
+      grip.className = "drag-grip";
+      grip.textContent = "⋮⋮";
+      grip.title = "Drag to reorder card";
+      gutter.appendChild(grip);
       const num = document.createElement("span");
       num.className = "expr-num";
       num.textContent = String(idx + 1);
@@ -3317,7 +3481,7 @@
     const lockBtn = document.createElement("button");
     lockBtn.className = "expr-mini-btn" + (s.locked ? " locked" : "");
     lockBtn.textContent = s.locked ? "🔒" : "🔓";
-    lockBtn.title = s.locked ? "Unlock (move to Domain Shapes)" : "Lock (move to Landmarks tab)";
+    lockBtn.title = s.locked ? "Unlock element" : "Lock element";
     lockBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       s.locked = !s.locked;
@@ -3326,6 +3490,12 @@
       window.CFVComplex.requestRender();
       notifyStateChanged(true, true);
     });
+    if (s.locked) {
+      const lkPill = document.createElement("span");
+      lkPill.className = "locked-pill-badge";
+      lkPill.textContent = "Locked";
+      head.appendChild(lkPill);
+    }
     head.appendChild(lockBtn);
 
     const gearBtn = document.createElement("button");
@@ -3515,7 +3685,7 @@
     const lockBtn = document.createElement("button");
     lockBtn.className = "expr-mini-btn" + (ln.locked ? " locked" : "");
     lockBtn.textContent = ln.locked ? "🔒" : "🔓";
-    lockBtn.title = ln.locked ? "Unlock (move to Domain Shapes)" : "Lock (move to Landmarks tab)";
+    lockBtn.title = ln.locked ? "Unlock guide line" : "Lock guide line";
     lockBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       ln.locked = !ln.locked;
@@ -3523,6 +3693,12 @@
       refreshSettingsIfTarget("guide_line", ln.id);
       notifyStateChanged(true, true);
     });
+    if (ln.locked) {
+      const lkPill = document.createElement("span");
+      lkPill.className = "locked-pill-badge";
+      lkPill.textContent = "Locked";
+      head.appendChild(lkPill);
+    }
     head.appendChild(lockBtn);
 
     const gearBtn = document.createElement("button");
@@ -3674,7 +3850,7 @@
     const lockBtn = document.createElement("button");
     lockBtn.className = "expr-mini-btn" + (p.locked ? " locked" : "");
     lockBtn.textContent = p.locked ? "🔒" : "🔓";
-    lockBtn.title = p.locked ? "Unlock (move to Domain Shapes)" : "Lock (pin to Landmarks, hide from output)";
+    lockBtn.title = p.locked ? "Unlock point (maps to output)" : "Lock point (pinned to input plane)";
     lockBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       p.locked = !p.locked;
@@ -3683,6 +3859,12 @@
       if (!isReal) window.CFVComplex.requestRender();
       notifyStateChanged(true, true);
     });
+    if (p.locked) {
+      const lkPill = document.createElement("span");
+      lkPill.className = "locked-pill-badge";
+      lkPill.textContent = "Locked";
+      head.appendChild(lkPill);
+    }
     head.appendChild(lockBtn);
 
     const gearBtn = document.createElement("button");
@@ -3762,81 +3944,115 @@
 
   function renderDomainCards() {
     domainCardsEl.innerHTML = "";
-    landmarkCardsEl.innerHTML = "";
     const isReal = isRealMode();
-    const shapes = isReal ? [] : window.CFVComplex.state.shapes;
-    const lines = isReal ? window.CFVReal.state.lines : window.CFVComplex.state.lines;
-    const points = isReal ? window.CFVReal.state.points : window.CFVComplex.state.points;
-
-    const unlockedShapes = shapes.filter((s) => !s.locked);
-    const unlockedLines = lines.filter((l) => !l.locked);
-    const unlockedPoints = points.filter((p) => !p.locked);
-
-    const lockedShapes = shapes.filter((s) => Boolean(s.locked));
-    const lockedLines = lines.filter((l) => Boolean(l.locked));
-    const lockedPoints = points.filter((p) => Boolean(p.locked));
+    const ordered = isReal
+      ? (window.CFVReal && window.CFVReal.getOrderedElements ? window.CFVReal.getOrderedElements() : [])
+      : (window.CFVComplex && window.CFVComplex.getOrderedElements ? window.CFVComplex.getOrderedElements() : []);
 
     const realPolys = isReal && window.CFVReal && window.CFVReal.state ? (window.CFVReal.state.polygons || []) : [];
-    const domainTotal = unlockedShapes.length + unlockedLines.length + unlockedPoints.length + (realPolys.length > 0 ? 1 : 0);
-    const landmarkTotal = lockedShapes.length + lockedLines.length + lockedPoints.length;
-    if (domainTabCount) domainTabCount.textContent = String(realPolys.length > 0 ? realPolys.length + unlockedLines.length + unlockedPoints.length : domainTotal);
-    if (landmarksTabCount) landmarksTabCount.textContent = String(landmarkTotal);
+    const domainTotal = ordered.length + (realPolys.length > 0 ? 1 : 0);
+    if (domainTabCount) domainTabCount.textContent = String(realPolys.length > 0 ? realPolys.length + ordered.length : ordered.length);
 
     if (domainTotal === 0) {
       const empty = document.createElement("div");
       empty.style.cssText = "padding:12px;font-size:11.5px;color:#64748b;line-height:1.45;";
       empty.textContent = isReal
-        ? "Click + Pt or + Line above to add movable points or guide lines."
-        : "Draw shapes on the input plane, or click + Circle / + Rect / + Path / + Pt / + Line.";
+        ? "Click + Pt or + Line above to add points or guide lines. Drag cards to reorder layers."
+        : "Draw shapes on the input plane, or click + Circle / + Arc / + Rect / + Seg / + Pt / + Line. Drag cards to reorder layers.";
       domainCardsEl.appendChild(empty);
-    } else {
-      let seq = 1;
-      if (isReal && realPolys.length > 0) {
-        const selCnt = window.CFVReal.state.selectedPolyIds ? window.CFVReal.state.selectedPolyIds.size : 0;
-        const dims = window.CFVReal.getActiveGridDims ? window.CFVReal.getActiveGridDims() : { r: 32, w: 64, h: 64, centered: true };
-        const dimLbl = dims.centered ? `[±${dims.r}]² · ${dims.w}×${dims.h}` : `${dims.w}×${dims.h}`;
-        const fillLbl = dims.centered ? `Fill [±${dims.r}]²` : `Fill ${dims.w}×${dims.h}`;
-        const pCard = document.createElement("div");
-        pCard.className = "expr-card real-poly-summary-card";
-        pCard.innerHTML = `
-          <div class="expr-gutter"><span class="expr-num">${seq++}</span></div>
-          <div class="expr-body">
-            <div class="expr-head">
-              <span class="expr-fn-tag" style="color:#34d399;background:rgba(52,211,153,0.14)">Grid</span>
-              <span style="font-size:11.5px;font-weight:600;color:#e2e8f0">${realPolys.length} Cells (${dimLbl})</span>
-              <span style="margin-left:auto;font-size:10px;color:${selCnt > 0 ? "#38bdf8" : "#64748b"}">${selCnt} sel</span>
-            </div>
-            <div class="poly-summary-actions">
-              <button class="hud-btn" data-pact="all">Select All</button>
-              <button class="hud-btn" data-pact="inv">Invert</button>
-              <button class="hud-btn danger-btn" data-pact="del">Delete Sel</button>
-              <button class="hud-btn" data-pact="fill">${fillLbl}</button>
-              <button class="hud-btn" data-pact="clear">Clear</button>
-            </div>
-          </div>`;
-        pCard.querySelector('[data-pact="all"]').addEventListener("click", () => window.CFVReal.selectAllPolygons());
-        pCard.querySelector('[data-pact="inv"]').addEventListener("click", () => window.CFVReal.invertPolygonSelection());
-        pCard.querySelector('[data-pact="del"]').addEventListener("click", () => window.CFVReal.deleteSelectedPolygons());
-        pCard.querySelector('[data-pact="fill"]').addEventListener("click", () => window.CFVReal.fillGridPolygons());
-        pCard.querySelector('[data-pact="clear"]').addEventListener("click", () => window.CFVReal.clearPolygons());
-        domainCardsEl.appendChild(pCard);
-      }
-      for (const s of unlockedShapes) domainCardsEl.appendChild(buildShapeCard(s, seq++));
-      for (const ln of unlockedLines) domainCardsEl.appendChild(buildGuideLineCard(ln, seq++, isReal));
-      for (const p of unlockedPoints) domainCardsEl.appendChild(buildPointCard(p, seq++, isReal));
+      return;
     }
 
-    if (landmarkTotal === 0) {
-      const empty = document.createElement("div");
-      empty.style.cssText = "padding:12px;font-size:11.5px;color:#64748b;line-height:1.45;";
-      empty.textContent = "Click 🔒 on any shape, point, or line to pin it here as a locked landmark.";
-      landmarkCardsEl.appendChild(empty);
-    } else {
-      let seq = 1;
-      for (const s of lockedShapes) landmarkCardsEl.appendChild(buildShapeCard(s, seq++));
-      for (const ln of lockedLines) landmarkCardsEl.appendChild(buildGuideLineCard(ln, seq++, isReal));
-      for (const p of lockedPoints) landmarkCardsEl.appendChild(buildPointCard(p, seq++, isReal));
+    let seq = 1;
+    if (isReal && realPolys.length > 0) {
+      const selCnt = window.CFVReal.state.selectedPolyIds ? window.CFVReal.state.selectedPolyIds.size : 0;
+      const dims = window.CFVReal.getActiveGridDims ? window.CFVReal.getActiveGridDims() : { r: 32, w: 64, h: 64, centered: true };
+      const dimLbl = dims.centered ? `[±${dims.r}]² · ${dims.w}×${dims.h}` : `${dims.w}×${dims.h}`;
+      const fillLbl = dims.centered ? `Fill [±${dims.r}]²` : `Fill ${dims.w}×${dims.h}`;
+      const pCard = document.createElement("div");
+      pCard.className = "expr-card real-poly-summary-card";
+      pCard.innerHTML = `
+        <div class="expr-gutter"><span class="expr-num">${seq++}</span></div>
+        <div class="expr-body">
+          <div class="expr-head">
+            <span class="expr-fn-tag" style="color:#34d399;background:rgba(52,211,153,0.14)">Grid</span>
+            <span style="font-size:11.5px;font-weight:600;color:var(--text-primary)">${realPolys.length} Cells (${dimLbl})</span>
+            <span style="margin-left:auto;font-size:10px;color:${selCnt > 0 ? "var(--accent)" : "var(--text-muted)"}">${selCnt} sel</span>
+          </div>
+          <div class="poly-summary-actions">
+            <button class="hud-btn" data-pact="all">Select All</button>
+            <button class="hud-btn" data-pact="inv">Invert</button>
+            <button class="hud-btn danger-btn" data-pact="del">Delete Sel</button>
+            <button class="hud-btn" data-pact="fill">${fillLbl}</button>
+            <button class="hud-btn" data-pact="clear">Clear</button>
+          </div>
+        </div>`;
+      pCard.querySelector('[data-pact="all"]').addEventListener("click", () => window.CFVReal.selectAllPolygons());
+      pCard.querySelector('[data-pact="inv"]').addEventListener("click", () => window.CFVReal.invertPolygonSelection());
+      pCard.querySelector('[data-pact="del"]').addEventListener("click", () => window.CFVReal.deleteSelectedPolygons());
+      pCard.querySelector('[data-pact="fill"]').addEventListener("click", () => window.CFVReal.fillGridPolygons());
+      pCard.querySelector('[data-pact="clear"]').addEventListener("click", () => window.CFVReal.clearPolygons());
+      domainCardsEl.appendChild(pCard);
     }
+
+    let dragElFrom = -1;
+    ordered.forEach((el, idx) => {
+      const card =
+        el.kind === "shape" ? buildShapeCard(el.item, seq++) :
+        el.kind === "guide_line" ? buildGuideLineCard(el.item, seq++, isReal) :
+        buildPointCard(el.item, seq++, isReal);
+
+      const gutter = card.querySelector(".expr-gutter");
+      if (gutter) {
+        const grip = document.createElement("span");
+        grip.className = "drag-grip";
+        grip.textContent = "⋮⋮";
+        grip.title = "Drag to reorder layer (top = back, bottom = front)";
+        gutter.insertBefore(grip, gutter.firstChild);
+      }
+
+      card.draggable = true;
+      card.addEventListener("dragstart", (ev) => {
+        if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA" || ev.target.tagName === "SELECT")) {
+          ev.preventDefault();
+          return;
+        }
+        dragElFrom = idx;
+        card.classList.add("dragging-card");
+        if (ev.dataTransfer) { ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(idx)); }
+      });
+      card.addEventListener("dragover", (ev) => {
+        if (dragElFrom < 0 || dragElFrom === idx) return;
+        ev.preventDefault();
+        const rect = card.getBoundingClientRect();
+        const before = ev.clientY < rect.top + rect.height * 0.5;
+        card.classList.toggle("drop-before", before);
+        card.classList.toggle("drop-after", !before);
+      });
+      card.addEventListener("dragleave", () => {
+        card.classList.remove("drop-before", "drop-after");
+      });
+      card.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        card.classList.remove("drop-before", "drop-after");
+        if (dragElFrom < 0 || dragElFrom === idx) return;
+        const rect = card.getBoundingClientRect();
+        const before = ev.clientY < rect.top + rect.height * 0.5;
+        let toIdx = before ? idx : idx + 1;
+        if (dragElFrom < toIdx) toIdx--;
+        const fromIdx = dragElFrom;
+        dragElFrom = -1;
+        if (toIdx !== fromIdx) {
+          if (isReal && window.CFVReal.reorderElement) window.CFVReal.reorderElement(fromIdx, toIdx);
+          else if (!isReal && window.CFVComplex.reorderElement) window.CFVComplex.reorderElement(fromIdx, toIdx);
+        }
+      });
+      card.addEventListener("dragend", () => {
+        dragElFrom = -1;
+        card.classList.remove("dragging-card", "drop-before", "drop-after");
+      });
+      domainCardsEl.appendChild(card);
+    });
   }
 
   function syncPointCoords(pt) {
@@ -3892,6 +4108,18 @@
     }
   }
 
+  function openItemSettingsAt(kind, id, clientX, clientY) {
+    state.settingsTarget = { kind, id };
+    renderItemSettings();
+    itemSettingsPopover.classList.remove("hidden");
+    const popW = itemSettingsPopover.offsetWidth || 268;
+    const popH = itemSettingsPopover.offsetHeight || 340;
+    const left = Math.max(10, Math.min((window.innerWidth || 1200) - popW - 12, clientX + 8));
+    const top = Math.max(52, Math.min((window.innerHeight || 800) - popH - 14, clientY - 12));
+    itemSettingsPopover.style.left = `${left}px`;
+    itemSettingsPopover.style.top = `${top}px`;
+  }
+
   function openItemSettings(kind, id, anchorEl) {
     if (
       !itemSettingsPopover.classList.contains("hidden") &&
@@ -3908,7 +4136,7 @@
 
     if (anchorEl && anchorEl.getBoundingClientRect) {
       const rect = anchorEl.getBoundingClientRect();
-      const popH = itemSettingsPopover.offsetHeight || 280;
+      const popH = itemSettingsPopover.offsetHeight || 320;
       const top = Math.max(54, Math.min((window.innerHeight || 800) - popH - 14, rect.top - 10));
       const left = Math.min((window.innerWidth || 1200) - 280, Math.max(12, sidebar.getBoundingClientRect().right + 8));
       itemSettingsPopover.style.top = `${top}px`;
@@ -3924,8 +4152,8 @@
 
     itemSettingsTitle.textContent =
       kind === "fn" ? "Curve / Function Style" :
-      kind === "shape" ? "Shape / Contour Style" :
-      kind === "guide_line" ? "Landmark Line Style" : "Point Style";
+      kind === "shape" ? "Shape / Contour Properties" :
+      kind === "guide_line" ? "Guide Line Properties" : "Point Properties";
     itemSettingsBody.innerHTML = "";
 
     const repaint = (recalc = false) => {
@@ -3948,7 +4176,7 @@
 
     const colorSec = document.createElement("div");
     colorSec.className = "tools-section";
-    colorSec.innerHTML = `<div class="tools-sec-label">Color</div>`;
+    colorSec.innerHTML = `<div class="tools-sec-label">Color &amp; Opacity</div>`;
     const grid = document.createElement("div");
     grid.className = "swatch-grid";
     for (const hex of COLORS) {
@@ -3973,6 +4201,25 @@
     });
     grid.appendChild(picker);
     colorSec.appendChild(grid);
+
+    /* Opacity Slider (applies to both Input Space & Output Space!) */
+    const opRow = document.createElement("div");
+    opRow.className = "slider-row";
+    opRow.style.marginTop = "6px";
+    opRow.innerHTML = `<span>Opacity</span>`;
+    const curOp = normOpacityWs(item.opacity, 1.0);
+    const opRange = document.createElement("input");
+    opRange.type = "range"; opRange.min = "0"; opRange.max = "1"; opRange.step = "0.05";
+    opRange.value = String(curOp);
+    const opVal = document.createElement("code");
+    opVal.textContent = `${Math.round(curOp * 100)}%`;
+    opRange.addEventListener("input", () => {
+      item.opacity = normOpacityWs(opRange.value, 1.0);
+      opVal.textContent = `${Math.round(item.opacity * 100)}%`;
+      repaint(false);
+    });
+    opRow.appendChild(opRange); opRow.appendChild(opVal);
+    colorSec.appendChild(opRow);
     itemSettingsBody.appendChild(colorSec);
 
     if (kind === "point") {
@@ -3983,7 +4230,7 @@
       szRow.className = "slider-row";
       szRow.innerHTML = `<span>Size</span>`;
       const szRange = document.createElement("input");
-      szRange.type = "range"; szRange.min = "3"; szRange.max = "12"; szRange.step = "0.5";
+      szRange.type = "range"; szRange.min = "2"; szRange.max = "14"; szRange.step = "0.5";
       szRange.value = String(item.size || 5);
       const szVal = document.createElement("code");
       szVal.textContent = String(item.size || 5);
@@ -4025,18 +4272,19 @@
     } else {
       const lnSec = document.createElement("div");
       lnSec.className = "tools-section";
-      lnSec.innerHTML = `<div class="tools-sec-label">Stroke &amp; Line Style</div>`;
+      lnSec.innerHTML = `<div class="tools-sec-label">Stroke &amp; Line Style (0 = No Outline)</div>`;
 
       const lwRow = document.createElement("div");
       lwRow.className = "slider-row";
       lwRow.innerHTML = `<span>Width</span>`;
+      const curLw = normLineWidthWs(item.lineWidth, 2.2);
       const lwRange = document.createElement("input");
-      lwRange.type = "range"; lwRange.min = "1"; lwRange.max = "5"; lwRange.step = "0.2";
-      lwRange.value = String(item.lineWidth || 2.2);
+      lwRange.type = "range"; lwRange.min = "0"; lwRange.max = "6"; lwRange.step = "0.2";
+      lwRange.value = String(curLw);
       const lwVal = document.createElement("code");
-      lwVal.textContent = Number(item.lineWidth || 2.2).toFixed(1);
+      lwVal.textContent = curLw.toFixed(1);
       lwRange.addEventListener("input", () => {
-        item.lineWidth = parseFloat(lwRange.value);
+        item.lineWidth = normLineWidthWs(lwRange.value, 2.2);
         lwVal.textContent = item.lineWidth.toFixed(1);
         repaint(kind === "fn" && !isRealMode());
       });
@@ -4128,20 +4376,66 @@
       itemSettingsBody.appendChild(lnSec);
     }
 
+    if (kind === "shape" || kind === "point" || kind === "guide_line") {
+      const laySec = document.createElement("div");
+      laySec.className = "tools-section";
+      laySec.innerHTML = `<div class="tools-sec-label">Layer Order</div>`;
+      const lRow = document.createElement("div");
+      lRow.className = "layer-move-row";
+      const moveFn = (act) => {
+        if (isRealMode() && window.CFVReal.moveElementLayer) window.CFVReal.moveElementLayer(kind, id, act);
+        else if (!isRealMode() && window.CFVComplex.moveElementLayer) window.CFVComplex.moveElementLayer(kind, id, act);
+      };
+      for (const [act, lbl, title] of [
+        ["back", "⇤ Back", "Send to Back (drawn first)"],
+        ["backward", "↑ Back", "Send Backward one layer"],
+        ["forward", "↓ Front", "Bring Forward one layer"],
+        ["front", "Front ⇥", "Bring to Front (drawn on top)"],
+      ]) {
+        const b = document.createElement("button");
+        b.className = "style-opt-btn";
+        b.textContent = lbl;
+        b.title = title;
+        b.addEventListener("click", () => moveFn(act));
+        lRow.appendChild(b);
+      }
+      laySec.appendChild(lRow);
+      itemSettingsBody.appendChild(laySec);
+    }
+
     const lockSec = document.createElement("div");
     lockSec.className = "tools-section";
     const lockRow = document.createElement("label");
     lockRow.className = "toggle-row";
-    lockRow.innerHTML = `<span>🔒 Lock (pin to Landmarks tab)</span>`;
+    lockRow.innerHTML = `<span>🔒 Lock element</span>`;
     const lockCb = document.createElement("input");
     lockCb.type = "checkbox";
     lockCb.checked = Boolean(item.locked);
     lockCb.addEventListener("change", () => {
       item.locked = lockCb.checked;
       repaint();
+      renderItemSettings();
     });
     lockRow.appendChild(lockCb);
     lockSec.appendChild(lockRow);
+
+    if (!item.locked) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn-danger full-btn";
+      delBtn.style.marginTop = "6px";
+      delBtn.textContent = "Delete Element";
+      delBtn.addEventListener("click", () => {
+        closeItemSettings();
+        if (kind === "fn") {
+          state.cards = state.cards.filter((q) => q.id !== id);
+          if (state.primaryCardId === id) { const rem = fnCards(); state.primaryCardId = rem[0] ? rem[0].id : null; }
+          renderFnCards(); compileWorkspace(true, false); notifyStateChanged(true, true);
+        } else if (kind === "shape") window.CFVComplex.deleteShape(id);
+        else if (kind === "point") { if (isRealMode()) window.CFVReal.deletePoint(id); else window.CFVComplex.deletePoint(id); }
+        else if (kind === "guide_line") { if (isRealMode()) window.CFVReal.deleteGuideLine(id); else window.CFVComplex.deleteGuideLine(id); }
+      });
+      lockSec.appendChild(delBtn);
+    }
     itemSettingsBody.appendChild(lockSec);
   }
 
@@ -4174,6 +4468,7 @@
     if (e.key === "Escape") {
       closeItemSettings();
       closeExamplesDropdown();
+      closeFnLibraryDropdown();
       closeUnsavedModal();
       closeDeleteModal();
       closeSaveProjectForm();
@@ -4423,6 +4718,8 @@
 
       state.activeProjectId = null;
       state.activeProjectName = "New Project";
+      state.activeProjectDescription = "";
+      syncDescriptionUI();
       state.activeProjectIsCustom = false;
       state.activeProjectFolder = "my";
       state.sourceExampleId = null;
@@ -4611,12 +4908,13 @@
   }
 
   /* Standardized Project Row used uniformly for ALL projects (saved & built-in examples) */
-  function buildProjectRow({ title, badge, subtitle, isActive, onSelect, onRename, onExportJson, onDelete }) {
+  function buildProjectRow({ title, badge, subtitle, description, isActive, onSelect, onRename, onExportJson, onDelete }) {
     const wrap = document.createElement("div");
     wrap.className = "ex-item-row";
 
     const b = document.createElement("button");
     b.className = "ex-item" + (isActive ? " active" : "");
+    if (description) b.title = description;
 
     const top = document.createElement("div");
     top.className = "ex-item-top";
@@ -4634,6 +4932,13 @@
     sSpan.className = "ex-item-sub";
     sSpan.textContent = subtitle || "";
     b.appendChild(sSpan);
+
+    if (description && description.trim() && description.trim() !== (subtitle || "").trim()) {
+      const dSpan = document.createElement("span");
+      dSpan.className = "ex-item-desc";
+      dSpan.textContent = description.trim();
+      b.appendChild(dSpan);
+    }
 
     b.addEventListener("click", onSelect);
     wrap.appendChild(b);
@@ -4680,6 +4985,7 @@
       title: proj.name,
       badge: pCnt === 0 ? "Default view" : `${pCnt} preset${pCnt === 1 ? "" : "s"}`,
       subtitle: subTxt,
+      description: proj.description || "",
       isActive: isCur,
       onSelect: () => {
         closeExamplesDropdown();
@@ -4711,6 +5017,7 @@
       title: dispName,
       badge: `${pCnt} preset${pCnt === 1 ? "" : "s"}`,
       subtitle: ex.subtitle || "",
+      description: ex.description || "",
       isActive: isCur,
       onSelect: () => {
         closeExamplesDropdown();
@@ -4880,6 +5187,8 @@
       state.activeProjectId = ex.id;
       const customRename = state.libraryMeta && state.libraryMeta.exampleRenames && state.libraryMeta.exampleRenames[ex.id];
       state.activeProjectName = customRename ? customRename : ex.title.split("—")[0].trim();
+      state.activeProjectDescription = ex.description || ex.subtitle || "";
+      syncDescriptionUI();
       state.activeProjectIsCustom = false;
       state.activeProjectFolder = "examples";
       state.sourceExampleId = ex.id;
@@ -4980,7 +5289,11 @@
         mode === "real" ? "2D Real Curves & Relations" : mode === "integral" ? "Integrand f(z) & Aux" : "Function w = f(z) & Aux";
     }
     if (domainSectionLabel) {
-      domainSectionLabel.textContent = isReal ? "Movable Points & Lines" : "Domain Shapes";
+      domainSectionLabel.textContent = "Elements & Layers";
+    }
+    closeFnLibraryDropdown();
+    if (fnSyntaxGuide && !fnSyntaxGuide.classList.contains("hidden") && window.CFVFunctionLibrary) {
+      fnSyntaxGuide.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(mode);
     }
     if (domainQuickAdds && domainQuickAdds.querySelectorAll) {
       domainQuickAdds.querySelectorAll(".complex-only-add").forEach((el) => {
@@ -5113,6 +5426,8 @@
     if (!saveProjectForm) return;
     closeExamplesDropdown();
     populateSaveFolderSelect(state.activeProjectFolder || "my");
+    if (saveNewFolderRow) saveNewFolderRow.classList.add("hidden");
+    if (saveProjectDesc) saveProjectDesc.value = state.activeProjectDescription || "";
     saveProjectForm.classList.remove("hidden");
     if (saveProjectName) {
       if (isInSavedProject()) {
@@ -5128,7 +5443,219 @@
   }
   function closeSaveProjectForm() {
     if (saveProjectForm) saveProjectForm.classList.add("hidden");
+    if (saveNewFolderRow) saveNewFolderRow.classList.add("hidden");
   }
+
+  /* Add Folder button directly inside Save As popover */
+  if (btnSaveAddFolder && saveNewFolderRow) {
+    btnSaveAddFolder.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const opening = saveNewFolderRow.classList.contains("hidden");
+      saveNewFolderRow.classList.toggle("hidden", !opening);
+      if (opening && saveNewFolderInput) {
+        saveNewFolderInput.value = "";
+        saveNewFolderInput.focus();
+      }
+    });
+  }
+  if (btnSaveCancelFolder && saveNewFolderRow) {
+    btnSaveCancelFolder.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      saveNewFolderRow.classList.add("hidden");
+    });
+  }
+  if (btnSaveConfirmFolder) {
+    btnSaveConfirmFolder.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const nm = saveNewFolderInput && saveNewFolderInput.value ? saveNewFolderInput.value.trim() : "";
+      if (!nm) { if (saveNewFolderInput) saveNewFolderInput.focus(); return; }
+      const f = createFolder(nm, state.mode);
+      if (f) populateSaveFolderSelect(f.id);
+      if (saveNewFolderRow) saveNewFolderRow.classList.add("hidden");
+    });
+  }
+  if (saveNewFolderInput) {
+    saveNewFolderInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); if (btnSaveConfirmFolder) btnSaveConfirmFolder.click(); }
+      else if (e.key === "Escape") { e.preventDefault(); if (saveNewFolderRow) saveNewFolderRow.classList.add("hidden"); }
+    });
+  }
+
+  /* Collapsible Project Description Strip */
+  function syncDescriptionUI() {
+    const desc = (state.activeProjectDescription || "").trim();
+    if (projectDescPreview) {
+      projectDescPreview.textContent = desc || "Add project description…";
+      projectDescPreview.title = desc || "Click to add a project description";
+    }
+    if (projectDescInput && document.activeElement !== projectDescInput) {
+      projectDescInput.value = state.activeProjectDescription || "";
+    }
+  }
+  if (btnToggleDesc && projectDescBar && projectDescEditor) {
+    btnToggleDesc.addEventListener("click", () => {
+      const opening = projectDescEditor.classList.contains("hidden");
+      projectDescEditor.classList.toggle("hidden", !opening);
+      projectDescBar.classList.toggle("open", opening);
+      btnToggleDesc.setAttribute("aria-expanded", String(opening));
+      if (opening && projectDescInput) projectDescInput.focus();
+    });
+  }
+  if (projectDescInput) {
+    projectDescInput.addEventListener("input", () => {
+      state.activeProjectDescription = projectDescInput.value;
+      syncDescriptionUI();
+      notifyStateChanged(false, true);
+    });
+  }
+
+  /* Prewritten Function Library Dropdown (Strictly separated Complex vs 2D Real) */
+  let fnLibSelectedCat = "All";
+  function closeFnLibraryDropdown() {
+    if (fnLibraryDropdown) fnLibraryDropdown.classList.add("hidden");
+  }
+  function renderFnLibraryMenu() {
+    if (!fnLibList || !fnLibCats || !window.CFVFunctionLibrary) return;
+    const items = window.CFVFunctionLibrary.getForMode(state.mode);
+    if (fnLibTitle) {
+      fnLibTitle.textContent = isRealMode()
+        ? "2D Real Function & Curve Library"
+        : "Complex Analysis Function Library";
+    }
+    const cats = ["All", ...Array.from(new Set(items.map((x) => x.cat)))];
+    if (!cats.includes(fnLibSelectedCat)) fnLibSelectedCat = "All";
+
+    fnLibCats.innerHTML = "";
+    for (const cat of cats) {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "fn-lib-cat-pill" + (cat === fnLibSelectedCat ? " active" : "");
+      pill.textContent = cat;
+      pill.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        fnLibSelectedCat = cat;
+        renderFnLibraryMenu();
+      });
+      fnLibCats.appendChild(pill);
+    }
+
+    const q = (fnLibSearch && fnLibSearch.value ? fnLibSearch.value : "").trim().toLowerCase();
+    const filtered = items.filter((it) => {
+      if (fnLibSelectedCat !== "All" && it.cat !== fnLibSelectedCat) return false;
+      if (!q) return true;
+      return (
+        it.name.toLowerCase().includes(q) ||
+        it.expr.toLowerCase().includes(q) ||
+        it.desc.toLowerCase().includes(q) ||
+        it.cat.toLowerCase().includes(q)
+      );
+    });
+
+    fnLibList.innerHTML = "";
+    if (filtered.length === 0) {
+      const emp = document.createElement("div");
+      emp.className = "proj-folder-empty";
+      emp.textContent = "No matching functions in this mode.";
+      fnLibList.appendChild(emp);
+      return;
+    }
+    for (const it of filtered) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "fn-lib-item";
+      btn.innerHTML = `
+        <div class="fn-lib-item-top">
+          <span class="fn-lib-item-name"></span>
+          <span class="fn-lib-item-cat"></span>
+        </div>
+        <div class="fn-lib-item-code"></div>
+        <div class="fn-lib-item-desc"></div>
+      `;
+      btn.querySelector(".fn-lib-item-name").textContent = it.name;
+      btn.querySelector(".fn-lib-item-cat").textContent = it.cat;
+      btn.querySelector(".fn-lib-item-code").textContent = it.expr.replace(/\s+/g, " ");
+      btn.querySelector(".fn-lib-item-desc").textContent = it.desc;
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        closeFnLibraryDropdown();
+        addFunctionCard(it.expr, it.name);
+        if (!isRealMode()) {
+          const fns = fnCards();
+          const added = fns[fns.length - 1];
+          if (added) {
+            state.primaryCardId = added.id;
+            renderFnCards();
+            compileWorkspace(false, false);
+          }
+        }
+      });
+      fnLibList.appendChild(btn);
+    }
+  }
+  if (btnFnLibrary && fnLibraryDropdown) {
+    btnFnLibrary.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const opening = fnLibraryDropdown.classList.contains("hidden");
+      if (!opening) { closeFnLibraryDropdown(); return; }
+      fnLibSelectedCat = "All";
+      if (fnLibSearch) fnLibSearch.value = "";
+      renderFnLibraryMenu();
+      fnLibraryDropdown.classList.remove("hidden");
+      const r = btnFnLibrary.getBoundingClientRect();
+      const left = Math.min((window.innerWidth || 1200) - 352, Math.max(10, r.left));
+      const top = Math.min((window.innerHeight || 800) - 452, r.bottom + 6);
+      fnLibraryDropdown.style.left = `${left}px`;
+      fnLibraryDropdown.style.top = `${top}px`;
+      if (fnLibSearch) fnLibSearch.focus();
+    });
+  }
+  if (fnLibSearch) {
+    fnLibSearch.addEventListener("click", (ev) => ev.stopPropagation());
+    fnLibSearch.addEventListener("input", renderFnLibraryMenu);
+  }
+  if (btnFnGuide && fnSyntaxGuide) {
+    btnFnGuide.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const opening = fnSyntaxGuide.classList.contains("hidden");
+      if (opening && window.CFVFunctionLibrary) {
+        fnSyntaxGuide.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(state.mode);
+      }
+      fnSyntaxGuide.classList.toggle("hidden", !opening);
+      btnFnGuide.classList.toggle("active", opening);
+    });
+  }
+
+  /* Light / Dark Theme Toggle */
+  const THEME_KEY = "cfv_theme_v1";
+  function applyTheme(theme, persist = false) {
+    const isLight = theme === "light";
+    document.documentElement.dataset.theme = isLight ? "light" : "dark";
+    if (themeIconSun) themeIconSun.classList.toggle("hidden", isLight);
+    if (themeIconMoon) themeIconMoon.classList.toggle("hidden", !isLight);
+    if (themeToggleLabel) themeToggleLabel.textContent = isLight ? "Dark" : "Light";
+    if (persist) {
+      try { if (window.localStorage) window.localStorage.setItem(THEME_KEY, isLight ? "light" : "dark"); } catch (_) {}
+    }
+    if (window.CFVComplex) window.CFVComplex.requestRender();
+    if (window.CFVReal) window.CFVReal.requestRender();
+  }
+  try {
+    const savedTheme = window.localStorage && window.localStorage.getItem(THEME_KEY);
+    if (savedTheme === "light" || savedTheme === "dark") applyTheme(savedTheme, false);
+    else applyTheme("dark", false);
+  } catch (_) {}
+  if (btnToggleTheme) {
+    btnToggleTheme.addEventListener("click", () => {
+      const curLight = document.documentElement.dataset.theme === "light";
+      applyTheme(curLight ? "dark" : "light", true);
+    });
+  }
+
+  document.addEventListener("pointerdown", (ev) => {
+    if (fnLibraryDropdown && !fnLibraryDropdown.classList.contains("hidden")) {
+      if (!fnLibraryDropdown.contains(ev.target) && ev.target !== btnFnLibrary) closeFnLibraryDropdown();
+    }
+  });
 
   function openSavePresetForm() {
     if (btnSavePreset) btnSavePreset.classList.add("hidden");
@@ -5238,6 +5765,10 @@
     btnConfirmSaveProject.addEventListener("click", () => {
       const nm = (saveProjectName && saveProjectName.value.trim()) || defaultProjectName();
       const folderId = (saveProjectFolder && saveProjectFolder.value) || state.activeProjectFolder || "my";
+      if (saveProjectDesc) {
+        state.activeProjectDescription = saveProjectDesc.value.trim();
+        syncDescriptionUI();
+      }
       saveCurrentProject(nm, { forceNew: true, folder: folderId });
       closeSaveProjectForm();
     });
@@ -5536,6 +6067,8 @@
     compileWorkspace,
     loadExample,
     importAIBundle,
+    openItemSettings,
+    openItemSettingsAt,
     renderDomainCards,
     syncPointCoords,
     syncGuideLine,

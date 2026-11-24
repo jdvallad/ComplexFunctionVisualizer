@@ -6413,5 +6413,6 @@
         }
       }
     }
-  ]
+  ],
+  "description": "Truncated icosahedron (soccer ball) tiling mapped through an SU(2) rigid Möbius rotation of the Riemann Sphere with live roll and spin sliders."
 }

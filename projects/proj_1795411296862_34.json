@@ -1502,5 +1502,6 @@
         }
       }
     }
-  ]
+  ],
+  "description": "Iterated quadratic polynomial Q(z) = z² + c with continuous fractional depth interpolation, folding domain shapes into Julia-set origami structures."
 }

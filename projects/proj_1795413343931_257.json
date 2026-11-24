@@ -31,5 +31,6 @@
       "zoom": 1
     }
   },
-  "presets": []
+  "presets": [],
+  "description": "Minimal blank Complex Map test workspace for quick experimentation and prototyping."
 }

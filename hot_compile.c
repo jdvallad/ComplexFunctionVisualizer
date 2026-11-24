@@ -2,6 +2,7 @@
 
 #include "hot_compile.h"
 #include "complex_math.h"
+#include "sampler.h"
 
 #include <ctype.h>
 #include <dlfcn.h>
@@ -791,5 +792,122 @@ void hot_sample_parametric_slot(int slot, const EvalParams *params, double tmin,
                                 .end = count,
                                 .xy = xy_out};
         hot_parametric_worker(&job);
+    }
+}
+
+typedef struct {
+    int slot;
+    EvalParams params;
+    double cx;
+    double cy;
+    double half_w;
+    double half_h;
+    int width;
+    int height;
+    int y_start;
+    int y_end;
+    int scheme;
+    uint8_t *rgba;
+} HotDomainJob;
+
+static void *hot_domain_worker(void *arg) {
+    HotDomainJob *j = (HotDomainJob *)arg;
+    double x0 = j->cx - j->half_w;
+    double y0 = j->cy + j->half_h;
+    double dx = (2.0 * j->half_w) / (double)j->width;
+    double dy = (2.0 * j->half_h) / (double)j->height;
+
+    pthread_rwlock_rdlock(&g_hot_lock);
+    HotComplexSlotFn fn = g_complex_slot_fn;
+    int max_s = g_complex_slots;
+    if (fn && j->slot >= 0 && j->slot < max_s) {
+        for (int py = j->y_start; py < j->y_end; py++) {
+            double im = y0 - ((double)py + 0.5) * dy;
+            for (int px = 0; px < j->width; px++) {
+                double re = x0 + ((double)px + 0.5) * dx;
+                double complex w = fn(j->slot, c_make(re, im), &j->params);
+                size_t idx = ((size_t)py * (size_t)j->width + (size_t)px) * 4;
+                uint8_t r, g, b;
+                sampler_color_complex(w, j->scheme, &r, &g, &b);
+                j->rgba[idx + 0] = r;
+                j->rgba[idx + 1] = g;
+                j->rgba[idx + 2] = b;
+                j->rgba[idx + 3] = 255;
+            }
+        }
+    } else {
+        for (int py = j->y_start; py < j->y_end; py++) {
+            for (int px = 0; px < j->width; px++) {
+                size_t idx = ((size_t)py * (size_t)j->width + (size_t)px) * 4;
+                j->rgba[idx + 0] = 10;
+                j->rgba[idx + 1] = 14;
+                j->rgba[idx + 2] = 23;
+                j->rgba[idx + 3] = 255;
+            }
+        }
+    }
+    pthread_rwlock_unlock(&g_hot_lock);
+    return NULL;
+}
+
+void hot_render_domain_slot(int slot, const EvalParams *params, double cx, double cy, double half_w,
+                            double half_h, int width, int height, int scheme, uint8_t *rgba_out) {
+    if (!rgba_out || width <= 0 || height <= 0) {
+        return;
+    }
+    EvalParams p_copy = {{0}, 0};
+    if (params) {
+        p_copy = *params;
+    }
+    const int nthreads = (height >= 32) ? 4 : 1;
+    if (nthreads > 1) {
+        pthread_t threads[4];
+        HotDomainJob jobs[4];
+        int rows_per = (height + nthreads - 1) / nthreads;
+        int launched = 0;
+        for (int t = 0; t < nthreads; t++) {
+            int ys = t * rows_per;
+            if (ys >= height) {
+                break;
+            }
+            int ye = ys + rows_per;
+            if (ye > height) {
+                ye = height;
+            }
+            jobs[t] = (HotDomainJob){.slot = slot,
+                                     .params = p_copy,
+                                     .cx = cx,
+                                     .cy = cy,
+                                     .half_w = half_w,
+                                     .half_h = half_h,
+                                     .width = width,
+                                     .height = height,
+                                     .y_start = ys,
+                                     .y_end = ye,
+                                     .scheme = scheme,
+                                     .rgba = rgba_out};
+            if (pthread_create(&threads[t], NULL, hot_domain_worker, &jobs[t]) == 0) {
+                launched++;
+            } else {
+                hot_domain_worker(&jobs[t]);
+            }
+        }
+        for (int t = 0; t < launched; t++) {
+            pthread_join(threads[t], NULL);
+        }
+    } else {
+        HotDomainJob job = {.slot = slot,
+                            .params = p_copy,
+                            .cx = cx,
+                            .cy = cy,
+                            .half_w = half_w,
+                            .half_h = half_h,
+                            .width = width,
+                            .height = height,
+                            .y_start = 0,
+                            .y_end = height,
+                            .scheme = scheme,
+                            .rgba = rgba_out};
+        hot_domain_worker(&job);
     }
 }

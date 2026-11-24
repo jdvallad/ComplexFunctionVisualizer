@@ -43,6 +43,7 @@
     /* 2D Landmark Points, Landmark Lines & Interactive Grid/Cell Polygons */
     points: [],
     lines: [],
+    layerOrder: [],
     polygons: [],
     polyGridMap: new Map(),
     selectedPolyIds: new Set(),
@@ -562,7 +563,8 @@
           const c = fnList[i];
           curves.push({
             cardId: c.id, title: c.title, color: c.color, step: Boolean(c.step),
-            lineStyle: c.lineStyle || "solid", lineWidth: Number(c.lineWidth) || 2.1, ys: s.ys,
+            lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.1),
+            opacity: normOpacity(c.opacity, 1.0), ys: s.ys,
           });
         });
       } else {
@@ -583,7 +585,8 @@
           const ys = b.kind === "exact" ? d.exact : b.kind === "baseline" ? d.baseline : (d.approx && d.approx[0] ? d.approx[0].ys : []);
           curves.push({
             cardId: c.id, title: c.title, color: c.color, step: Boolean(c.step),
-            lineStyle: c.lineStyle || "solid", lineWidth: Number(c.lineWidth) || 2.1, ys,
+            lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.1),
+            opacity: normOpacity(c.opacity, 1.0), ys,
           });
         }
       }
@@ -608,7 +611,8 @@
             if (xv !== null && Number.isFinite(xv)) {
               verticals.push({
                 cardId: c.id, title: c.title, color: c.color, xVal: xv,
-                lineStyle: c.lineStyle || "solid", lineWidth: Number(c.lineWidth) || 2.2,
+                lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.2),
+                opacity: normOpacity(c.opacity, 1.0),
               });
             }
           });
@@ -619,7 +623,8 @@
           if (Number.isFinite(xv)) {
             verticals.push({
               cardId: c.id, title: c.title, color: c.color, xVal: xv,
-              lineStyle: c.lineStyle || "solid", lineWidth: Number(c.lineWidth) || 2.2,
+              lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.2),
+              opacity: normOpacity(c.opacity, 1.0),
             });
           }
         }
@@ -643,7 +648,8 @@
           const c = xOfYList[i];
           xOfYCurves.push({
             cardId: c.id, title: c.title, color: c.color,
-            lineStyle: c.lineStyle || "solid", lineWidth: Number(c.lineWidth) || 2.2,
+            lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.2),
+            opacity: normOpacity(c.opacity, 1.0),
             ys: yGrid, xs: s.ys,
           });
         });
@@ -670,7 +676,8 @@
           const buf = await res.arrayBuffer();
           implicits.push({
             cardId: c.id, title: c.title, color: c.color,
-            lineStyle: c.lineStyle || "solid", lineWidth: Number(c.lineWidth) || 2.2,
+            lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.2),
+            opacity: normOpacity(c.opacity, 1.0),
             nx, ny,
             xmin: state.view.xmin, xmax: state.view.xmax,
             ymin: state.view.ymin, ymax: state.view.ymax,
@@ -699,7 +706,8 @@
           const buf = await res.arrayBuffer();
           parametrics.push({
             cardId: c.id, title: c.title, color: c.color,
-            lineStyle: c.lineStyle || "solid", lineWidth: Number(c.lineWidth) || 2.3,
+            lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.3),
+            opacity: normOpacity(c.opacity, 1.0),
             xy: new Float32Array(buf),
           });
         })
@@ -769,6 +777,70 @@
     requestRender();
   }
 
+  function isLightTheme() {
+    return typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
+  }
+  function normLineWidth(v, fallback = 2.1) {
+    if (v === undefined || v === null || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, n) : fallback;
+  }
+  function normOpacity(v, fallback = 1.0) {
+    if (v === undefined || v === null || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
+  }
+  function syncLayerOrder() {
+    const valid = new Map();
+    for (const l of state.lines) valid.set(`guide_line:${l.id}`, { kind: "guide_line", id: l.id });
+    for (const p of state.points) valid.set(`point:${p.id}`, { kind: "point", id: p.id });
+    const next = [];
+    const seen = new Set();
+    for (const e of state.layerOrder || []) {
+      const k = `${e.kind}:${e.id}`;
+      if (valid.has(k) && !seen.has(k)) { seen.add(k); next.push({ kind: e.kind, id: e.id }); }
+    }
+    for (const [k, rec] of valid.entries()) {
+      if (!seen.has(k)) { seen.add(k); next.push(rec); }
+    }
+    state.layerOrder = next;
+    return next;
+  }
+  function getOrderedElements() {
+    syncLayerOrder();
+    const lMap = new Map(state.lines.map((l) => [l.id, l]));
+    const pMap = new Map(state.points.map((p) => [p.id, p]));
+    const out = [];
+    for (const e of state.layerOrder) {
+      const item = e.kind === "guide_line" ? lMap.get(e.id) : pMap.get(e.id);
+      if (item) out.push({ kind: e.kind, id: e.id, item });
+    }
+    return out;
+  }
+  function reorderElement(fromIdx, toIdx) {
+    syncLayerOrder();
+    const n = state.layerOrder.length;
+    if (fromIdx < 0 || fromIdx >= n || toIdx < 0 || toIdx >= n || fromIdx === toIdx) return false;
+    const [moved] = state.layerOrder.splice(fromIdx, 1);
+    state.layerOrder.splice(toIdx, 0, moved);
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+    return true;
+  }
+  function moveElementLayer(kind, id, action) {
+    syncLayerOrder();
+    const idx = state.layerOrder.findIndex((e) => e.kind === kind && e.id === id);
+    if (idx < 0) return false;
+    const n = state.layerOrder.length;
+    let target = idx;
+    if (action === "forward") target = Math.min(n - 1, idx + 1);
+    else if (action === "backward") target = Math.max(0, idx - 1);
+    else if (action === "front") target = n - 1;
+    else if (action === "back") target = 0;
+    return reorderElement(idx, target);
+  }
+
   function sampleAt(xs, ys, tx) {
     if (!xs || !ys || xs.length < 2) return null;
     const x0 = xs[0], x1 = xs[xs.length - 1];
@@ -780,8 +852,11 @@
     return a + (b - a) * (f - i);
   }
 
-  function drawCurve(xs, ys, color, lw, lineStyle, step, glow) {
+  function drawCurve(xs, ys, color, lw, lineStyle, step, glow, opacity = 1.0) {
     if (!xs || !ys || xs.length < 2) return;
+    const width = normLineWidth(lw, 2.1);
+    const op = normOpacity(opacity, 1.0);
+    if (width <= 0 || op <= 0.001) return;
     const h = canvas.clientHeight;
     const trace = () => {
       ctx.beginPath();
@@ -798,16 +873,19 @@
       }
     };
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
-    if (glow) { trace(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = lw + 4; ctx.stroke(); }
-    trace(); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.stroke();
+    if (glow) { trace(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = width + 4; ctx.stroke(); }
+    trace(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
     ctx.restore();
   }
 
   function drawXOfYCurve(c) {
-    const { xs, ys, color, lineWidth, lineStyle } = c;
-    if (!xs || !ys || xs.length < 2) return;
+    const { xs, ys, color, lineWidth, lineStyle, opacity } = c;
+    const width = normLineWidth(lineWidth, 2.2);
+    const op = normOpacity(opacity, 1.0);
+    if (!xs || !ys || xs.length < 2 || width <= 0 || op <= 0.001) return;
     const w = canvas.clientWidth;
     const trace = () => {
       ctx.beginPath();
@@ -822,16 +900,19 @@
       }
     };
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
-    trace(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = lineWidth + 4; ctx.stroke();
-    trace(); ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.stroke();
+    trace(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = width + 4; ctx.stroke();
+    trace(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
     ctx.restore();
   }
 
   function drawImplicitContour(imp) {
-    const { grid, nx, ny, xmin, xmax, ymin, ymax, color, lineWidth, lineStyle } = imp;
-    if (!grid || grid.length < nx * ny) return;
+    const { grid, nx, ny, xmin, xmax, ymin, ymax, color, lineWidth, lineStyle, opacity } = imp;
+    const width = normLineWidth(lineWidth, 2.2);
+    const op = normOpacity(opacity, 1.0);
+    if (!grid || grid.length < nx * ny || width <= 0 || op <= 0.001) return;
     const dx = (xmax - xmin) / (nx - 1);
     const dy = (ymax - ymin) / (ny - 1);
 
@@ -883,16 +964,19 @@
     };
 
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
-    traceSegs(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = lineWidth + 4; ctx.stroke();
-    traceSegs(); ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.stroke();
+    traceSegs(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = width + 4; ctx.stroke();
+    traceSegs(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
     ctx.restore();
   }
 
   function drawParametricCurve(pc) {
-    const { xy, color, lineWidth, lineStyle } = pc;
-    if (!xy || xy.length < 4) return;
+    const { xy, color, lineWidth, lineStyle, opacity } = pc;
+    const width = normLineWidth(lineWidth, 2.3);
+    const op = normOpacity(opacity, 1.0);
+    if (!xy || xy.length < 4 || width <= 0 || op <= 0.001) return;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     const trace = () => {
       ctx.beginPath();
@@ -907,70 +991,74 @@
       }
     };
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
-    trace(); ctx.strokeStyle = hexToRgba(color, 0.25); ctx.lineWidth = lineWidth + 4; ctx.stroke();
-    trace(); ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.stroke();
+    trace(); ctx.strokeStyle = hexToRgba(color, 0.25); ctx.lineWidth = width + 4; ctx.stroke();
+    trace(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
     ctx.restore();
   }
 
-  function drawGuideLines(w, h) {
-    if (!state.lines.length) return;
-    ctx.save();
-    ctx.font = '600 10.5px "JetBrains Mono", monospace';
-    for (const ln of state.lines) {
-      if (!ln.visible) continue;
-      const sel = ln.id === state.selectedLineId;
-      const col = ln.color || "#fbbf24";
-      ctx.strokeStyle = sel ? "#ffffff" : hexToRgba(col, 0.85);
-      ctx.lineWidth = (Number(ln.lineWidth) || 1.6) + (sel ? 0.8 : 0);
-      applyLineStyle(ctx, ln.lineStyle || "dashed");
+  function drawSingleGuideLine(ln, w, h) {
+    if (!ln.visible) return;
+    const op = normOpacity(ln.opacity, 1.0);
+    if (op <= 0.001) return;
+    const sel = ln.id === state.selectedLineId;
+    const col = ln.color || "#fbbf24";
+    const lw = normLineWidth(ln.lineWidth, 1.6);
+    const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
 
-      if (ln.orientation === "horizontal") {
-        const sy = yToS(ln.value);
-        if (sy >= -6 && sy <= h + 6) {
-          ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
-          if (ln.showLabel !== false && ln.label) {
-            ctx.setLineDash([]);
-            ctx.fillStyle = col;
-            ctx.fillText(ln.label, 12, Math.max(54, sy - 6));
-          }
+    ctx.save();
+    ctx.globalAlpha = op;
+    ctx.font = '600 10.5px "JetBrains Mono", monospace';
+    ctx.strokeStyle = sel ? hiCol : hexToRgba(col, 0.85);
+    ctx.lineWidth = lw + (sel ? 0.8 : 0);
+    applyLineStyle(ctx, ln.lineStyle || "dashed");
+
+    if (ln.orientation === "horizontal") {
+      const sy = yToS(ln.value);
+      if (sy >= -6 && sy <= h + 6) {
+        if (lw > 0 || sel) { ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke(); }
+        if (ln.showLabel !== false && ln.label) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = col;
+          ctx.fillText(ln.label, 12, Math.max(54, sy - 6));
         }
-      } else {
-        const sx = xToS(ln.value);
-        if (sx >= -6 && sx <= w + 6) {
-          ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
-          if (ln.showLabel !== false && ln.label) {
-            ctx.setLineDash([]);
-            ctx.fillStyle = col;
-            ctx.fillText(ln.label, sx + 6, 58);
-          }
+      }
+    } else {
+      const sx = xToS(ln.value);
+      if (sx >= -6 && sx <= w + 6) {
+        if (lw > 0 || sel) { ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke(); }
+        if (ln.showLabel !== false && ln.label) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = col;
+          ctx.fillText(ln.label, sx + 6, 58);
         }
       }
     }
     ctx.restore();
   }
 
-  function drawPoints(w, h) {
-    if (!state.points.length) return;
+  function drawSinglePoint(p, w, h) {
+    if (!p.visible) return;
+    const op = normOpacity(p.opacity, 1.0);
+    if (op <= 0.001) return;
+    const sx = xToS(p.x), sy = yToS(p.y);
+    if (sx < -36 || sx > w + 36 || sy < -36 || sy > h + 36) return;
     const drawIcon = window.CFVComplex && window.CFVComplex.drawPointIcon;
+    const sel = p.id === state.selectedPointId;
     ctx.save();
+    ctx.globalAlpha = op;
     ctx.font = '10.5px "JetBrains Mono", monospace';
-    for (const p of state.points) {
-      if (!p.visible) continue;
-      const sx = xToS(p.x), sy = yToS(p.y);
-      if (sx < -36 || sx > w + 36 || sy < -36 || sy > h + 36) continue;
-      const sel = p.id === state.selectedPointId;
-      if (drawIcon) {
-        drawIcon(ctx, sx, sy, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
-      } else {
-        ctx.fillStyle = p.color || "#34d399";
-        ctx.beginPath(); ctx.arc(sx, sy, p.size || 5, 0, Math.PI * 2); ctx.fill();
-      }
-      if (p.showLabel !== false && p.label) {
-        ctx.fillStyle = p.color || "#e2e8f0";
-        ctx.fillText(p.label, sx + (p.size || 5) + 6, sy + 3);
-      }
+    if (drawIcon) {
+      drawIcon(ctx, sx, sy, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
+    } else {
+      ctx.fillStyle = p.color || "#34d399";
+      ctx.beginPath(); ctx.arc(sx, sy, p.size || 5, 0, Math.PI * 2); ctx.fill();
+    }
+    if (p.showLabel !== false && p.label) {
+      ctx.fillStyle = p.color || (isLightTheme() ? "#0f172a" : "#e2e8f0");
+      ctx.fillText(p.label, sx + (p.size || 5) + 6, sy + 3);
     }
     ctx.restore();
   }
@@ -981,10 +1069,11 @@
     if (!ensureCanvasSize()) return;
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth, h = canvas.clientHeight;
+    const light = isLightTheme();
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = "#0a0e17";
+    ctx.fillStyle = light ? "#f8fafc" : "#0a0e17";
     ctx.fillRect(0, 0, w, h);
 
     const xSpan = state.view.xmax - state.view.xmin;
@@ -992,7 +1081,7 @@
     const xStep = niceStep((xSpan * 90) / Math.max(1, w));
     const yStep = niceStep((ySpan * 65) / Math.max(1, h));
 
-    ctx.strokeStyle = "rgba(148,163,184,0.11)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = light ? "rgba(15,23,42,0.09)" : "rgba(148,163,184,0.11)"; ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = Math.floor(state.view.xmin / xStep) * xStep; x <= state.view.xmax; x += xStep) {
       const sx = Math.round(xToS(x)) + 0.5; ctx.moveTo(sx, 0); ctx.lineTo(sx, h);
@@ -1027,16 +1116,14 @@
       }
     }
 
-    drawGuideLines(w, h);
-
     const ox = xToS(0), oy = yToS(0);
-    ctx.strokeStyle = "rgba(203,213,225,0.36)"; ctx.lineWidth = 1.25;
+    ctx.strokeStyle = light ? "rgba(15,23,42,0.34)" : "rgba(203,213,225,0.36)"; ctx.lineWidth = 1.25;
     ctx.beginPath();
     if (oy >= 0 && oy <= h) { ctx.moveTo(0, oy); ctx.lineTo(w, oy); }
     if (ox >= 0 && ox <= w) { ctx.moveTo(ox, 0); ctx.lineTo(ox, h); }
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(148,163,184,0.7)"; ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.fillStyle = light ? "rgba(51,65,85,0.8)" : "rgba(148,163,184,0.7)"; ctx.font = '10px "JetBrains Mono", monospace';
     const xly = Math.min(h - 14, Math.max(42, oy + 14));
     const ylx = Math.min(w - 40, Math.max(8, ox + 6));
     for (let x = Math.floor(state.view.xmin / xStep) * xStep; x <= state.view.xmax; x += xStep) {
@@ -1061,13 +1148,17 @@
 
       /* Vertical lines x = expr */
       for (const v of verticals || []) {
+        const vw = normLineWidth(v.lineWidth, 2.2);
+        const vop = normOpacity(v.opacity, 1.0);
+        if (vw <= 0 || vop <= 0.001) continue;
         const sx = xToS(v.xVal);
         if (sx < -10 || sx > w + 10) continue;
         ctx.save();
+        ctx.globalAlpha = vop;
         applyLineStyle(ctx, v.lineStyle || "solid");
-        ctx.strokeStyle = hexToRgba(v.color, 0.28); ctx.lineWidth = v.lineWidth + 4;
+        ctx.strokeStyle = hexToRgba(v.color, 0.28); ctx.lineWidth = vw + 4;
         ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
-        ctx.strokeStyle = v.color; ctx.lineWidth = v.lineWidth;
+        ctx.strokeStyle = v.color; ctx.lineWidth = vw;
         ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = v.color;
@@ -1127,9 +1218,9 @@
 
         for (let i = 1; i < curves.length; i++) {
           const c = curves[i];
-          drawCurve(xs, c.ys, c.color, c.lineWidth || 2.0, c.lineStyle, c.step, i === curves.length - 1);
+          drawCurve(xs, c.ys, c.color, c.lineWidth, c.lineStyle, c.step, i === curves.length - 1, c.opacity);
         }
-        drawCurve(xs, curves[0].ys, curves[0].color, curves[0].lineWidth || 2.3, curves[0].lineStyle, curves[0].step, true);
+        drawCurve(xs, curves[0].ys, curves[0].color, curves[0].lineWidth, curves[0].lineStyle, curves[0].step, true, curves[0].opacity);
 
         if (state.calc.showDeriv && state.calc.derivXs && state.calc.derivYs) {
           drawCurve(state.calc.derivXs, state.calc.derivYs, "#fb7185", 1.8, "solid", false, false);
@@ -1167,7 +1258,11 @@
     }
 
     drawPolygons(w, h);
-    drawPoints(w, h);
+    /* Unified Element Layering Order (back -> front) */
+    for (const el of getOrderedElements()) {
+      if (el.kind === "guide_line") drawSingleGuideLine(el.item, w, h);
+      else if (el.kind === "point") drawSinglePoint(el.item, w, h);
+    }
     ctx.restore();
   }
 
@@ -1351,6 +1446,49 @@
     return null;
   }
 
+  function hitRealElement(sx, sy) {
+    /* 1. Unified layer-ordered Points & Guide Lines (topmost first) */
+    const els = getOrderedElements();
+    for (let i = els.length - 1; i >= 0; i--) {
+      const el = els[i];
+      if (!el.item || !el.item.visible) continue;
+      if (el.kind === "point") {
+        if (Math.hypot(sx - xToS(el.item.x), sy - yToS(el.item.y)) <= Math.max(10, (el.item.size || 5) + 6)) return el;
+      } else if (el.kind === "guide_line") {
+        if (el.item.orientation === "horizontal") {
+          if (Math.abs(sy - yToS(el.item.value)) <= 8) return el;
+        } else {
+          if (Math.abs(sx - xToS(el.item.value)) <= 8) return el;
+        }
+      }
+    }
+    /* 2. Graphed Curves (y=f(x), parametric, vertical, x=g(y)) */
+    if (state.cache) {
+      const { xs, curves, verticals, xOfYCurves, parametrics } = state.cache;
+      const wx = sToX(sx), wy = sToY(sy);
+      for (const c of curves || []) {
+        const yv = sampleAt(xs, c.ys, wx);
+        if (yv !== null && Number.isFinite(yv) && Math.abs(sy - yToS(yv)) <= 10) return { kind: "fn", id: c.cardId };
+      }
+      for (const v of verticals || []) {
+        if (Math.abs(sx - xToS(v.xVal)) <= 10) return { kind: "fn", id: v.cardId };
+      }
+      for (const xc of xOfYCurves || []) {
+        const xv = sampleAt(xc.ys, xc.xs, wy);
+        if (xv !== null && Number.isFinite(xv) && Math.abs(sx - xToS(xv)) <= 10) return { kind: "fn", id: xc.cardId };
+      }
+      for (const pc of parametrics || []) {
+        const xy = pc.xy || [];
+        for (let i = 0; i + 1 < xy.length; i += 2) {
+          const px = xy[i], py = xy[i + 1];
+          if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+          if (Math.hypot(sx - xToS(px), sy - yToS(py)) <= 10) return { kind: "fn", id: pc.cardId };
+        }
+      }
+    }
+    return null;
+  }
+
   /* Pointer events */
   function localPos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1358,7 +1496,7 @@
     canvas.setPointerCapture(e.pointerId);
     const pos = localPos(e);
     if (e.button === 1 || e.button === 2 || state.spaceHeld) {
-      state.pan = { sx: pos.x, sy: pos.y, ov: { ...state.view } };
+      state.pan = { sx: pos.x, sy: pos.y, ov: { ...state.view }, rightClick: e.button === 2 };
       card.classList.add("panning");
       return;
     }
@@ -1528,7 +1666,7 @@
     updateLegend(); requestRender();
   });
 
-  canvas.addEventListener("pointerup", async () => {
+  canvas.addEventListener("pointerup", async (e) => {
     if (state.calc.draggingGate) { state.calc.draggingGate = null; refreshCalculus(); return; }
     if (state.polyPendingClick) {
       const pc = state.polyPendingClick;
@@ -1573,7 +1711,23 @@
     }
     if (state.dragPoint) { state.dragPoint = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); return; }
     if (state.dragLine) { state.dragLine = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); return; }
-    if (state.pan) { state.pan = null; card.classList.remove("panning"); scheduleSample(true); notifyState(false, false); }
+    if (state.pan) {
+      const p = state.pan;
+      state.pan = null;
+      card.classList.remove("panning");
+      const pos = localPos(e);
+      if (p.rightClick && Math.hypot(pos.x - p.sx, pos.y - p.sy) < 5) {
+        const hit = hitRealElement(pos.x, pos.y);
+        if (hit && ws() && typeof ws().openItemSettingsAt === "function") {
+          if (hit.kind === "point") selectPoint(hit.id);
+          else if (hit.kind === "guide_line") selectGuideLine(hit.id);
+          ws().openItemSettingsAt(hit.kind, hit.id, e.clientX, e.clientY);
+          return;
+        }
+      }
+      scheduleSample(true);
+      notifyState(false, false);
+    }
   });
 
   /* 2D Real Dock & Selection Banner Buttons + Keyboard Shortcuts */
@@ -1639,19 +1793,38 @@
     e.preventDefault();
     const pos = localPos(e), f = e.deltaY < 0 ? 1 / 1.16 : 1.16;
     const wx = sToX(pos.x), wy = sToY(pos.y);
-    if (state.squareAspect) {
+    const scaleXOnly = e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const scaleYOnly = (e.ctrlKey || e.metaKey || e.altKey) && !e.shiftKey;
+    if (scaleXOnly) {
+      if (state.squareAspect) { state.squareAspect = false; const b = document.getElementById("real-square"); if (b) b.classList.remove("active"); }
+      state.view.xmin = wx + (state.view.xmin - wx) * f;
+      state.view.xmax = wx + (state.view.xmax - wx) * f;
+    } else if (scaleYOnly) {
+      if (state.squareAspect) { state.squareAspect = false; const b = document.getElementById("real-square"); if (b) b.classList.remove("active"); }
+      state.view.ymin = wy + (state.view.ymin - wy) * f;
+      state.view.ymax = wy + (state.view.ymax - wy) * f;
+    } else {
       state.view.xmin = wx + (state.view.xmin - wx) * f; state.view.xmax = wx + (state.view.xmax - wx) * f;
       state.view.ymin = wy + (state.view.ymin - wy) * f; state.view.ymax = wy + (state.view.ymax - wy) * f;
-      state.squareMoved = true;
-    } else {
-      if (!e.altKey) { state.view.xmin = wx + (state.view.xmin - wx) * f; state.view.xmax = wx + (state.view.xmax - wx) * f; }
-      if (!e.shiftKey) { state.view.ymin = wy + (state.view.ymin - wy) * f; state.view.ymax = wy + (state.view.ymax - wy) * f; }
+      if (state.squareAspect) state.squareMoved = true;
     }
     requestRender(); scheduleSample(false); notifyState(false, false);
   }, { passive: false });
 
   const btnRealSquare = document.getElementById("real-square");
   if (btnRealSquare) btnRealSquare.addEventListener("click", () => setSquareAspect(!state.squareAspect));
+  const scaleRealAxis = (fx, fy) => {
+    if (state.squareAspect) { state.squareAspect = false; if (btnRealSquare) btnRealSquare.classList.remove("active"); }
+    const cx = 0.5 * (state.view.xmin + state.view.xmax), cy = 0.5 * (state.view.ymin + state.view.ymax);
+    const hw = 0.5 * (state.view.xmax - state.view.xmin) * fx, hh = 0.5 * (state.view.ymax - state.view.ymin) * fy;
+    state.view = { xmin: cx - hw, xmax: cx + hw, ymin: cy - hh, ymax: cy + hh };
+    scheduleSample(true); notifyState(false, false);
+  };
+  const bindRealBtn = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("click", fn); };
+  bindRealBtn("real-zoom-x-in", () => scaleRealAxis(1 / 1.3, 1));
+  bindRealBtn("real-zoom-x-out", () => scaleRealAxis(1.3, 1));
+  bindRealBtn("real-zoom-y-in", () => scaleRealAxis(1, 1 / 1.3));
+  bindRealBtn("real-zoom-y-out", () => scaleRealAxis(1, 1.3));
   document.getElementById("real-fit-y").addEventListener("click", () => { fitY(); notifyState(false, false); });
   document.getElementById("real-zoom-in").addEventListener("click", () => {
     const cx = 0.5 * (state.view.xmin + state.view.xmax), cy = 0.5 * (state.view.ymin + state.view.ymax);
@@ -1798,18 +1971,25 @@
   function r4(n) { return Math.round((Number(n) || 0) * 10000) / 10000; }
 
   function exportSnapshot() {
+    const ordered = getOrderedElements();
+    const ptIdx = new Map(state.points.map((p, i) => [p.id, i]));
+    const lnIdx = new Map(state.lines.map((l, i) => [l.id, i]));
+    const lo = ordered.map((e) => (e.kind === "point" ? `p:${ptIdx.get(e.id)}` : `l:${lnIdx.get(e.id)}`));
     const snap = {
       vw: [r4(state.view.xmin), r4(state.view.xmax), r4(state.view.ymin), r4(state.view.ymax)],
       sq: state.squareAspect ? 1 : 0,
       sp: state.showPrimes ? 1 : 0,
       sz: state.showZeros ? 1 : 0,
+      lo,
       pt: state.points.map((p) => ({
         x: r4(p.x), y: r4(p.y), l: p.label || "", i: p.icon || "dot", c: p.color || "#34d399",
-        s: Number(p.size) || 5, lk: p.locked ? 1 : 0, v: p.visible !== false ? 1 : 0, sl: p.showLabel !== false ? 1 : 0,
+        s: Number(p.size) || 5, op: r4(normOpacity(p.opacity, 1.0)),
+        lk: p.locked ? 1 : 0, v: p.visible !== false ? 1 : 0, sl: p.showLabel !== false ? 1 : 0,
       })),
       ln: state.lines.map((ln) => ({
         o: ln.orientation === "horizontal" ? "h" : "v", val: r4(ln.value),
-        l: ln.label || "", c: ln.color || "#fbbf24", w: Number(ln.lineWidth) || 1.5,
+        l: ln.label || "", c: ln.color || "#fbbf24", w: normLineWidth(ln.lineWidth, 1.5),
+        op: r4(normOpacity(ln.opacity, 1.0)),
         st: ln.lineStyle || "dashed", lk: ln.locked ? 1 : 0, v: ln.visible !== false ? 1 : 0, sl: ln.showLabel !== false ? 1 : 0,
       })),
     };
@@ -1819,6 +1999,20 @@
       snap.pg = cells;
     }
     return snap;
+  }
+
+  function applyLayerRefs(refs) {
+    state.layerOrder = [];
+    if (Array.isArray(refs) && refs.length > 0) {
+      for (const r of refs) {
+        const parts = String(r).split(":");
+        if (parts.length !== 2) continue;
+        const idx = parseInt(parts[1], 10);
+        if (parts[0] === "p" && state.points[idx]) state.layerOrder.push({ kind: "point", id: state.points[idx].id });
+        else if (parts[0] === "l" && state.lines[idx]) state.layerOrder.push({ kind: "guide_line", id: state.lines[idx].id });
+      }
+    }
+    syncLayerOrder();
   }
 
   function restoreSnapshot(snap) {
@@ -1844,6 +2038,7 @@
       icon: p.i || "diamond",
       color: p.c || "#34d399",
       size: Number(p.s) || 5,
+      opacity: normOpacity(p.op, 1.0),
       locked: Boolean(p.lk),
       visible: p.v !== 0,
       showLabel: p.sl !== 0,
@@ -1855,12 +2050,14 @@
       value: Number(ln.val) || 0,
       label: ln.l || "",
       color: ln.c || "#fbbf24",
-      lineWidth: Number(ln.w) || 1.5,
+      lineWidth: normLineWidth(ln.w, 1.5),
+      opacity: normOpacity(ln.op, 1.0),
       lineStyle: ln.st || "dashed",
       locked: Boolean(ln.lk),
       visible: ln.v !== 0,
       showLabel: ln.sl !== 0,
     }));
+    applyLayerRefs(snap.lo);
     state.polyUndoStack = [];
     if (Array.isArray(snap.pg) && snap.pg.length >= 2) {
       const cells = [];
@@ -1895,6 +2092,9 @@
     addGuideLine,
     deleteGuideLine,
     selectGuideLine,
+    getOrderedElements,
+    reorderElement,
+    moveElementLayer,
     setPolyTool,
     setPolygonsFromCells,
     getActiveGridDims,
