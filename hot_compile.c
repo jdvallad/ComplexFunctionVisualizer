@@ -195,6 +195,7 @@ bool hot_compile_workspace(bool is_real, const char *const *card_codes, size_t c
     ok_gen &= sb_printf(&sb, "#include <complex.h>\n");
     ok_gen &= sb_printf(&sb, "#include <math.h>\n");
     ok_gen &= sb_printf(&sb, "#include <stdbool.h>\n");
+    ok_gen &= sb_printf(&sb, "#include <stdlib.h>\n");
     ok_gen &= sb_printf(&sb, "#include \"complex_math.h\"\n");
     ok_gen &= sb_printf(&sb, "#include \"real_math.h\"\n");
     ok_gen &= sb_printf(&sb, "#include \"hot_compile.h\"\n\n");
