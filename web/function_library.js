@@ -133,80 +133,106 @@
     if (isReal) {
       return `
         <div class="guide-box">
-          <div class="guide-title">2D Real C11 Function &amp; Curve Syntax Rules</div>
-          <div class="guide-rules">
-            <div><strong>Strict C11:</strong> Compiled natively with <code>clang</code>. Never write <code>#include</code> or outer <code>double f(...)</code> wrappers. Use <code>pow(a, b)</code> (not <code>^</code>) and <code>fabs(x)</code> for floats.</div>
-            <div><strong>Parameters &amp; Helpers:</strong> Every slider/var name is automatically a <code>double</code> local variable. Call earlier cards via <code>f1(x)</code>, <code>f2(x)</code>, etc.</div>
-            <div><strong>Reserved Names (do NOT name sliders these):</strong> <code>x, y, z, s, P, slot</code> (and avoid <code>t</code> when using parametric cards).</div>
-          </div>
-          <div class="guide-examples">
-            <div class="guide-ex">
-              <span class="guide-ex-badge">y = f(x)</span>
-              <code>sin(x) * exp(-0.1 * fabs(x))</code>
-              <span class="guide-ex-note">or <code>y = a * x * x + b</code></span>
-            </div>
-            <div class="guide-ex">
-              <span class="guide-ex-badge">Multi-line</span>
-              <code>double u = x * a; if (u &lt; 0) return NAN; return sqrt(u);</code>
-              <span class="guide-ex-note">Any card with <code>;</code>, <code>{</code>, or <code>return</code> is a full C11 body</span>
-            </div>
-            <div class="guide-ex">
-              <span class="guide-ex-badge param">Parametric (1-line)</span>
-              <code>(3*cos(t), 2*sin(t)) for t in [0, 2*pi]</code>
-              <span class="guide-ex-note">Uses parameter <code>t</code>; bounds support <code>pi</code></span>
-            </div>
-            <div class="guide-ex">
-              <span class="guide-ex-badge param">Parametric (C11)</span>
-              <code>parametric [0, 6.283]:\ndouble r = 2 + cos(5*t);\npx = r*cos(t); py = r*sin(t);</code>
-              <span class="guide-ex-note">Assign <code>px</code> and <code>py</code> (use <code>NAN</code> for pen-up breaks)</span>
-            </div>
-            <div class="guide-ex">
-              <span class="guide-ex-badge imp">Implicit</span>
-              <code>x*x + y*y = r*r</code>
-              <span class="guide-ex-note">Single <code>=</code> with both <code>x</code> and <code>y</code> traces <code>LHS − RHS = 0</code></span>
-            </div>
-            <div class="guide-ex">
-              <span class="guide-ex-badge imp">Vertical / x=g(y)</span>
-              <code>x = 3.0</code> &nbsp;or&nbsp; <code>x = sin(y) * 2.0</code>
-              <span class="guide-ex-note">Vertical line or inverted curve</span>
+          <div class="guide-sec">
+            <div class="guide-sec-hdr">1. Four Curve Types in Real Mode (Click + Insert)</div>
+            <div class="guide-examples">
+              <div class="guide-ex">
+                <button class="guide-copy-btn" data-guide-insert="sin(a * x) * exp(-0.12 * x * x)">+ Insert</button>
+                <span class="guide-ex-badge">y = f(x)</span>
+                <code>sin(a * x) * exp(-0.12 * x * x)</code>
+                <span class="guide-ex-note">1-line expression or full C11 body ending in <code>return ...;</code>.</span>
+              </div>
+              <div class="guide-ex">
+                <button class="guide-copy-btn" data-guide-insert="parametric [0, 6.2832]:\ndouble r = 2.0 + cos(5.0 * t);\npx = r * cos(t); py = r * sin(t);">+ Insert</button>
+                <span class="guide-ex-badge param">Parametric (x(t), y(t))</span>
+                <code>parametric [0, 6.2832]:\ndouble r = 2.0 + cos(5.0 * t);\npx = r * cos(t); py = r * sin(t);</code>
+                <span class="guide-ex-note">Assign <code>px</code> &amp; <code>py</code> (or <code>NAN</code> to lift pen). Great for RK4 physics!</span>
+              </div>
+              <div class="guide-ex">
+                <button class="guide-copy-btn" data-guide-insert="cos(3*M_PI*x)*cos(5*M_PI*y) = cos(5*M_PI*x)*cos(3*M_PI*y)">+ Insert</button>
+                <span class="guide-ex-badge imp">Implicit F(x, y) = 0</span>
+                <code>cos(3*M_PI*x)*cos(5*M_PI*y) = cos(5*M_PI*x)*cos(3*M_PI*y)</code>
+                <span class="guide-ex-note">Any equation with <code>=</code> and both <code>x, y</code> runs parallel Marching Squares.</span>
+              </div>
+              <div class="guide-ex">
+                <button class="guide-copy-btn" data-guide-insert="x = 2.0 * sin(y)">+ Insert</button>
+                <span class="guide-ex-badge imp">Vertical / x = g(y)</span>
+                <code>x = 3.0 &nbsp;or&nbsp; x = 2.0 * sin(y)</code>
+                <span class="guide-ex-note">Vertical guide or inverted function of <code>y</code>.</span>
+              </div>
             </div>
           </div>
-          <div class="guide-api"><strong>Available Math:</strong> <code>sin cos tan asin acos atan atan2 sinh cosh tanh exp log log10 pow sqrt cbrt fabs floor ceil fmod erf tgamma abs M_PI M_E NAN</code> · <strong>Number Theory:</strong> <code>real_pi_exact real_pi_explicit real_li real_J_exact real_psi_exact c_hardy_z</code></div>
+
+          <div class="guide-sec">
+            <div class="guide-sec-hdr">2. Dynamic Camera Tracking &amp; Inline LaTeX</div>
+            <ul class="guide-list">
+              <li><strong>Camera Follow:</strong> Add <code>+ Var</code> formulas named <code>real_xmin</code>, <code>real_xmax</code>, <code>real_ymin</code>, <code>real_ymax</code> (e.g. <code>real_xmin = craft_x - 3</code>). Avoid naming vars <code>px, py, t</code> alongside parametric cards.</li>
+              <li><strong>Formula Landmarks:</strong> Put slider/var formulas inside Point <code>x:/y:</code> or Guide Line fields — they glide live even when 🔒 Locked!</li>
+              <li><strong>Inline LaTeX:</strong> Wrap math in <code>$...$</code> inside any Text card (e.g. <code>$f'(c^*) = \\frac{f(b)-f(a)}{b-a}$</code>) for typeset fractions, roots &amp; Greek letters!</li>
+            </ul>
+          </div>
+
+          <div class="guide-sec">
+            <div class="guide-sec-hdr">3. Real C11 Math &amp; Number Theory API</div>
+            <div class="guide-api"><strong>&lt;math.h&gt;:</strong> <code>sin cos tan asin acos atan atan2 sinh cosh tanh exp log log2 log10 pow sqrt cbrt hypot fabs floor ceil fmod erf tgamma M_PI M_E NAN</code></div>
+            <div class="guide-api"><strong>Primes:</strong> <code>real_pi_exact(x)</code> <code>real_pi_explicit(x, K)</code> <code>real_li(x)</code> <code>real_J_exact(x)</code> <code>real_psi_exact(x)</code> <code>real_psi_explicit(x, K)</code> <code>c_hardy_z(x)</code></div>
+          </div>
         </div>
       `;
     }
     return `
       <div class="guide-box">
-        <div class="guide-title">Complex Analysis C11 Function Syntax Rules (${mode === "integral" ? "Contour Integrand f(z)" : "Mapping w = f(z)"})</div>
-        <div class="guide-rules">
-          <div><strong>Strict ISO C11:</strong> Compiled with <code>clang</code>. Never write <code>#include</code> or function headers. <strong>Always use <code>c_make(re, im)</code></strong> for complex constants (NEVER <code>1.0i</code> or <code>I</code>).</div>
-          <div><strong>Input Variable:</strong> Both <code>z</code> and <code>s</code> are bound to the input <code>double complex</code>. Return <code>c_make(INFINITY, 0.0)</code> at poles.</div>
-          <div><strong>Sliders, Vars &amp; Composition:</strong> Every slider/var name is a <code>double</code> local variable. Compose helper cards via <code>f1(z)</code>, <code>f2(z)</code>, … (only the <code>★ Graphed</code> card is plotted).</div>
-          <div><strong>Reserved Names (do NOT name sliders these):</strong> <code>z, s, x, y, P, slot</code>.</div>
-        </div>
-        <div class="guide-examples">
-          <div class="guide-ex">
-            <span class="guide-ex-badge">Bare Expression</span>
-            <code>c_zeta(s)</code> &nbsp;or&nbsp; <code>(z - c_make(0, 1)) / (z + c_make(0, 1))</code>
-            <span class="guide-ex-note">Auto-wrapped as <code>return (...);</code></span>
-          </div>
-          <div class="guide-ex">
-            <span class="guide-ex-badge">With Sliders</span>
-            <code>z * z + c_make(c_re, c_im)</code>
-            <span class="guide-ex-note">Sliders <code>c_re</code>, <code>c_im</code> are injected as <code>double</code></span>
-          </div>
-          <div class="guide-ex">
-            <span class="guide-ex-badge">Multi-line C11</span>
-            <code>double complex w = z;\nfor (int k = 0; k &lt; 4; k++) w = w*w + z;\nreturn w;</code>
-            <span class="guide-ex-note">Use <code>;</code>, <code>{</code>, or <code>return</code> for full C11 loops/branches</span>
-          </div>
-          <div class="guide-ex">
-            <span class="guide-ex-badge param">Fractal / Color Field</span>
-            <code>Return c_make(nu, 0.0) for escaped points, c_make(-1.0, 0.0) for interior</code>
-            <span class="guide-ex-note">Enable Domain Coloring in <strong>Tools</strong> &rarr; pick <em>Mandelbrot Smooth</em></span>
+        <div class="guide-sec">
+          <div class="guide-sec-hdr">1. Quick-Start Complex C11 Recipes (Click + Insert)</div>
+          <div class="guide-examples">
+            <div class="guide-ex">
+              <button class="guide-copy-btn" data-guide-insert="(z - c_make(a, 0.0)) / (1.0 - c_make(a, 0.0) * z)">+ Insert</button>
+              <span class="guide-ex-badge">1-Line Map</span>
+              <code>(z - c_make(a, 0.0)) / (1.0 - c_make(a, 0.0) * z)</code>
+              <span class="guide-ex-note">Use <code>z</code> or <code>s</code> (<code>double complex</code>). Constants: <code>c_make(re, im)</code>. Call earlier cards via <code>f1(z)</code>.</span>
+            </div>
+            <div class="guide-ex">
+              <button class="guide-copy-btn" data-guide-insert="double complex w = 0.0;\nfor (int k = 0; k < 200; k++) {\n  w = w * w + z;\n  if (creal(w)*creal(w) + cimag(w)*cimag(w) > 256.0) return c_make((double)k, 0.0);\n}\nreturn c_make(-1.0, 0.0);">+ Insert</button>
+              <span class="guide-ex-badge param">Fractal Escape Field</span>
+              <code>for (...) { w = w*w + z; if (|w|² > 256) return c_make(k, 0); }\nreturn c_make(-1.0, 0.0);</code>
+              <span class="guide-ex-note">Multi-line C11 loops &amp; branches (set Tools → <strong>Ultra-Fractal / Inferno</strong>).</span>
+            </div>
           </div>
         </div>
-        <div class="guide-api"><strong>Built-ins:</strong> <code>c_make(re,im) c_isfinite c_zeta c_xi c_eta c_zeta_deriv c_zeta_log_deriv c_zeta_partial c_gamma c_lgamma c_ei</code> · <strong>&lt;complex.h&gt;:</strong> <code>cexp clog csin ccos ctan csinh ccosh ctanh cpow csqrt cabs carg creal cimag conj</code></div>
+
+        <div class="guide-sec">
+          <div class="guide-sec-hdr">2. Color Fields Explained (Tools → Domain / Fractal Coloring)</div>
+          <p class="guide-prose">Every pixel evaluates <code>w = f(z)</code> across all CPU cores. Pick a palette matching what your function returns:</p>
+          <div class="guide-palette-row">
+            <div class="guide-swatch-card">
+              <div class="guide-mini-title">Phase Schemes (Any Complex Map)</div>
+              <div class="guide-swatch-bar" style="background:linear-gradient(90deg,#ef4444,#eab308,#22c55e,#06b6d4,#6366f1,#ec4899,#ef4444);"></div>
+              <div class="guide-mini-sub"><strong>Classic · Neon Prism · Grayscale</strong></div>
+              <p class="guide-prose" style="margin:3px 0 0;"><strong>Hue</strong> = angle <code>arg(w)</code>; <strong>dark</strong> = zeros, <strong>bright</strong> = poles, rings = constant <code>|w|</code>.</p>
+            </div>
+            <div class="guide-swatch-card">
+              <div class="guide-mini-title">Scalar Schemes (Fractals &amp; Shaders)</div>
+              <div class="guide-swatch-bar" style="background:linear-gradient(90deg,#05070d 12%,#1e3a8a 30%,#38bdf8 55%,#fbbf24 80%,#ffffff 100%);"></div>
+              <div class="guide-mini-sub"><strong>Ultra-Fractal · Inferno · Ocean</strong></div>
+              <p class="guide-prose" style="margin:3px 0 0;">Return <code>c_make(v, 0.0)</code>: <code>v &lt; 0</code> paints <strong>jet black</strong>; <code>v &ge; 0</code> maps smoothly across the palette!</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-sec">
+          <div class="guide-sec-hdr">3. Projections, 60 FPS Sphere Spin &amp; Inline LaTeX</div>
+          <ul class="guide-list">
+            <li><strong>Editable vs Viewing Projections:</strong> Draw &amp; edit elements in <strong>Planar &Copf;</strong> or <strong>Polar &Copf;</strong>. Switch Input or Output to <strong>Mercator</strong>, <strong>Stereographic Disk</strong>, <strong>Poincaré Disk</strong>, or <strong>Riemann Sphere</strong> to inspect!</li>
+            <li><strong>60 FPS Camera Vars (Zero Lag!):</strong> Drive <code>sphere_yaw</code>, <code>sphere_pitch</code>, <code>sphere_zoom</code>, <code>in_cx/cy/r</code>, <code>out_cx/cy/r</code> via <code>+ Var</code> formulas — never put <code>spin</code> inside <code>f(z)</code> just to rotate the sphere!</li>
+            <li><strong>Inline LaTeX:</strong> Wrap math in <code>$...$</code> in any Text card (e.g. <code>$\\oint \\zeta(s)\\,ds = 2\\pi i$</code>) for typeset math on both sidebar &amp; canvas!</li>
+          </ul>
+        </div>
+
+        <div class="guide-sec">
+          <div class="guide-sec-hdr">4. Built-in Complex C11 API</div>
+          <div class="guide-api"><strong>Special:</strong> <code>c_make(re,im)</code> <code>c_zeta(s)</code> <code>c_xi(s)</code> <code>c_eta(s)</code> <code>c_zeta_deriv(s)</code> <code>c_zeta_log_deriv(s)</code> <code>c_zeta_partial(s,N)</code> <code>c_gamma(z)</code> <code>c_lgamma(z)</code> <code>c_ei(z)</code></div>
+          <div class="guide-api"><strong>&lt;complex.h&gt;:</strong> <code>cexp clog csin ccos ctan csinh ccosh ctanh casin cacos catan cpow csqrt cabs carg creal cimag conj</code></div>
+        </div>
       </div>
     `;
   }

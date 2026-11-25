@@ -36,22 +36,34 @@
     showMarkers: true,
     showErrorFill: false,
     squareAspect: true,
+    coordSystem: "cartesian", /* "cartesian" | "polar" | "logx" | "loglog" */
     savedRectRatio: null,
     savedRectView: null,
     squareMoved: false,
 
-    /* 2D Landmark Points, Landmark Lines & Interactive Grid/Cell Polygons */
+    /* 2D Vector Shapes, Landmark Points, Landmark Lines, Text Boxes & Interactive Grid/Cell Polygons */
+    shapes: [],
     points: [],
     lines: [],
+    texts: [],
     layerOrder: [],
     polygons: [],
     polyGridMap: new Map(),
     selectedPolyIds: new Set(),
-    polyTool: "pan", /* "pan" | "select" | "deselect" | "add" */
+    polyTool: "move", /* "move" | "pan" | "freehand" | "infline" | "ray" | "seg" | "arc" | "circle" | "rect" | "polygon" | "point" | "text" | "select" | "deselect" | "add" */
     polyMarquee: null,
     polyPendingClick: null,
     polyPaint: null,
     polyUndoStack: [],
+    drawing: null,
+    polyDraft: null,
+    dragShape: null,
+    dragResize: null,
+    dragRotate: null,
+    dragGroup: null,
+    marquee: null,
+    shapeUndoStack: [],
+    lastUndoKind: "elements",
     gridR: 32,
     gridMinX: -32,
     gridMaxX: 32,
@@ -60,11 +72,17 @@
     gridW: 64,
     gridH: 64,
     spaceHeld: false,
+    nextShapeId: 1,
     nextPointId: 1,
     nextLineId: 1,
+    nextTextId: 1,
     nextPolyId: 1,
+    selectedShapeId: null,
+    selectedShapeIds: new Set(),
     selectedPointId: null,
+    selectedPointIds: new Set(),
     selectedLineId: null,
+    selectedTextId: null,
     dragPoint: null,
     dragLine: null,
     colorIdx: 0,
@@ -91,11 +109,16 @@
     pan: null,
     hoverX: null,
     hoverPx: null,
+    snapHint: null,
   };
 
   const canvas = document.getElementById("canvas-real");
   const ctx = canvas.getContext("2d");
   const card = document.getElementById("real-plane-card");
+  const legendCard = document.getElementById("real-legend-card");
+  const legendHdr = document.getElementById("real-legend-hdr");
+  const btnMinRealLegend = document.getElementById("btn-min-real-legend");
+  const realLegendResizeHandle = document.getElementById("real-legend-resize-handle");
   const legendX = document.getElementById("real-legend-x");
   const legendRows = document.getElementById("real-legend-rows");
   const planeSub = document.getElementById("real-plane-sub");
@@ -104,6 +127,8 @@
   const realPolyDock = document.getElementById("real-poly-dock");
   const realSelBanner = document.getElementById("real-selection-banner");
   const realSelBannerText = document.getElementById("real-sel-banner-text");
+  let realLegendMinimized = false;
+  let savedRealLegendSize = null;
 
   function ws() { return window.CFVWorkspace; }
   function notifyDomain() {
@@ -153,6 +178,20 @@
   function pushPolyUndoSnapshot() {
     state.polyUndoStack.push(state.polygons.map((p) => ({ id: p.id, gx: p.gx, gy: p.gy, color: p.color })));
     if (state.polyUndoStack.length > 40) state.polyUndoStack.shift();
+    state.lastUndoKind = "polys";
+  }
+
+  const realCoordSelect = document.getElementById("real-coord-select");
+  function setCoordSystem(cs, silent = false) {
+    const valid = new Set(["cartesian", "polar", "logx", "loglog"]);
+    const next = valid.has(cs) ? cs : "cartesian";
+    state.coordSystem = next;
+    if (realCoordSelect) realCoordSelect.value = next;
+    requestRender();
+    if (!silent) notifyState(true, true);
+  }
+  if (realCoordSelect) {
+    realCoordSelect.addEventListener("change", () => setCoordSystem(realCoordSelect.value, false));
   }
 
   function updatePolyUI() {
@@ -164,7 +203,8 @@
         ? `Fill entire [-${dims.r}, ${dims.r}]×[-${dims.r}, ${dims.r}] (${dims.w}×${dims.h}) play area with square polygons`
         : `Fill entire ${dims.w}×${dims.h} play area with square polygons`;
     }
-    const hasPolys = state.polygons.length > 0 || state.polyTool !== "pan";
+    const isCellTool = state.polyTool === "select" || state.polyTool === "deselect" || state.polyTool === "add";
+    const hasPolys = state.polygons.length > 0 || isCellTool;
     if (realPolyDock) realPolyDock.classList.toggle("hidden", !hasPolys);
     const nSel = state.selectedPolyIds.size;
     if (realSelBanner) {
@@ -177,20 +217,30 @@
       b.classList.toggle("active", b.dataset.realTool === state.polyTool);
     });
     if (card) {
-      card.style.cursor = state.polyTool === "pan" || state.spaceHeld ? "" : state.polyTool === "deselect" ? "cell" : "crosshair";
+      card.style.cursor =
+        state.polyTool === "pan" || state.spaceHeld ? "grab" :
+        state.polyTool === "move" ? "default" :
+        state.polyTool === "deselect" ? "cell" : "crosshair";
     }
   }
 
   function setPolyTool(tool) {
-    state.polyTool = tool || "pan";
+    state.polyTool = tool || "move";
     state.polyMarquee = null;
     state.polyPaint = null;
     state.polyPendingClick = null;
+    state.drawing = null;
+    state.polyDraft = null;
+    state.dragResize = null;
+    state.dragRotate = null;
+    state.dragGroup = null;
+    state.marquee = null;
     updatePolyUI();
     requestRender();
   }
 
   async function syncSeedToServer() {
+    if (state._paramCache) state._paramCache.clear();
     const cells = [];
     for (const p of state.polygons) {
       if (p.gx >= -64 && p.gx < 64 && p.gy >= -64 && p.gy < 64) {
@@ -448,7 +498,11 @@
     if (Math.abs(v) >= 10000 || Math.abs(v) < 0.005) return v.toExponential(1);
     return Number(v.toFixed(4)).toString();
   }
-  function hexToRgba(hex, a) {
+  function themeCol(col, opts) {
+    return (window.CFVTheme && window.CFVTheme.adaptColor) ? window.CFVTheme.adaptColor(col, opts) : (col || "#38bdf8");
+  }
+  function hexToRgba(hex, a, opts) {
+    if (window.CFVTheme && window.CFVTheme.adaptRgba) return window.CFVTheme.adaptRgba(hex, a, opts);
     if (!hex || hex[0] !== "#" || hex.length < 7) return `rgba(56,189,248,${a})`;
     return `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
   }
@@ -660,7 +714,7 @@
     if (implList.length > 0 && compiled) {
       const nx = isAnim ? 76 : 124;
       const ny = isAnim ? 54 : 92;
-      await Promise.all(
+      const implResults = await Promise.all(
         implList.map(async (c) => {
           const res = await fetch("/api/workspace/implicit", {
             method: "POST",
@@ -672,9 +726,9 @@
               nx, ny, params,
             }),
           });
-          if (!res.ok) return;
+          if (!res.ok) return null;
           const buf = await res.arrayBuffer();
-          implicits.push({
+          return {
             cardId: c.id, title: c.title, color: c.color,
             lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.2),
             opacity: normOpacity(c.opacity, 1.0),
@@ -682,36 +736,67 @@
             xmin: state.view.xmin, xmax: state.view.xmax,
             ymin: state.view.ymin, ymax: state.view.ymax,
             grid: new Float32Array(buf),
-          });
+          };
         })
       );
+      for (const r of implResults) if (r) implicits.push(r);
     }
 
-    /* 5. Continuous Parametric Curves (x(t), y(t)) via 4-thread C11 binary endpoint! */
+    /* 5. Continuous Parametric Curves (x(t), y(t)) via 4-thread C11 binary endpoint!
+     * Cache results per-card keyed ONLY on the parameters referenced by that card's C code,
+     * so panning, zooming, and 60 FPS dynamic camera follow make ZERO redundant HTTP fetches! */
     if (paramList.length > 0 && compiled) {
-      await Promise.all(
+      const paramCache = state._paramCache || (state._paramCache = new Map());
+      const allRealCards = typeof ws().getRealCards === "function" ? ws().getRealCards() : [];
+      const paramNames = Object.keys(paramMap).sort();
+      const paramResults = await Promise.all(
         paramList.map(async (c) => {
           const tmin = Number.isFinite(c.tMin) ? c.tMin : 0.0;
           const tmax = Number.isFinite(c.tMax) && c.tMax > tmin ? c.tMax : Math.PI * 2;
           const span = tmax - tmin;
           const pSamples = span >= 100
-            ? Math.min(4800, Math.max(1200, Math.round(span) + 1))
-            : (isAnim ? 720 : 1200);
-          const res = await fetch("/api/workspace/parametric", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slot: c.slot, tmin, tmax, samples: pSamples, params }),
-          });
-          if (!res.ok) return;
-          const buf = await res.arrayBuffer();
-          parametrics.push({
+            ? Math.min(4800, Math.max(1600, Math.round(span) + 1))
+            : (isAnim ? 1600 : 2800);
+          const codeStr = String(c.compiledCode || c.code || "");
+          const usesHelper = /\bf\d+\s*\(/.test(codeStr);
+          const relevantCode = usesHelper
+            ? allRealCards.map((rc) => String(rc.compiledCode || rc.code || "")).join("\n")
+            : codeStr;
+          const isStateful = /\breal_(life|seed)_/.test(relevantCode);
+          let pKey = "";
+          for (const nm of paramNames) {
+            if (new RegExp(`\\b${nm}\\b`).test(relevantCode)) {
+              pKey += `${nm}=${paramMap[nm]};`;
+            }
+          }
+          const cacheKey = `${c.slot}|${tmin}|${tmax}|${pSamples}|${codeStr.length}|${codeStr.slice(0, 64)}|${codeStr.slice(-48)}|${pKey}`;
+          let xy = isStateful ? null : paramCache.get(cacheKey);
+          if (!xy) {
+            const res = await fetch("/api/workspace/parametric", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slot: c.slot, tmin, tmax, samples: pSamples, params }),
+            });
+            if (!res.ok) return null;
+            const buf = await res.arrayBuffer();
+            xy = new Float32Array(buf);
+            if (!isStateful) {
+              if (paramCache.size > 48) {
+                const firstKey = paramCache.keys().next().value;
+                if (firstKey !== undefined) paramCache.delete(firstKey);
+              }
+              paramCache.set(cacheKey, xy);
+            }
+          }
+          return {
             cardId: c.id, title: c.title, color: c.color,
             lineStyle: c.lineStyle || "solid", lineWidth: normLineWidth(c.lineWidth, 2.3),
             opacity: normOpacity(c.opacity, 1.0),
-            xy: new Float32Array(buf),
-          });
+            xy,
+          };
         })
       );
+      for (const r of paramResults) if (r) parametrics.push(r);
     }
 
     if (!state.active) return;
@@ -792,8 +877,10 @@
   }
   function syncLayerOrder() {
     const valid = new Map();
+    for (const s of state.shapes) valid.set(`shape:${s.id}`, { kind: "shape", id: s.id });
     for (const l of state.lines) valid.set(`guide_line:${l.id}`, { kind: "guide_line", id: l.id });
     for (const p of state.points) valid.set(`point:${p.id}`, { kind: "point", id: p.id });
+    for (const t of state.texts) valid.set(`text:${t.id}`, { kind: "text", id: t.id });
     const next = [];
     const seen = new Set();
     for (const e of state.layerOrder || []) {
@@ -808,14 +895,51 @@
   }
   function getOrderedElements() {
     syncLayerOrder();
+    const sMap = new Map(state.shapes.map((s) => [s.id, s]));
     const lMap = new Map(state.lines.map((l) => [l.id, l]));
     const pMap = new Map(state.points.map((p) => [p.id, p]));
+    const tMap = new Map(state.texts.map((t) => [t.id, t]));
     const out = [];
     for (const e of state.layerOrder) {
-      const item = e.kind === "guide_line" ? lMap.get(e.id) : pMap.get(e.id);
+      const item =
+        e.kind === "shape" ? sMap.get(e.id) :
+        e.kind === "guide_line" ? lMap.get(e.id) :
+        e.kind === "text" ? tMap.get(e.id) :
+        pMap.get(e.id);
       if (item) out.push({ kind: e.kind, id: e.id, item });
     }
     return out;
+  }
+  function rebuildFormulaElements() {
+    const ev = window.CFVComplex && window.CFVComplex.evalParamExpr;
+    if (!ev) return;
+    const pm = ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
+    for (const p of state.points) {
+      if (p.xExpr && String(p.xExpr).trim()) {
+        const vx = ev(p.xExpr, pm);
+        if (Number.isFinite(vx)) p.x = vx;
+      }
+      if (p.yExpr && String(p.yExpr).trim()) {
+        const vy = ev(p.yExpr, pm);
+        if (Number.isFinite(vy)) p.y = vy;
+      }
+    }
+    for (const ln of state.lines) {
+      if (ln.valExpr && String(ln.valExpr).trim()) {
+        const vv = ev(ln.valExpr, pm);
+        if (Number.isFinite(vv)) ln.value = vv;
+      }
+    }
+    for (const tb of state.texts) {
+      if (tb.xExpr && String(tb.xExpr).trim()) {
+        const vx = ev(tb.xExpr, pm);
+        if (Number.isFinite(vx)) tb.x = vx;
+      }
+      if (tb.yExpr && String(tb.yExpr).trim()) {
+        const vy = ev(tb.yExpr, pm);
+        if (Number.isFinite(vy)) tb.y = vy;
+      }
+    }
   }
   function reorderElement(fromIdx, toIdx) {
     syncLayerOrder();
@@ -876,8 +1000,9 @@
     ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
+    const col = themeCol(color);
     if (glow) { trace(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = width + 4; ctx.stroke(); }
-    trace(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+    trace(); ctx.strokeStyle = col; ctx.lineWidth = width; ctx.stroke();
     ctx.restore();
   }
 
@@ -903,8 +1028,9 @@
     ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
+    const col = themeCol(color);
     trace(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = width + 4; ctx.stroke();
-    trace(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+    trace(); ctx.strokeStyle = col; ctx.lineWidth = width; ctx.stroke();
     ctx.restore();
   }
 
@@ -967,8 +1093,9 @@
     ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
+    const col = themeCol(color);
     traceSegs(); ctx.strokeStyle = hexToRgba(color, 0.24); ctx.lineWidth = width + 4; ctx.stroke();
-    traceSegs(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+    traceSegs(); ctx.strokeStyle = col; ctx.lineWidth = width; ctx.stroke();
     ctx.restore();
   }
 
@@ -994,8 +1121,80 @@
     ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     applyLineStyle(ctx, lineStyle || "solid");
+    const col = themeCol(color);
     trace(); ctx.strokeStyle = hexToRgba(color, 0.25); ctx.lineWidth = width + 4; ctx.stroke();
-    trace(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+    trace(); ctx.strokeStyle = col; ctx.lineWidth = width; ctx.stroke();
+    ctx.restore();
+  }
+
+  function expandRealLinearPts(s) {
+    if (!s || !s.rawPts || s.rawPts.length < 2) return s ? s.rawPts : [];
+    if (s.kind !== "ray" && s.kind !== "infline") return s.rawPts;
+    const a = s.rawPts[0], b = s.rawPts[s.rawPts.length - 1];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) { dx = 1; dy = 0; } else { dx /= len; dy /= len; }
+    const span = Math.max(10, Math.hypot(state.view.xmax - state.view.xmin, state.view.ymax - state.view.ymin) * 4);
+    if (s.kind === "ray") return [a, { x: a.x + dx * span, y: a.y + dy * span }];
+    return [{ x: a.x - dx * span, y: a.y - dy * span }, { x: a.x + dx * span, y: a.y + dy * span }];
+  }
+
+  function drawRealShape(s) {
+    if (!s || !s.visible || !s.rawPts || s.rawPts.length < 2) return;
+    const defaultOp = s.closed ? 0.22 : 1.0;
+    const op = normOpacity(s.opacity, defaultOp);
+    if (op <= 0.001) return;
+    const strokeAlpha = s.closed ? (op < 0.22 ? op / 0.22 : 1.0) : op;
+    const lw = normLineWidth(s.lineWidth, 2.2);
+    const hi = isShapeSelected(s.id);
+    const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
+    const fillCol = themeCol(s.color || "#38bdf8", { solidFill: s.closed && op >= 0.85 });
+    const strokeCol = themeCol(s.color || "#38bdf8");
+    const drawPts = expandRealLinearPts(s);
+
+    const trace = () => {
+      ctx.beginPath();
+      for (let i = 0; i < drawPts.length; i++) {
+        const sx = xToS(drawPts[i].x), sy = yToS(drawPts[i].y);
+        if (i === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      if (s.closed && drawPts.length >= 3) ctx.closePath();
+    };
+
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (s.closed && drawPts.length >= 3) {
+      trace();
+      ctx.fillStyle = op >= 0.995 ? fillCol : hexToRgba(s.color || "#38bdf8", op);
+      ctx.fill("nonzero");
+    }
+    if (lw > 0 || hi) {
+      ctx.globalAlpha = strokeAlpha;
+      applyLineStyle(ctx, s.lineStyle || "solid");
+      if (lw > 0 && op < 0.85) {
+        trace();
+        ctx.strokeStyle = hexToRgba(s.color || "#38bdf8", hi ? 0.48 : 0.24);
+        ctx.lineWidth = lw + (hi ? 6 : 4);
+        ctx.stroke();
+      }
+      trace();
+      ctx.strokeStyle = hi ? hiCol : strokeCol;
+      ctx.lineWidth = lw > 0 ? (hi ? lw + 0.7 : lw) : 1.4;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (s.kind === "ray") {
+        const aSp = { x: xToS(s.rawPts[0].x), y: yToS(s.rawPts[0].y) };
+        ctx.fillStyle = hi ? hiCol : strokeCol;
+        ctx.beginPath(); ctx.arc(aSp.x, aSp.y, 4.2, 0, Math.PI * 2); ctx.fill();
+      }
+      if (hi && !s.locked && (s.kind === "line" || s.kind === "seg" || s.kind === "ray" || s.kind === "infline")) {
+        for (const ep of [s.rawPts[0], s.rawPts[s.rawPts.length - 1]]) {
+          ctx.fillStyle = "#0a0e17"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(xToS(ep.x), yToS(ep.y), 4.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      }
+    }
     ctx.restore();
   }
 
@@ -1004,14 +1203,14 @@
     const op = normOpacity(ln.opacity, 1.0);
     if (op <= 0.001) return;
     const sel = ln.id === state.selectedLineId;
-    const col = ln.color || "#fbbf24";
+    const col = themeCol(ln.color || "#fbbf24");
     const lw = normLineWidth(ln.lineWidth, 1.6);
     const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
 
     ctx.save();
     ctx.globalAlpha = op;
     ctx.font = '600 10.5px "JetBrains Mono", monospace';
-    ctx.strokeStyle = sel ? hiCol : hexToRgba(col, 0.85);
+    ctx.strokeStyle = sel ? hiCol : hexToRgba(ln.color || "#fbbf24", 0.85);
     ctx.lineWidth = lw + (sel ? 0.8 : 0);
     applyLineStyle(ctx, ln.lineStyle || "dashed");
 
@@ -1046,18 +1245,19 @@
     const sx = xToS(p.x), sy = yToS(p.y);
     if (sx < -36 || sx > w + 36 || sy < -36 || sy > h + 36) return;
     const drawIcon = window.CFVComplex && window.CFVComplex.drawPointIcon;
-    const sel = p.id === state.selectedPointId;
+    const sel = isPointSelected(p.id);
+    const col = themeCol(p.color || "#34d399");
     ctx.save();
     ctx.globalAlpha = op;
     ctx.font = '10.5px "JetBrains Mono", monospace';
     if (drawIcon) {
-      drawIcon(ctx, sx, sy, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
+      drawIcon(ctx, sx, sy, p.icon || "dot", col, p.size || 5, sel);
     } else {
-      ctx.fillStyle = p.color || "#34d399";
+      ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(sx, sy, p.size || 5, 0, Math.PI * 2); ctx.fill();
     }
     if (p.showLabel !== false && p.label) {
-      ctx.fillStyle = p.color || (isLightTheme() ? "#0f172a" : "#e2e8f0");
+      ctx.fillStyle = col;
       ctx.fillText(p.label, sx + (p.size || 5) + 6, sy + 3);
     }
     ctx.restore();
@@ -1073,7 +1273,7 @@
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = light ? "#f8fafc" : "#0a0e17";
+    ctx.fillStyle = light ? "#f5f7fb" : "#0a0e17";
     ctx.fillRect(0, 0, w, h);
 
     const xSpan = state.view.xmax - state.view.xmin;
@@ -1081,15 +1281,75 @@
     const xStep = niceStep((xSpan * 90) / Math.max(1, w));
     const yStep = niceStep((ySpan * 65) / Math.max(1, h));
 
-    ctx.strokeStyle = light ? "rgba(15,23,42,0.09)" : "rgba(148,163,184,0.11)"; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = Math.floor(state.view.xmin / xStep) * xStep; x <= state.view.xmax; x += xStep) {
-      const sx = Math.round(xToS(x)) + 0.5; ctx.moveTo(sx, 0); ctx.lineTo(sx, h);
+    if (state.coordSystem === "polar") {
+      if (window.CFVProjections && window.CFVProjections.drawProjectionOverlay) {
+        const realW2S = (_v, _c, wx, wy) => ({ x: xToS(wx), y: yToS(wy) });
+        const polarView = { ...state.view, scaleX: w / Math.max(1e-9, xSpan), scaleY: h / Math.max(1e-9, ySpan) };
+        window.CFVProjections.drawProjectionOverlay(ctx, canvas, polarView, realW2S, "polar", light);
+      }
+    } else if (state.coordSystem === "logx" || state.coordSystem === "loglog") {
+      /* Logarithmic Decade & Sub-Decade Grid (10^k) */
+      const logMajCol = light ? "rgba(15,23,42,0.16)" : "rgba(148,163,184,0.20)";
+      const logMinCol = light ? "rgba(15,23,42,0.06)" : "rgba(148,163,184,0.08)";
+      const drawLogX = () => {
+        const x0 = Math.max(1e-4, state.view.xmin);
+        const x1 = Math.max(x0 * 1.1, state.view.xmax);
+        if (state.view.xmax <= 0) return;
+        const dMin = Math.floor(Math.log10(x0));
+        const dMax = Math.ceil(Math.log10(x1));
+        for (let d = dMin; d <= dMax; d++) {
+          const base = Math.pow(10, d);
+          for (let m = 1; m <= 9; m++) {
+            const v = m * base;
+            if (v < state.view.xmin || v > state.view.xmax) continue;
+            const sx = Math.round(xToS(v)) + 0.5;
+            ctx.strokeStyle = m === 1 ? logMajCol : logMinCol;
+            ctx.lineWidth = m === 1 ? 1.1 : 0.75;
+            ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+          }
+        }
+      };
+      const drawLogY = () => {
+        const y0 = Math.max(1e-4, state.view.ymin);
+        const y1 = Math.max(y0 * 1.1, state.view.ymax);
+        if (state.view.ymax <= 0) return;
+        const dMin = Math.floor(Math.log10(y0));
+        const dMax = Math.ceil(Math.log10(y1));
+        for (let d = dMin; d <= dMax; d++) {
+          const base = Math.pow(10, d);
+          for (let m = 1; m <= 9; m++) {
+            const v = m * base;
+            if (v < state.view.ymin || v > state.view.ymax) continue;
+            const sy = Math.round(yToS(v)) + 0.5;
+            ctx.strokeStyle = m === 1 ? logMajCol : logMinCol;
+            ctx.lineWidth = m === 1 ? 1.1 : 0.75;
+            ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+          }
+        }
+      };
+      drawLogX();
+      if (state.coordSystem === "loglog") {
+        drawLogY();
+      } else {
+        ctx.strokeStyle = light ? "rgba(15,23,42,0.09)" : "rgba(148,163,184,0.11)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let y = Math.floor(state.view.ymin / yStep) * yStep; y <= state.view.ymax; y += yStep) {
+          const sy = Math.round(yToS(y)) + 0.5; ctx.moveTo(0, sy); ctx.lineTo(w, sy);
+        }
+        ctx.stroke();
+      }
+    } else {
+      ctx.strokeStyle = light ? "rgba(15,23,42,0.09)" : "rgba(148,163,184,0.11)"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = Math.floor(state.view.xmin / xStep) * xStep; x <= state.view.xmax; x += xStep) {
+        const sx = Math.round(xToS(x)) + 0.5; ctx.moveTo(sx, 0); ctx.lineTo(sx, h);
+      }
+      for (let y = Math.floor(state.view.ymin / yStep) * yStep; y <= state.view.ymax; y += yStep) {
+        const sy = Math.round(yToS(y)) + 0.5; ctx.moveTo(0, sy); ctx.lineTo(w, sy);
+      }
+      ctx.stroke();
     }
-    for (let y = Math.floor(state.view.ymin / yStep) * yStep; y <= state.view.ymax; y += yStep) {
-      const sy = Math.round(yToS(y)) + 0.5; ctx.moveTo(0, sy); ctx.lineTo(w, sy);
-    }
-    ctx.stroke();
 
     if (state.showMarkers) {
       if (state.showPrimes && xSpan <= 115) {
@@ -1258,16 +1518,163 @@
     }
 
     drawPolygons(w, h);
-    /* Unified Element Layering Order (back -> front) */
+    rebuildFormulaElements();
+    /* Unified Element Layering Order (back -> front: shapes, guide lines, points) */
     for (const el of getOrderedElements()) {
-      if (el.kind === "guide_line") drawSingleGuideLine(el.item, w, h);
+      if (el.kind === "shape") drawRealShape(el.item);
+      else if (el.kind === "guide_line") drawSingleGuideLine(el.item, w, h);
       else if (el.kind === "point") drawSinglePoint(el.item, w, h);
+    }
+    if (window.CFVAnnotations && state.texts.length > 0) {
+      window.CFVAnnotations.drawTextBoxes(ctx, canvas, state.texts, {
+        isLight: light,
+        selectedTextId: state.selectedTextId,
+        hoveredTextId: state.hoveredTextId,
+        worldToScreen: (wx, wy) => ({ x: xToS(wx), y: yToS(wy) }),
+      });
+    } else {
+      canvas._textLayouts = [];
+    }
+    /* Live vector drawing preview */
+    if (state.drawing && state.drawing.rawPts && state.drawing.rawPts.length >= 2) {
+      const d = state.drawing;
+      const col = themeCol(d.color || "#38bdf8");
+      ctx.save();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      for (let i = 0; i < d.rawPts.length; i++) {
+        const sx = xToS(d.rawPts[i].x), sy = yToS(d.rawPts[i].y);
+        if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+      }
+      if (d.closed || d.snapActive) ctx.closePath();
+      ctx.stroke();
+      if (d.kind === "freehand" && d.rawPts.length >= 6) {
+        const stx = xToS(d.rawPts[0].x), sty = yToS(d.rawPts[0].y);
+        ctx.strokeStyle = d.snapActive ? "#10b981" : (light ? "rgba(15,23,42,0.35)" : "rgba(255,255,255,0.45)");
+        ctx.beginPath(); ctx.arc(stx, sty, d.snapActive ? 10 : 5, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (state.polyDraft && state.polyDraft.rawPts && state.polyDraft.rawPts.length >= 1) {
+      const pd = state.polyDraft;
+      const pts = pd.hoverPt ? [...pd.rawPts, pd.hoverPt] : pd.rawPts;
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = themeCol(pd.color || "#38bdf8");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const sx = xToS(pts[i].x), sy = yToS(pts[i].y);
+        if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    /* Move-Mode Selection Overlay: Group Box, Resize Handles, Rotate Knob & Marquee */
+    if (state.polyTool === "move") {
+      const grpBox = getGroupBox();
+      if (grpBox) {
+        const tl = { x: xToS(grpBox.xmin), y: yToS(grpBox.ymax) };
+        const br = { x: xToS(grpBox.xmax), y: yToS(grpBox.ymin) };
+        const rx = Math.min(tl.x, br.x), ry = Math.min(tl.y, br.y);
+        const rw = Math.abs(br.x - tl.x), rh = Math.abs(br.y - tl.y);
+        ctx.save();
+        ctx.fillStyle = "rgba(56,189,248,0.06)";
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 1.3;
+        ctx.setLineDash([5, 4]);
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.setLineDash([]);
+        for (const gh of getGroupHandles(grpBox)) {
+          const sx = xToS(gh.x), sy = yToS(gh.y);
+          ctx.fillStyle = light ? "#ffffff" : "#0a0e17";
+          ctx.strokeStyle = "#38bdf8";
+          ctx.lineWidth = 2;
+          ctx.fillRect(sx - 4.5, sy - 4.5, 9, 9);
+          ctx.strokeRect(sx - 4.5, sy - 4.5, 9, 9);
+        }
+        ctx.restore();
+      } else if (state.selectedShapeId !== null) {
+        const selSh = state.shapes.find((x) => x.id === state.selectedShapeId);
+        if (selSh && selSh.visible !== false && !selSh.locked) {
+          ctx.save();
+          for (const h of getResizeHandles(selSh)) {
+            const sx = xToS(h.x), sy = yToS(h.y);
+            ctx.fillStyle = light ? "#ffffff" : "#0a0e17";
+            ctx.strokeStyle = "#38bdf8";
+            ctx.lineWidth = 2;
+            if (h.shapeKind === "line" || h.shapeKind === "polygon" || h.shapeKind === "circle") {
+              ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            } else {
+              ctx.fillRect(sx - 4.5, sy - 4.5, 9, 9);
+              ctx.strokeRect(sx - 4.5, sy - 4.5, 9, 9);
+            }
+          }
+          ctx.restore();
+        }
+      }
+      const rotInfo = getSelectionRotateInfo();
+      if (rotInfo) {
+        ctx.save();
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(rotInfo.stemX, rotInfo.stemY);
+        ctx.lineTo(rotInfo.handleX, rotInfo.handleY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = state.dragRotate ? "#38bdf8" : (light ? "#ffffff" : "#0a0e17");
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(rotInfo.handleX, rotInfo.handleY, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        if (state.dragRotate) {
+          const deg = Math.round(((state.dragRotate.angle || 0) * 180) / Math.PI);
+          const pill = `${deg}°`;
+          ctx.font = '600 11px "JetBrains Mono", monospace';
+          const tw = ctx.measureText(pill).width + 12;
+          ctx.fillStyle = "rgba(15,23,42,0.9)";
+          ctx.beginPath(); ctx.roundRect(rotInfo.handleX + 10, rotInfo.handleY - 10, tw, 20, 5); ctx.fill();
+          ctx.fillStyle = "#38bdf8";
+          ctx.fillText(pill, rotInfo.handleX + 16, rotInfo.handleY + 4);
+        }
+        ctx.restore();
+      }
+      if (state.marquee) {
+        const m = state.marquee;
+        const x0 = Math.min(m.x0, m.x1), y0 = Math.min(m.y0, m.y1);
+        const mw = Math.abs(m.x1 - m.x0), mh = Math.abs(m.y1 - m.y0);
+        ctx.save();
+        ctx.fillStyle = "rgba(56,189,248,0.12)";
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 1.3;
+        ctx.setLineDash([5, 4]);
+        ctx.fillRect(x0, y0, mw, mh);
+        ctx.strokeRect(x0, y0, mw, mh);
+        ctx.restore();
+      }
+    }
+    /* Magnetic Endpoint & Point Snap Ring (matches Complex mode!) */
+    if (state.snapHint) {
+      const spx = xToS(state.snapHint.x), spy = yToS(state.snapHint.y);
+      ctx.save();
+      ctx.strokeStyle = "#34d399";
+      ctx.fillStyle = "rgba(52, 211, 153, 0.22)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(spx, spy, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
     ctx.restore();
   }
 
   function drawPolygons(w, h) {
-    const hasPolys = state.polygons.length > 0 || state.polyTool !== "pan";
+    const isCellTool = state.polyTool === "select" || state.polyTool === "deselect" || state.polyTool === "add";
+    const hasPolys = state.polygons.length > 0 || isCellTool;
     if (!hasPolys) return;
 
     const pm = ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
@@ -1365,31 +1772,31 @@
       if (idx === 0 && x !== null) readoutOut.textContent = val !== null && Number.isFinite(val) ? val.toFixed(4) : "—";
       const row = document.createElement("div");
       row.className = "real-legend-row";
-      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${c.color}"></span>${c.title}</span><span class="real-legend-val">${val !== null && Number.isFinite(val) ? val.toFixed(4) : "—"}</span>`;
+      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${themeCol(c.color)}"></span>${c.title}</span><span class="real-legend-val">${val !== null && Number.isFinite(val) ? val.toFixed(4) : "—"}</span>`;
       legendRows.appendChild(row);
     });
     for (const pc of parametrics || []) {
       const row = document.createElement("div");
       row.className = "real-legend-row";
-      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${pc.color}"></span>${pc.title}</span><span class="real-legend-val">(x(t), y(t))</span>`;
+      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${themeCol(pc.color)}"></span>${pc.title}</span><span class="real-legend-val">(x(t), y(t))</span>`;
       legendRows.appendChild(row);
     }
     for (const v of verticals || []) {
       const row = document.createElement("div");
       row.className = "real-legend-row";
-      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${v.color}"></span>${v.title}</span><span class="real-legend-val">x=${v.xVal.toFixed(3)}</span>`;
+      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${themeCol(v.color)}"></span>${v.title}</span><span class="real-legend-val">x=${v.xVal.toFixed(3)}</span>`;
       legendRows.appendChild(row);
     }
     for (const xc of xOfYCurves || []) {
       const row = document.createElement("div");
       row.className = "real-legend-row";
-      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${xc.color}"></span>${xc.title}</span><span class="real-legend-val">x=g(y)</span>`;
+      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${themeCol(xc.color)}"></span>${xc.title}</span><span class="real-legend-val">x=g(y)</span>`;
       legendRows.appendChild(row);
     }
     for (const imp of implicits || []) {
       const row = document.createElement("div");
       row.className = "real-legend-row";
-      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${imp.color}"></span>${imp.title}</span><span class="real-legend-val">F(x,y)=0</span>`;
+      row.innerHTML = `<span class="real-legend-name"><span class="real-legend-swatch" style="background:${themeCol(imp.color)}"></span>${imp.title}</span><span class="real-legend-val">F(x,y)=0</span>`;
       legendRows.appendChild(row);
     }
   }
@@ -1422,6 +1829,461 @@
     requestRender();
   }
 
+  function distSegSq(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    const t = l2 > 1e-9 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+    const ex = px - (ax + t * dx), ey = py - (ay + t * dy);
+    return ex * ex + ey * ey;
+  }
+
+  function ptInPoly(wx, wy, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+      if (yi > wy !== yj > wy && wx < ((xj - xi) * (wy - yi)) / (yj - yi + 1e-30) + xi) inside = !inside;
+    }
+    return inside;
+  }
+
+  const HANDLE_HIT_PX = 10;
+  const SNAP_PX = 14;
+
+  /* Magnetic Endpoint & Landmark Point Snapping (Exact Parity with Complex Mode!) */
+  function findRealSnapTarget(sx, sy, excludeShapeId = null, excludePointId = null) {
+    let best = null;
+    let bestDist = SNAP_PX;
+    for (const s of state.shapes) {
+      if (!s.visible || s.id === excludeShapeId || !s.rawPts || s.rawPts.length < 2) continue;
+      const ptsToCheck = s.closed
+        ? (s.rawPts.length <= 16 ? s.rawPts : [s.rawPts[0]])
+        : [s.rawPts[0], s.rawPts[s.rawPts.length - 1]];
+      for (const ep of ptsToCheck) {
+        const d = Math.hypot(sx - xToS(ep.x), sy - yToS(ep.y));
+        if (d <= bestDist) {
+          bestDist = d;
+          best = { x: ep.x, y: ep.y, kind: "endpoint", shapeId: s.id };
+        }
+      }
+    }
+    for (const p of state.points) {
+      if (!p.visible || p.id === excludePointId) continue;
+      const d = Math.hypot(sx - xToS(p.x), sy - yToS(p.y));
+      if (d <= bestDist) {
+        bestDist = d;
+        best = { x: p.x, y: p.y, kind: "point", pointId: p.id };
+      }
+    }
+    /* Also snap to graphed curve y = f(x) when hovering close! */
+    if (!best && state.cache && state.cache.xs && state.cache.xs.length >= 2) {
+      const wx = sToX(sx);
+      for (const c of state.cache.curves || []) {
+        const yv = sampleAt(state.cache.xs, c.ys, wx);
+        if (yv !== null && Number.isFinite(yv)) {
+          const d = Math.abs(sy - yToS(yv));
+          if (d <= 10 && d < bestDist) {
+            bestDist = d;
+            best = { x: wx, y: yv, kind: "curve" };
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  function bboxOf(pts) {
+    let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+    for (const p of pts || []) {
+      if (p.x < xmin) xmin = p.x;
+      if (p.x > xmax) xmax = p.x;
+      if (p.y < ymin) ymin = p.y;
+      if (p.y > ymax) ymax = p.y;
+    }
+    if (!Number.isFinite(xmin)) return { xmin: 0, xmax: 0, ymin: 0, ymax: 0, cx: 0, cy: 0 };
+    return { xmin, xmax, ymin, ymax, cx: 0.5 * (xmin + xmax), cy: 0.5 * (ymin + ymax) };
+  }
+
+  function isShapeSelected(id) {
+    return state.selectedShapeIds.has(id) || state.selectedShapeId === id;
+  }
+
+  function isPointSelected(id) {
+    return state.selectedPointIds.has(id) || state.selectedPointId === id;
+  }
+
+  function clearSelection() {
+    state.selectedShapeIds.clear();
+    state.selectedPointIds.clear();
+    state.selectedShapeId = null;
+    state.selectedPointId = null;
+    state.selectedLineId = null;
+    state.selectedTextId = null;
+  }
+
+  function syncPrimarySelection() {
+    const sArr = [...state.selectedShapeIds].filter((id) => state.shapes.some((s) => s.id === id));
+    state.selectedShapeIds = new Set(sArr);
+    state.selectedShapeId = sArr.length > 0 ? sArr[sArr.length - 1] : null;
+    const pArr = [...state.selectedPointIds].filter((id) => state.points.some((p) => p.id === id));
+    state.selectedPointIds = new Set(pArr);
+    state.selectedPointId = pArr.length > 0 ? pArr[pArr.length - 1] : null;
+  }
+
+  function getSelectedMovableItems() {
+    const shapes = state.shapes.filter((s) => !s.locked && s.visible !== false && isShapeSelected(s.id) && s.rawPts && s.rawPts.length >= 2);
+    const points = state.points.filter((p) => !p.locked && p.visible !== false && isPointSelected(p.id));
+    return { shapes, points, total: shapes.length + points.length };
+  }
+
+  function getGroupBox() {
+    const { shapes, points, total } = getSelectedMovableItems();
+    if (total < 2) return null;
+    let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+    for (const s of shapes) {
+      for (const p of s.rawPts) {
+        if (p.x < xmin) xmin = p.x;
+        if (p.x > xmax) xmax = p.x;
+        if (p.y < ymin) ymin = p.y;
+        if (p.y > ymax) ymax = p.y;
+      }
+    }
+    for (const pt of points) {
+      if (pt.x < xmin) xmin = pt.x;
+      if (pt.x > xmax) xmax = pt.x;
+      if (pt.y < ymin) ymin = pt.y;
+      if (pt.y > ymax) ymax = pt.y;
+    }
+    if (!Number.isFinite(xmin)) return null;
+    if (xmax - xmin < 1e-4) { xmin -= 0.12; xmax += 0.12; }
+    if (ymax - ymin < 1e-4) { ymin -= 0.12; ymax += 0.12; }
+    return { xmin, xmax, ymin, ymax, cx: 0.5 * (xmin + xmax), cy: 0.5 * (ymin + ymax) };
+  }
+
+  function getGroupHandles(bb) {
+    if (!bb) return [];
+    return [
+      { id: "nw", x: bb.xmin, y: bb.ymax, cursor: "nwse-resize" },
+      { id: "n", x: bb.cx, y: bb.ymax, cursor: "ns-resize" },
+      { id: "ne", x: bb.xmax, y: bb.ymax, cursor: "nesw-resize" },
+      { id: "e", x: bb.xmax, y: bb.cy, cursor: "ew-resize" },
+      { id: "se", x: bb.xmax, y: bb.ymin, cursor: "nwse-resize" },
+      { id: "s", x: bb.cx, y: bb.ymin, cursor: "ns-resize" },
+      { id: "sw", x: bb.xmin, y: bb.ymin, cursor: "nesw-resize" },
+      { id: "w", x: bb.xmin, y: bb.cy, cursor: "ew-resize" },
+    ];
+  }
+
+  function hitGroupHandle(sx, sy) {
+    const bb = getGroupBox();
+    if (!bb) return null;
+    for (const h of getGroupHandles(bb)) {
+      if (Math.hypot(sx - xToS(h.x), sy - yToS(h.y)) <= HANDLE_HIT_PX + 1) return { box: bb, handle: h };
+    }
+    return null;
+  }
+
+  function hitGroupBox(sx, sy) {
+    const bb = getGroupBox();
+    if (!bb) return false;
+    const x0 = Math.min(xToS(bb.xmin), xToS(bb.xmax)) - 6;
+    const x1 = Math.max(xToS(bb.xmin), xToS(bb.xmax)) + 6;
+    const y0 = Math.min(yToS(bb.ymax), yToS(bb.ymin)) - 6;
+    const y1 = Math.max(yToS(bb.ymax), yToS(bb.ymin)) + 6;
+    return sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1;
+  }
+
+  function rectLocalFrame(pts) {
+    if (!pts || pts.length !== 4) return null;
+    const p0 = pts[0], p1 = pts[1], p2 = pts[2], p3 = pts[3];
+    const cx = 0.25 * (p0.x + p1.x + p2.x + p3.x);
+    const cy = 0.25 * (p0.y + p1.y + p2.y + p3.y);
+    const e01x = p1.x - p0.x, e01y = p1.y - p0.y;
+    const e03x = p3.x - p0.x, e03y = p3.y - p0.y;
+    const w = Math.hypot(e01x, e01y);
+    const h = Math.hypot(e03x, e03y);
+    if (w < 1e-9 || h < 1e-9) {
+      const bb = bboxOf(pts);
+      return { cx: bb.cx, cy: bb.cy, ux: 1, uy: 0, vx: 0, vy: 1, w: Math.max(0.03, bb.xmax - bb.xmin), h: Math.max(0.03, bb.ymax - bb.ymin) };
+    }
+    return { cx, cy, ux: e01x / w, uy: e01y / w, vx: e03x / h, vy: e03y / h, w, h };
+  }
+
+  function getResizeHandles(shape) {
+    if (!shape || !shape.visible || shape.locked || !shape.rawPts || shape.rawPts.length < 2) return [];
+    const bb = bboxOf(shape.rawPts);
+    if (shape.kind === "circle") {
+      const r = 0.25 * (bb.xmax - bb.xmin + (bb.ymax - bb.ymin));
+      return [
+        { id: "e", x: bb.cx + r, y: bb.cy, cursor: "ew-resize", shapeKind: "circle" },
+        { id: "w", x: bb.cx - r, y: bb.cy, cursor: "ew-resize", shapeKind: "circle" },
+        { id: "n", x: bb.cx, y: bb.cy + r, cursor: "ns-resize", shapeKind: "circle" },
+        { id: "s", x: bb.cx, y: bb.cy - r, cursor: "ns-resize", shapeKind: "circle" },
+      ];
+    }
+    if (shape.kind === "rect" && shape.rawPts.length === 4) {
+      const [p0, p1, p2, p3] = shape.rawPts;
+      return [
+        { id: "nw", x: p3.x, y: p3.y, cursor: "nwse-resize", shapeKind: "rect" },
+        { id: "ne", x: p2.x, y: p2.y, cursor: "nesw-resize", shapeKind: "rect" },
+        { id: "se", x: p1.x, y: p1.y, cursor: "nwse-resize", shapeKind: "rect" },
+        { id: "sw", x: p0.x, y: p0.y, cursor: "nesw-resize", shapeKind: "rect" },
+        { id: "n", x: 0.5 * (p2.x + p3.x), y: 0.5 * (p2.y + p3.y), cursor: "ns-resize", shapeKind: "rect" },
+        { id: "s", x: 0.5 * (p0.x + p1.x), y: 0.5 * (p0.y + p1.y), cursor: "ns-resize", shapeKind: "rect" },
+        { id: "e", x: 0.5 * (p1.x + p2.x), y: 0.5 * (p1.y + p2.y), cursor: "ew-resize", shapeKind: "rect" },
+        { id: "w", x: 0.5 * (p3.x + p0.x), y: 0.5 * (p3.y + p0.y), cursor: "ew-resize", shapeKind: "rect" },
+      ];
+    }
+    if (shape.kind === "rect") {
+      return [
+        { id: "nw", x: bb.xmin, y: bb.ymax, cursor: "nwse-resize", shapeKind: "rect" },
+        { id: "ne", x: bb.xmax, y: bb.ymax, cursor: "nesw-resize", shapeKind: "rect" },
+        { id: "se", x: bb.xmax, y: bb.ymin, cursor: "nwse-resize", shapeKind: "rect" },
+        { id: "sw", x: bb.xmin, y: bb.ymin, cursor: "nesw-resize", shapeKind: "rect" },
+        { id: "n", x: bb.cx, y: bb.ymax, cursor: "ns-resize", shapeKind: "rect" },
+        { id: "s", x: bb.cx, y: bb.ymin, cursor: "ns-resize", shapeKind: "rect" },
+        { id: "e", x: bb.xmax, y: bb.cy, cursor: "ew-resize", shapeKind: "rect" },
+        { id: "w", x: bb.xmin, y: bb.cy, cursor: "ew-resize", shapeKind: "rect" },
+      ];
+    }
+    if (shape.kind === "line" || shape.kind === "seg" || shape.kind === "ray" || shape.kind === "infline") {
+      return [
+        { id: "start", x: shape.rawPts[0].x, y: shape.rawPts[0].y, cursor: "move", shapeKind: "line" },
+        { id: "end", x: shape.rawPts[shape.rawPts.length - 1].x, y: shape.rawPts[shape.rawPts.length - 1].y, cursor: "move", shapeKind: "line" },
+      ];
+    }
+    if (shape.kind === "polygon" && shape.rawPts.length <= 16) {
+      return shape.rawPts.map((p, idx) => ({ id: `v${idx}`, vertexIndex: idx, x: p.x, y: p.y, cursor: "move", shapeKind: "polygon" }));
+    }
+    return [
+      { id: "nw", x: bb.xmin, y: bb.ymax, cursor: "nwse-resize", shapeKind: "scale" },
+      { id: "ne", x: bb.xmax, y: bb.ymax, cursor: "nesw-resize", shapeKind: "scale" },
+      { id: "se", x: bb.xmax, y: bb.ymin, cursor: "nwse-resize", shapeKind: "scale" },
+      { id: "sw", x: bb.xmin, y: bb.ymin, cursor: "nesw-resize", shapeKind: "scale" },
+    ];
+  }
+
+  function hitResizeHandle(sx, sy) {
+    if (getSelectedMovableItems().total >= 2) return null;
+    const s = state.shapes.find((x) => x.id === state.selectedShapeId);
+    if (!s || !s.visible || s.locked) return null;
+    for (const h of getResizeHandles(s)) {
+      if (Math.hypot(sx - xToS(h.x), sy - yToS(h.y)) <= HANDLE_HIT_PX) return { shape: s, handle: h };
+    }
+    return null;
+  }
+
+  function getSelectionRotateInfo() {
+    const items = getSelectedMovableItems();
+    if (items.total === 0) return null;
+    if (items.total === 1 && items.shapes.length === 0) return null;
+    const bb = items.total >= 2 ? getGroupBox() : bboxOf(items.shapes[0].rawPts);
+    if (!bb || !Number.isFinite(bb.xmin)) return null;
+    const stemX = xToS(bb.cx), stemY = yToS(bb.ymax);
+    return { bb, cx: bb.cx, cy: bb.cy, stemX, stemY, handleX: stemX, handleY: stemY - 26, items };
+  }
+
+  function hitRotateHandle(sx, sy) {
+    const info = getSelectionRotateInfo();
+    if (!info) return null;
+    if (Math.hypot(sx - info.handleX, sy - info.handleY) <= HANDLE_HIT_PX + 2) return info;
+    return null;
+  }
+
+  function hitRealShape(sx, sy) {
+    const wx = sToX(sx), wy = sToY(sy);
+    for (let i = state.shapes.length - 1; i >= 0; i--) {
+      const s = state.shapes[i];
+      if (!s.visible || !s.rawPts || s.rawPts.length < 2) continue;
+      const pts = expandRealLinearPts(s);
+      const segs = s.closed ? pts.length : pts.length - 1;
+      for (let k = 0; k < segs; k++) {
+        const a = pts[k], b = pts[(k + 1) % pts.length];
+        if (distSegSq(sx, sy, xToS(a.x), yToS(a.y), xToS(b.x), yToS(b.y)) <= 144) return s;
+      }
+      if (s.closed && pts.length >= 3 && ptInPoly(wx, wy, pts)) return s;
+    }
+    return null;
+  }
+
+  function makeRealCircle(cx, cy, r, n = 64) {
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+    return pts;
+  }
+
+  function makeRealRect(x0, y0, x1, y1) {
+    const xmin = Math.min(x0, x1), xmax = Math.max(x0, x1);
+    const ymin = Math.min(y0, y1), ymax = Math.max(y0, y1);
+    return [{ x: xmin, y: ymin }, { x: xmax, y: ymin }, { x: xmax, y: ymax }, { x: xmin, y: ymax }];
+  }
+
+  function pushShapeUndo() {
+    state.shapeUndoStack.push({
+      shapes: state.shapes.map((s) => ({
+        ...s,
+        rawPts: (s.rawPts || []).map((p) => ({ x: p.x, y: p.y })),
+      })),
+      points: state.points.map((p) => ({ ...p })),
+      lines: state.lines.map((l) => ({ ...l })),
+      texts: state.texts.map((t) => ({ ...t })),
+      layerOrder: (state.layerOrder || []).map((e) => ({ ...e })),
+    });
+    if (state.shapeUndoStack.length > 40) state.shapeUndoStack.shift();
+    state.lastUndoKind = "elements";
+  }
+
+  function undoShapeAction() {
+    if (state.shapeUndoStack.length === 0) return false;
+    const snap = state.shapeUndoStack.pop();
+    if (Array.isArray(snap)) {
+      state.shapes = snap;
+    } else {
+      state.shapes = snap.shapes || [];
+      state.points = snap.points || [];
+      state.lines = snap.lines || [];
+      state.texts = snap.texts || [];
+      state.layerOrder = snap.layerOrder || [];
+    }
+    clearSelection();
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+    return true;
+  }
+
+  async function undoRealAction() {
+    if (state.lastUndoKind === "polys" && state.polyUndoStack.length > 0) {
+      return undoPolygonAction();
+    }
+    if (state.shapeUndoStack.length > 0) {
+      return undoShapeAction();
+    }
+    if (state.polyUndoStack.length > 0) {
+      return undoPolygonAction();
+    }
+    return false;
+  }
+
+  function deleteSelectedItems() {
+    const remShapeIds = new Set(state.shapes.filter((s) => !s.locked && isShapeSelected(s.id)).map((s) => s.id));
+    const remPointIds = new Set(state.points.filter((p) => !p.locked && isPointSelected(p.id)).map((p) => p.id));
+    const remLine = (remShapeIds.size === 0 && remPointIds.size === 0 && state.selectedLineId !== null)
+      ? state.lines.find((l) => l.id === state.selectedLineId && !l.locked)
+      : null;
+    const remText = (remShapeIds.size === 0 && remPointIds.size === 0 && !remLine && state.selectedTextId !== null)
+      ? state.texts.find((t) => t.id === state.selectedTextId && !t.locked)
+      : null;
+    if (remShapeIds.size === 0 && remPointIds.size === 0 && !remLine && !remText) return false;
+    pushShapeUndo();
+    if (remShapeIds.size > 0) state.shapes = state.shapes.filter((s) => !remShapeIds.has(s.id));
+    if (remPointIds.size > 0) state.points = state.points.filter((p) => !remPointIds.has(p.id));
+    if (remLine) state.lines = state.lines.filter((l) => l.id !== remLine.id);
+    if (remText) state.texts = state.texts.filter((t) => t.id !== remText.id);
+    clearSelection();
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+    return true;
+  }
+
+  function addShape(opts = {}, silent = false) {
+    if (!silent) pushShapeUndo();
+    const closed = opts.closed !== undefined ? Boolean(opts.closed) : (opts.kind !== "line" && opts.kind !== "freehand");
+    const col = opts.color || PALETTE[state.colorIdx++ % PALETTE.length];
+    const kind = opts.kind || "circle";
+    let pts = Array.isArray(opts.rawPts) ? opts.rawPts.map((p) => ({ x: Number(p.x) || 0, y: Number(p.y) || 0 })) : [];
+    if (pts.length < 2) {
+      const cx = 0.5 * (state.view.xmin + state.view.xmax);
+      const cy = 0.5 * (state.view.ymin + state.view.ymax);
+      const r = Math.max(0.5, (state.view.xmax - state.view.xmin) * 0.14);
+      if (kind === "rect") pts = makeRealRect(cx - r, cy - r * 0.7, cx + r, cy + r * 0.7);
+      else if (kind === "line") pts = [{ x: cx - r, y: cy }, { x: cx + r, y: cy }];
+      else pts = makeRealCircle(cx, cy, r);
+    }
+    const sh = {
+      id: state.nextShapeId++,
+      kind,
+      label: opts.label || (closed ? (kind === "freehand" ? "Closed Loop" : kind[0].toUpperCase() + kind.slice(1)) : "Path"),
+      color: col,
+      lineWidth: normLineWidth(opts.lineWidth, 2.2),
+      opacity: normOpacity(opts.opacity, closed ? 0.22 : 1.0),
+      lineStyle: opts.lineStyle || "solid",
+      locked: Boolean(opts.locked),
+      closed,
+      visible: opts.visible !== undefined ? Boolean(opts.visible) : true,
+      rawPts: pts,
+    };
+    state.shapes.push(sh);
+    clearSelection();
+    state.selectedShapeId = sh.id;
+    state.selectedShapeIds.add(sh.id);
+    notifyDomain();
+    if (!silent) notifyState(true);
+    requestRender();
+    return sh;
+  }
+
+  function deleteShape(id) {
+    const target = state.shapes.find((s) => s.id === id);
+    if (!target || target.locked) return;
+    pushShapeUndo();
+    state.shapes = state.shapes.filter((s) => s.id !== id);
+    state.selectedShapeIds.delete(id);
+    syncPrimarySelection();
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+  }
+
+  function selectShape(id) {
+    clearSelection();
+    state.selectedShapeId = id;
+    if (id !== null && id !== undefined) state.selectedShapeIds.add(id);
+    notifyDomain();
+    requestRender();
+  }
+
+  function toggleCloseShape(id) {
+    const s = state.shapes.find((q) => q.id === (id ?? state.selectedShapeId));
+    if (!s || s.locked || !s.rawPts || s.rawPts.length < 3) return;
+    pushShapeUndo();
+    s.closed = !s.closed;
+    if (s.closed && s.opacity === 1.0) s.opacity = 0.22;
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+  }
+
+  function clearShapes() {
+    const hadUnlocked = state.shapes.some((s) => !s.locked);
+    if (!hadUnlocked) return;
+    pushShapeUndo();
+    state.shapes = state.shapes.filter((s) => s.locked);
+    state.selectedShapeId = null;
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+  }
+
+  function finishPolyDraft() {
+    const pd = state.polyDraft;
+    if (!pd) return;
+    state.polyDraft = null;
+    if (pd.rawPts.length >= 3) {
+      addShape({
+        kind: "polygon",
+        label: `Polygon (${pd.rawPts.length}v)`,
+        color: pd.color,
+        closed: true,
+        rawPts: pd.rawPts,
+      });
+    } else {
+      requestRender();
+    }
+  }
+
   /* Hit-testing 2D Landmark Points & Landmark Lines */
   function hitPoint(sx, sy) {
     for (let i = state.points.length - 1; i >= 0; i--) {
@@ -1447,8 +2309,9 @@
   }
 
   function hitRealElement(sx, sy) {
-    /* 1. Unified layer-ordered Points & Guide Lines (topmost first) */
+    /* 1. Unified layer-ordered Shapes, Points & Guide Lines (topmost first) */
     const els = getOrderedElements();
+    const wx = sToX(sx), wy = sToY(sy);
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i];
       if (!el.item || !el.item.visible) continue;
@@ -1459,6 +2322,16 @@
           if (Math.abs(sy - yToS(el.item.value)) <= 8) return el;
         } else {
           if (Math.abs(sx - xToS(el.item.value)) <= 8) return el;
+        }
+      } else if (el.kind === "shape") {
+        const pts = el.item.rawPts || [];
+        if (pts.length >= 2) {
+          const segs = el.item.closed ? pts.length : pts.length - 1;
+          for (let k = 0; k < segs; k++) {
+            const a = pts[k], b = pts[(k + 1) % pts.length];
+            if (distSegSq(sx, sy, xToS(a.x), yToS(a.y), xToS(b.x), yToS(b.y)) <= 144) return el;
+          }
+          if (el.item.closed && pts.length >= 3 && ptInPoly(wx, wy, pts)) return el;
         }
       }
     }
@@ -1495,6 +2368,31 @@
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
     const pos = localPos(e);
+    /* Hit-test text boxes on the Real plane so users can drag or resize any text box directly! */
+    if (e.button === 0 && !state.spaceHeld && window.CFVAnnotations && state.texts.length > 0) {
+      const tbHit = window.CFVAnnotations.hitTestTextBoxes(ctx, canvas, state.texts, pos.x, pos.y, {});
+      if (tbHit) {
+        selectTextBox(tbHit.tb.id);
+        if (!tbHit.tb.locked) {
+          state.dragText = {
+            tb: tbHit.tb,
+            mode: tbHit.hit,
+            startX: pos.x,
+            startY: pos.y,
+            origBx: tbHit.bx,
+            origBy: tbHit.by,
+            origW: tbHit.boxW,
+            origH: tbHit.boxH,
+            origWorldX: Number(tbHit.tb.x) || 0,
+            origWorldY: Number(tbHit.tb.y) || 0,
+            moved: false,
+          };
+          canvas.style.cursor = tbHit.hit === "resize" ? "nwse-resize" : "grabbing";
+        }
+        requestRender();
+        return;
+      }
+    }
     if (e.button === 1 || e.button === 2 || state.spaceHeld) {
       state.pan = { sx: pos.x, sy: pos.y, ov: { ...state.view }, rightClick: e.button === 2 };
       card.classList.add("panning");
@@ -1503,6 +2401,78 @@
     if (state.calc.showIntegral) {
       if (Math.abs(pos.x - xToS(state.calc.a)) <= 12) { state.calc.draggingGate = "a"; return; }
       if (Math.abs(pos.x - xToS(state.calc.b)) <= 12) { state.calc.draggingGate = "b"; return; }
+    }
+
+    /* Interactive 2D Real Landmark Placement Tools (with Magnetic Snapping!) */
+    if (state.polyTool === "point") {
+      const sn = findRealSnapTarget(pos.x, pos.y);
+      const wx = Number((sn ? sn.x : sToX(pos.x)).toFixed(4));
+      const wy = Number((sn ? sn.y : sToY(pos.y)).toFixed(4));
+      state.snapHint = null;
+      addPoint({ x: wx, y: wy, label: `P${state.points.length + 1}` });
+      return;
+    }
+    if (state.polyTool === "vline") {
+      const wx = Number(sToX(pos.x).toFixed(3));
+      addGuideLine({ orientation: "vertical", value: wx, label: `x = ${wx}` });
+      return;
+    }
+    if (state.polyTool === "hline") {
+      const wy = Number(sToY(pos.y).toFixed(3));
+      addGuideLine({ orientation: "horizontal", value: wy, label: `y = ${wy}` });
+      return;
+    }
+
+    /* Unified Click-to-Place & Vector Drawing Tools in Real Mode */
+    if (state.polyTool === "text") {
+      const cw = canvas.clientWidth || 600, ch = canvas.clientHeight || 400;
+      addTextBox({
+        title: "Note",
+        text: "Click to edit in sidebar, or drag & resize directly on the graph.",
+        anchor: "free",
+        nx: Number(Math.max(0.02, Math.min(0.82, pos.x / cw)).toFixed(4)),
+        ny: Number(Math.max(0.06, Math.min(0.84, pos.y / ch)).toFixed(4)),
+        x: Number(sToX(pos.x).toFixed(3)),
+        y: Number(sToY(pos.y).toFixed(3)),
+        color: PALETTE[state.colorIdx % PALETTE.length],
+      });
+      return;
+    }
+    if (state.polyTool === "polygon") {
+      const sn = findRealSnapTarget(pos.x, pos.y);
+      const wpt = sn ? { x: sn.x, y: sn.y } : { x: sToX(pos.x), y: sToY(pos.y) };
+      if (!state.polyDraft) {
+        state.polyDraft = { color: PALETTE[state.colorIdx % PALETTE.length], rawPts: [wpt], hoverPt: wpt };
+      } else {
+        const first = state.polyDraft.rawPts[0];
+        if (state.polyDraft.rawPts.length >= 3 && Math.hypot(pos.x - xToS(first.x), pos.y - yToS(first.y)) < 14) {
+          finishPolyDraft();
+          return;
+        }
+        state.polyDraft.rawPts.push(wpt);
+      }
+      requestRender();
+      return;
+    }
+    if (
+      state.polyTool === "freehand" || state.polyTool === "line" || state.polyTool === "seg" ||
+      state.polyTool === "ray" || state.polyTool === "infline" || state.polyTool === "arc" ||
+      state.polyTool === "circle" || state.polyTool === "rect"
+    ) {
+      const sn = findRealSnapTarget(pos.x, pos.y);
+      const startPt = sn ? { x: sn.x, y: sn.y } : { x: sToX(pos.x), y: sToY(pos.y) };
+      state.snapHint = sn;
+      state.drawing = {
+        kind: state.polyTool,
+        color: PALETTE[state.colorIdx % PALETTE.length],
+        start: startPt,
+        startPx: { x: pos.x, y: pos.y },
+        closed: state.polyTool === "circle" || state.polyTool === "rect",
+        snapActive: false,
+        rawPts: [startPt, { ...startPt }],
+      };
+      requestRender();
+      return;
     }
 
     /* Interactive 2D Real Cell Polygon Tools */
@@ -1550,11 +2520,176 @@
       return;
     }
 
+    /* Move Mode: Rotate, Group Resize/Move, Single Resize, Multi-Select & Marquee (Exact Parity with Complex Mode!) */
+    if (state.polyTool === "move") {
+      const multiMod = Boolean(e.ctrlKey || e.metaKey || e.shiftKey);
+      const rotHit = !multiMod ? hitRotateHandle(pos.x, pos.y) : null;
+      if (rotHit) {
+        pushShapeUndo();
+        const wx = sToX(pos.x), wy = sToY(pos.y);
+        state.dragRotate = {
+          cx: rotHit.cx,
+          cy: rotHit.cy,
+          startAngle: Math.atan2(wy - rotHit.cy, wx - rotHit.cx),
+          angle: 0,
+          shapes: rotHit.items.shapes.map((s) => ({ shape: s, origPts: s.rawPts.map((p) => ({ x: p.x, y: p.y })) })),
+          points: rotHit.items.points.map((p) => ({ point: p, origX: p.x, origY: p.y })),
+        };
+        card.classList.add("panning");
+        requestRender();
+        return;
+      }
+      const grpH = !multiMod ? hitGroupHandle(pos.x, pos.y) : null;
+      if (grpH) {
+        pushShapeUndo();
+        const items = getSelectedMovableItems();
+        state.dragGroup = {
+          mode: "resize",
+          handleId: grpH.handle.id,
+          origBox: { ...grpH.box },
+          startX: sToX(pos.x),
+          startY: sToY(pos.y),
+          shapes: items.shapes.map((s) => ({ shape: s, origPts: s.rawPts.map((p) => ({ x: p.x, y: p.y })) })),
+          points: items.points.map((p) => ({ point: p, origX: p.x, origY: p.y })),
+        };
+        requestRender();
+        return;
+      }
+      const hHit = !multiMod ? hitResizeHandle(pos.x, pos.y) : null;
+      if (hHit) {
+        pushShapeUndo();
+        state.dragResize = {
+          shape: hHit.shape,
+          handle: hHit.handle,
+          origPts: hHit.shape.rawPts.map((p) => ({ x: p.x, y: p.y })),
+          origBox: bboxOf(hHit.shape.rawPts),
+        };
+        requestRender();
+        return;
+      }
+      const pHit = hitPoint(pos.x, pos.y);
+      if (pHit) {
+        if (multiMod) {
+          if (state.selectedPointIds.has(pHit.id)) state.selectedPointIds.delete(pHit.id);
+          else state.selectedPointIds.add(pHit.id);
+          syncPrimarySelection();
+          notifyDomain();
+          requestRender();
+          return;
+        }
+        if (isPointSelected(pHit.id) && getSelectedMovableItems().total >= 2) {
+          pushShapeUndo();
+          const items = getSelectedMovableItems();
+          state.dragGroup = {
+            mode: "move",
+            startX: sToX(pos.x),
+            startY: sToY(pos.y),
+            shapes: items.shapes.map((s) => ({ shape: s, origPts: s.rawPts.map((p) => ({ x: p.x, y: p.y })) })),
+            points: items.points.map((p) => ({ point: p, origX: p.x, origY: p.y })),
+          };
+          card.classList.add("panning");
+          requestRender();
+          return;
+        }
+        clearSelection();
+        state.selectedPointId = pHit.id;
+        state.selectedPointIds.add(pHit.id);
+        if (!pHit.locked) {
+          pushShapeUndo();
+          state.dragPoint = { point: pHit };
+          card.classList.add("panning");
+        }
+        notifyDomain();
+        requestRender();
+        return;
+      }
+      const lHit = hitGuideLine(pos.x, pos.y);
+      if (lHit) {
+        clearSelection();
+        state.selectedLineId = lHit.id;
+        if (!lHit.locked) {
+          pushShapeUndo();
+          state.dragLine = { line: lHit };
+          card.classList.add("panning");
+        }
+        notifyDomain();
+        requestRender();
+        return;
+      }
+      const sHit = hitRealShape(pos.x, pos.y);
+      if (sHit) {
+        if (multiMod) {
+          if (state.selectedShapeIds.has(sHit.id)) state.selectedShapeIds.delete(sHit.id);
+          else state.selectedShapeIds.add(sHit.id);
+          syncPrimarySelection();
+          notifyDomain();
+          requestRender();
+          return;
+        }
+        if (isShapeSelected(sHit.id) && getSelectedMovableItems().total >= 2) {
+          pushShapeUndo();
+          const items = getSelectedMovableItems();
+          state.dragGroup = {
+            mode: "move",
+            startX: sToX(pos.x),
+            startY: sToY(pos.y),
+            shapes: items.shapes.map((s) => ({ shape: s, origPts: s.rawPts.map((p) => ({ x: p.x, y: p.y })) })),
+            points: items.points.map((p) => ({ point: p, origX: p.x, origY: p.y })),
+          };
+          card.classList.add("panning");
+          requestRender();
+          return;
+        }
+        clearSelection();
+        state.selectedShapeId = sHit.id;
+        state.selectedShapeIds.add(sHit.id);
+        if (!sHit.locked) {
+          pushShapeUndo();
+          state.dragShape = {
+            shape: sHit,
+            startX: sToX(pos.x),
+            startY: sToY(pos.y),
+            origPts: sHit.rawPts.map((p) => ({ x: p.x, y: p.y })),
+          };
+          card.classList.add("panning");
+        }
+        notifyDomain();
+        requestRender();
+        return;
+      }
+      if (!multiMod && hitGroupBox(pos.x, pos.y)) {
+        pushShapeUndo();
+        const items = getSelectedMovableItems();
+        state.dragGroup = {
+          mode: "move",
+          startX: sToX(pos.x),
+          startY: sToY(pos.y),
+          shapes: items.shapes.map((s) => ({ shape: s, origPts: s.rawPts.map((p) => ({ x: p.x, y: p.y })) })),
+          points: items.points.map((p) => ({ point: p, origX: p.x, origY: p.y })),
+        };
+        card.classList.add("panning");
+        requestRender();
+        return;
+      }
+      if (!multiMod) clearSelection();
+      state.marquee = {
+        x0: pos.x, y0: pos.y, x1: pos.x, y1: pos.y,
+        additive: multiMod,
+        prevShapes: new Set(state.selectedShapeIds),
+        prevPoints: new Set(state.selectedPointIds),
+      };
+      notifyDomain();
+      requestRender();
+      return;
+    }
+
     const pHit = hitPoint(pos.x, pos.y);
     if (pHit) {
+      clearSelection();
       state.selectedPointId = pHit.id;
-      state.selectedLineId = null;
+      state.selectedPointIds.add(pHit.id);
       if (!pHit.locked) {
+        pushShapeUndo();
         state.dragPoint = { point: pHit };
         card.classList.add("panning");
       }
@@ -1564,9 +2699,10 @@
     }
     const lHit = hitGuideLine(pos.x, pos.y);
     if (lHit) {
+      clearSelection();
       state.selectedLineId = lHit.id;
-      state.selectedPointId = null;
       if (!lHit.locked) {
+        pushShapeUndo();
         state.dragLine = { line: lHit };
         card.classList.add("panning");
       }
@@ -1574,14 +2710,264 @@
       requestRender();
       return;
     }
-    state.selectedPointId = null;
-    state.selectedLineId = null;
+    clearSelection();
     state.pan = { sx: pos.x, sy: pos.y, ov: { ...state.view } };
     card.classList.add("panning");
   });
 
   canvas.addEventListener("pointermove", (e) => {
     const pos = localPos(e);
+    if (state.dragText) {
+      const dt = state.dragText;
+      const dx = pos.x - dt.startX;
+      const dy = pos.y - dt.startY;
+      if (Math.hypot(dx, dy) >= 2) dt.moved = true;
+      const cw = canvas.clientWidth || 600, ch = canvas.clientHeight || 400;
+      if (dt.mode === "resize") {
+        dt.tb.width = Math.round(Math.max(150, Math.min(cw - 24, dt.origW + dx)));
+        dt.tb.height = Math.round(Math.max(44, Math.min(ch - 24, dt.origH + dy)));
+      } else if (dt.tb.anchor === "world") {
+        const vw = Math.max(1e-9, state.view.xmax - state.view.xmin);
+        const vh = Math.max(1e-9, state.view.ymax - state.view.ymin);
+        dt.tb.x = Number((dt.origWorldX + (dx / cw) * vw).toFixed(4));
+        dt.tb.y = Number((dt.origWorldY - (dy / ch) * vh).toFixed(4));
+        dt.tb.xExpr = "";
+        dt.tb.yExpr = "";
+      } else {
+        dt.tb.anchor = "free";
+        dt.tb.nx = Number(Math.max(0.01, Math.min(0.95, (dt.origBx + dx) / cw)).toFixed(4));
+        dt.tb.ny = Number(Math.max(0.01, Math.min(0.95, (dt.origBy + dy) / ch)).toFixed(4));
+      }
+      requestRender();
+      return;
+    }
+    if (state.dragRotate) {
+      const dr = state.dragRotate;
+      const wx = sToX(pos.x), wy = sToY(pos.y);
+      let dAng = Math.atan2(wy - dr.cy, wx - dr.cx) - dr.startAngle;
+      if (e.shiftKey) {
+        const snap = Math.PI / 12;
+        dAng = Math.round(dAng / snap) * snap;
+      }
+      dr.angle = dAng;
+      const cs = Math.cos(dAng), sn = Math.sin(dAng);
+      for (const item of dr.shapes) {
+        item.shape.rawPts = item.origPts.map((p) => {
+          const rx = p.x - dr.cx, ry = p.y - dr.cy;
+          return { x: dr.cx + rx * cs - ry * sn, y: dr.cy + rx * sn + ry * cs };
+        });
+      }
+      for (const item of dr.points) {
+        const rx = item.origX - dr.cx, ry = item.origY - dr.cy;
+        item.point.x = Number((dr.cx + rx * cs - ry * sn).toFixed(4));
+        item.point.y = Number((dr.cy + rx * sn + ry * cs).toFixed(4));
+        if (ws() && typeof ws().syncPointCoords === "function") ws().syncPointCoords(item.point);
+      }
+      requestRender();
+      return;
+    }
+    if (state.dragGroup) {
+      const dg = state.dragGroup;
+      const wx = sToX(pos.x), wy = sToY(pos.y);
+      if (dg.mode === "move") {
+        const dx = wx - dg.startX, dy = wy - dg.startY;
+        for (const item of dg.shapes) {
+          item.shape.rawPts = item.origPts.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+        }
+        for (const item of dg.points) {
+          item.point.x = Number((item.origX + dx).toFixed(4));
+          item.point.y = Number((item.origY + dy).toFixed(4));
+          if (ws() && typeof ws().syncPointCoords === "function") ws().syncPointCoords(item.point);
+        }
+      } else {
+        const ob = dg.origBox;
+        let nx0 = ob.xmin, nx1 = ob.xmax, ny0 = ob.ymin, ny1 = ob.ymax;
+        const hid = dg.handleId;
+        if (hid.includes("w")) nx0 = Math.min(nx1 - 0.04, wx);
+        if (hid.includes("e")) nx1 = Math.max(nx0 + 0.04, wx);
+        if (hid.includes("s")) ny0 = Math.min(ny1 - 0.04, wy);
+        if (hid.includes("n")) ny1 = Math.max(ny0 + 0.04, wy);
+        const ow = Math.max(1e-6, ob.xmax - ob.xmin), oh = Math.max(1e-6, ob.ymax - ob.ymin);
+        const sxF = (nx1 - nx0) / ow, syF = (ny1 - ny0) / oh;
+        for (const item of dg.shapes) {
+          item.shape.rawPts = item.origPts.map((p) => ({
+            x: nx0 + (p.x - ob.xmin) * sxF,
+            y: ny0 + (p.y - ob.ymin) * syF,
+          }));
+        }
+        for (const item of dg.points) {
+          item.point.x = Number((nx0 + (item.origX - ob.xmin) * sxF).toFixed(4));
+          item.point.y = Number((ny0 + (item.origY - ob.ymin) * syF).toFixed(4));
+          if (ws() && typeof ws().syncPointCoords === "function") ws().syncPointCoords(item.point);
+        }
+      }
+      requestRender();
+      return;
+    }
+    if (state.dragResize) {
+      const dr = state.dragResize;
+      const sh = dr.shape;
+      const h = dr.handle;
+      const ob = dr.origBox;
+      const wx = sToX(pos.x), wy = sToY(pos.y);
+      if (h.shapeKind === "circle") {
+        const origR = Math.max(1e-6, 0.25 * ((ob.xmax - ob.xmin) + (ob.ymax - ob.ymin)));
+        const r = Math.max(0.03, Math.hypot(wx - ob.cx, wy - ob.cy));
+        const ratio = r / origR;
+        sh.rawPts = dr.origPts.map((p) => ({
+          x: ob.cx + (p.x - ob.cx) * ratio,
+          y: ob.cy + (p.y - ob.cy) * ratio,
+        }));
+      } else if (h.shapeKind === "line") {
+        const pts = dr.origPts.map((p) => ({ x: p.x, y: p.y }));
+        if (h.id === "start") pts[0] = { x: wx, y: wy };
+        else pts[pts.length - 1] = { x: wx, y: wy };
+        sh.rawPts = pts;
+      } else if (h.shapeKind === "polygon") {
+        const pts = dr.origPts.map((p) => ({ x: p.x, y: p.y }));
+        pts[h.vertexIndex] = { x: wx, y: wy };
+        sh.rawPts = pts;
+      } else if (h.shapeKind === "rect") {
+        const rf = rectLocalFrame(dr.origPts);
+        if (rf) {
+          let uMin = -0.5 * rf.w, uMax = 0.5 * rf.w;
+          let vMin = -0.5 * rf.h, vMax = 0.5 * rf.h;
+          const dx = wx - rf.cx, dy = wy - rf.cy;
+          const pu = dx * rf.ux + dy * rf.uy;
+          const pv = dx * rf.vx + dy * rf.vy;
+          if (h.id.includes("w")) uMin = Math.min(uMax - 0.03, pu);
+          if (h.id.includes("e")) uMax = Math.max(uMin + 0.03, pu);
+          if (h.id.includes("s")) vMin = Math.min(vMax - 0.03, pv);
+          if (h.id.includes("n")) vMax = Math.max(vMin + 0.03, pv);
+          const mk = (u, v) => ({ x: rf.cx + u * rf.ux + v * rf.vx, y: rf.cy + u * rf.uy + v * rf.vy });
+          sh.rawPts = [mk(uMin, vMin), mk(uMax, vMin), mk(uMax, vMax), mk(uMin, vMax)];
+        } else {
+          let nx0 = ob.xmin, nx1 = ob.xmax, ny0 = ob.ymin, ny1 = ob.ymax;
+          if (h.id.includes("w")) nx0 = Math.min(nx1 - 0.03, wx);
+          if (h.id.includes("e")) nx1 = Math.max(nx0 + 0.03, wx);
+          if (h.id.includes("s")) ny0 = Math.min(ny1 - 0.03, wy);
+          if (h.id.includes("n")) ny1 = Math.max(ny0 + 0.03, wy);
+          sh.rawPts = makeRealRect(nx0, ny0, nx1, ny1);
+        }
+      } else {
+        let nx0 = ob.xmin, nx1 = ob.xmax, ny0 = ob.ymin, ny1 = ob.ymax;
+        if (h.id.includes("w")) nx0 = Math.min(nx1 - 0.03, wx);
+        if (h.id.includes("e")) nx1 = Math.max(nx0 + 0.03, wx);
+        if (h.id.includes("s")) ny0 = Math.min(ny1 - 0.03, wy);
+        if (h.id.includes("n")) ny1 = Math.max(ny0 + 0.03, wy);
+        const ow = Math.max(1e-6, ob.xmax - ob.xmin), oh = Math.max(1e-6, ob.ymax - ob.ymin);
+        let sxF = (nx1 - nx0) / ow, syF = (ny1 - ny0) / oh;
+        if (e.shiftKey) {
+          const u = Math.max(sxF, syF);
+          sxF = u; syF = u;
+        }
+        sh.rawPts = dr.origPts.map((p) => ({
+          x: ob.cx + (p.x - ob.cx) * sxF,
+          y: ob.cy + (p.y - ob.cy) * syF,
+        }));
+      }
+      requestRender();
+      return;
+    }
+    if (state.marquee) {
+      const m = state.marquee;
+      m.x1 = pos.x; m.y1 = pos.y;
+      const sx0 = Math.min(m.x0, m.x1), sx1 = Math.max(m.x0, m.x1);
+      const sy0 = Math.min(m.y0, m.y1), sy1 = Math.max(m.y0, m.y1);
+      const nextS = m.additive ? new Set(m.prevShapes) : new Set();
+      const nextP = m.additive ? new Set(m.prevPoints) : new Set();
+      for (const s of state.shapes) {
+        if (!s.visible || !s.rawPts || s.rawPts.length < 2) continue;
+        const bb = bboxOf(s.rawPts);
+        const cx = xToS(bb.cx), cy = yToS(bb.cy);
+        if (cx >= sx0 && cx <= sx1 && cy >= sy0 && cy <= sy1) nextS.add(s.id);
+      }
+      for (const p of state.points) {
+        if (!p.visible) continue;
+        const px = xToS(p.x), py = yToS(p.y);
+        if (px >= sx0 && px <= sx1 && py >= sy0 && py <= sy1) nextP.add(p.id);
+      }
+      state.selectedShapeIds = nextS;
+      state.selectedPointIds = nextP;
+      syncPrimarySelection();
+      requestRender();
+      return;
+    }
+    if (!state.pan && !state.drawing && !state.dragShape && !state.dragPoint && !state.dragLine) {
+      if (window.CFVAnnotations && state.texts.length > 0) {
+        const th = window.CFVAnnotations.hitTestTextBoxes(ctx, canvas, state.texts, pos.x, pos.y, {});
+        const nextHov = th ? th.tb.id : null;
+        if (nextHov !== state.hoveredTextId) {
+          state.hoveredTextId = nextHov;
+          requestRender();
+        }
+        if (th && !th.tb.locked) {
+          canvas.style.cursor = th.hit === "resize" ? "nwse-resize" : "grab";
+          state.hoverPx = pos.x; state.hoverX = sToX(pos.x);
+          updateLegend(); requestRender();
+          return;
+        }
+      }
+      if (state.polyTool === "move") {
+        if (hitRotateHandle(pos.x, pos.y)) { canvas.style.cursor = "grab"; }
+        else {
+          const gh = hitGroupHandle(pos.x, pos.y);
+          const hh = gh ? gh.handle : (hitResizeHandle(pos.x, pos.y)?.handle || null);
+          if (hh) canvas.style.cursor = hh.cursor;
+          else if (hitGroupBox(pos.x, pos.y) || hitPoint(pos.x, pos.y) || hitGuideLine(pos.x, pos.y) || hitRealShape(pos.x, pos.y)) canvas.style.cursor = "move";
+          else canvas.style.cursor = "default";
+        }
+      } else if (canvas.style.cursor) {
+        canvas.style.cursor = "";
+      }
+    }
+    if (state.polyDraft) {
+      const sn = findRealSnapTarget(pos.x, pos.y);
+      state.snapHint = sn;
+      state.polyDraft.hoverPt = sn ? { x: sn.x, y: sn.y } : { x: sToX(pos.x), y: sToY(pos.y) };
+      requestRender();
+      return;
+    }
+    if (state.drawing) {
+      const d = state.drawing;
+      const sn = (d.kind === "line" || d.kind === "seg" || d.kind === "ray" || d.kind === "infline" || d.kind === "freehand")
+        ? findRealSnapTarget(pos.x, pos.y)
+        : null;
+      state.snapHint = sn;
+      const cur = sn ? { x: sn.x, y: sn.y } : { x: sToX(pos.x), y: sToY(pos.y) };
+      if (d.kind === "freehand") {
+        const last = d.rawPts[d.rawPts.length - 1];
+        if (Math.hypot(xToS(cur.x) - xToS(last.x), yToS(cur.y) - yToS(last.y)) >= 4) {
+          d.rawPts.push(cur);
+        }
+        d.snapActive = d.rawPts.length >= 8 && Math.hypot(pos.x - xToS(d.rawPts[0].x), pos.y - yToS(d.rawPts[0].y)) <= 16;
+      } else if (d.kind === "line" || d.kind === "seg" || d.kind === "ray" || d.kind === "infline") {
+        d.rawPts = [d.start, cur];
+      } else if (d.kind === "arc") {
+        const r = Math.max(1e-4, Math.hypot(cur.x - d.start.x, cur.y - d.start.y));
+        const a0 = Math.atan2(cur.y - d.start.y, cur.x - d.start.x);
+        d.rawPts = [];
+        for (let i = 0; i <= 48; i++) {
+          const ang = a0 + (i / 48) * Math.PI;
+          d.rawPts.push({ x: d.start.x + r * Math.cos(ang), y: d.start.y + r * Math.sin(ang) });
+        }
+      } else if (d.kind === "circle") {
+        const r = Math.hypot(cur.x - d.start.x, cur.y - d.start.y);
+        d.rawPts = makeRealCircle(d.start.x, d.start.y, Math.max(1e-4, r));
+      } else if (d.kind === "rect") {
+        d.rawPts = makeRealRect(d.start.x, d.start.y, cur.x, cur.y);
+      }
+      requestRender();
+      return;
+    }
+    if (state.dragShape) {
+      const ds = state.dragShape;
+      const dx = sToX(pos.x) - ds.startX;
+      const dy = sToY(pos.y) - ds.startY;
+      ds.shape.rawPts = ds.origPts.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+      requestRender();
+      return;
+    }
     if (state.calc.draggingGate) {
       state.calc[state.calc.draggingGate] = sToX(pos.x);
       document.getElementById("calc-a").value = state.calc.a.toFixed(2);
@@ -1640,8 +3026,10 @@
     }
     if (state.dragPoint) {
       const pt = state.dragPoint.point;
-      pt.x = Number(sToX(pos.x).toFixed(4));
-      pt.y = Number(sToY(pos.y).toFixed(4));
+      const sn = findRealSnapTarget(pos.x, pos.y, null, pt.id);
+      state.snapHint = sn;
+      pt.x = Number((sn ? sn.x : sToX(pos.x)).toFixed(4));
+      pt.y = Number((sn ? sn.y : sToY(pos.y)).toFixed(4));
       if (ws() && typeof ws().syncPointCoords === "function") ws().syncPointCoords(pt);
       requestRender();
       return;
@@ -1667,6 +3055,72 @@
   });
 
   canvas.addEventListener("pointerup", async (e) => {
+    if (state.dragText) {
+      const moved = state.dragText.moved;
+      state.dragText = null;
+      canvas.style.cursor = "";
+      if (moved) {
+        notifyDomain();
+        notifyState(true, true);
+      }
+      requestRender();
+      return;
+    }
+    if (state.drawing) {
+      const d = state.drawing;
+      state.drawing = null;
+      state.snapHint = null;
+      const endPos = localPos(e);
+      const dragDistPx = d.startPx ? Math.hypot(endPos.x - d.startPx.x, endPos.y - d.startPx.y) : 99;
+      if (dragDistPx < 5 && d.kind !== "freehand") {
+        const rx = Math.max(0.2, (state.view.xmax - state.view.xmin) * 0.12);
+        const ry = Math.max(0.2, (state.view.ymax - state.view.ymin) * 0.12);
+        const r = Math.min(rx, ry);
+        const ax = d.start.x, ay = d.start.y;
+        if (d.kind === "circle") { d.rawPts = makeRealCircle(ax, ay, r); d.closed = true; }
+        else if (d.kind === "rect") { d.rawPts = makeRealRect(ax - r, ay - r * 0.72, ax + r, ay + r * 0.72); d.closed = true; }
+        else if (d.kind === "arc") {
+          d.rawPts = [];
+          for (let i = 0; i <= 48; i++) {
+            const ang = (i / 48) * Math.PI;
+            d.rawPts.push({ x: ax + r * Math.cos(ang), y: ay + r * Math.sin(ang) });
+          }
+          d.closed = false;
+        } else if (d.kind === "ray") {
+          d.rawPts = [{ x: ax, y: ay }, { x: ax + rx, y: ay }];
+          d.closed = false;
+        } else {
+          d.rawPts = [{ x: ax - rx, y: ay }, { x: ax + rx, y: ay }];
+          d.closed = false;
+        }
+      }
+      const hasSpan = d.rawPts && d.rawPts.length >= 2 && (
+        d.rawPts.length > 2 ||
+        Math.hypot(xToS(d.rawPts[1].x) - xToS(d.rawPts[0].x), yToS(d.rawPts[1].y) - yToS(d.rawPts[0].y)) >= 3
+      );
+      if (hasSpan) {
+        const lbl =
+          d.kind === "infline" ? "Line" :
+          d.kind === "ray" ? "Ray" :
+          d.kind === "seg" || d.kind === "line" ? "Segment" :
+          d.kind === "arc" ? "Arc" : undefined;
+        addShape({
+          kind: d.kind,
+          label: lbl,
+          color: d.color,
+          closed: (d.kind === "ray" || d.kind === "infline") ? false : (d.closed || d.snapActive),
+          rawPts: d.rawPts,
+        });
+      } else {
+        requestRender();
+      }
+      return;
+    }
+    if (state.dragRotate) { state.dragRotate = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); requestRender(); return; }
+    if (state.dragGroup) { state.dragGroup = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); requestRender(); return; }
+    if (state.dragResize) { state.dragResize = null; notifyDomain(); notifyState(true, true); requestRender(); return; }
+    if (state.marquee) { state.marquee = null; notifyDomain(); requestRender(); return; }
+    if (state.dragShape) { state.dragShape = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); return; }
     if (state.calc.draggingGate) { state.calc.draggingGate = null; refreshCalculus(); return; }
     if (state.polyPendingClick) {
       const pc = state.polyPendingClick;
@@ -1709,7 +3163,7 @@
       }
       return;
     }
-    if (state.dragPoint) { state.dragPoint = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); return; }
+    if (state.dragPoint) { state.dragPoint = null; state.snapHint = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); requestRender(); return; }
     if (state.dragLine) { state.dragLine = null; card.classList.remove("panning"); notifyDomain(); notifyState(true, true); return; }
     if (state.pan) {
       const p = state.pan;
@@ -1717,9 +3171,18 @@
       card.classList.remove("panning");
       const pos = localPos(e);
       if (p.rightClick && Math.hypot(pos.x - p.sx, pos.y - p.sy) < 5) {
+        const tbHit = window.CFVAnnotations && state.texts.length > 0
+          ? window.CFVAnnotations.hitTestTextBoxes(ctx, canvas, state.texts, pos.x, pos.y, {})
+          : null;
+        if (tbHit && ws() && typeof ws().openItemSettingsAt === "function") {
+          selectTextBox(tbHit.tb.id);
+          ws().openItemSettingsAt("text", tbHit.tb.id, e.clientX, e.clientY);
+          return;
+        }
         const hit = hitRealElement(pos.x, pos.y);
         if (hit && ws() && typeof ws().openItemSettingsAt === "function") {
-          if (hit.kind === "point") selectPoint(hit.id);
+          if (hit.kind === "shape") selectShape(hit.id);
+          else if (hit.kind === "point") selectPoint(hit.id);
           else if (hit.kind === "guide_line") selectGuideLine(hit.id);
           ws().openItemSettingsAt(hit.kind, hit.id, e.clientX, e.clientY);
           return;
@@ -1730,10 +3193,108 @@
     }
   });
 
+  canvas.addEventListener("dblclick", () => { if (state.polyDraft) finishPolyDraft(); });
+
   /* 2D Real Dock & Selection Banner Buttons + Keyboard Shortcuts */
   document.querySelectorAll(".real-dock-tool").forEach((b) => {
     b.addEventListener("click", () => setPolyTool(b.dataset.realTool));
   });
+  const btnRealCloseShape = document.getElementById("btn-real-close-shape");
+  const btnRealUndoShape = document.getElementById("btn-real-undo-shape");
+  const btnRealClearShapes = document.getElementById("btn-real-clear-shapes");
+  if (btnRealCloseShape) btnRealCloseShape.addEventListener("click", () => toggleCloseShape());
+  if (btnRealUndoShape) btnRealUndoShape.addEventListener("click", () => undoRealAction());
+  if (btnRealClearShapes) btnRealClearShapes.addEventListener("click", () => clearShapes());
+
+  /* Draggable, Minimizable & Resizable Curves & Relations Legend Panel (mirrors Contour Integrals) */
+  if (btnMinRealLegend && legendCard) {
+    btnMinRealLegend.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      realLegendMinimized = !realLegendMinimized;
+      if (realLegendMinimized) {
+        savedRealLegendSize = { w: legendCard.style.width, h: legendCard.style.height, mh: legendCard.style.maxHeight };
+        legendCard.style.width = "";
+        legendCard.style.height = "";
+      } else if (savedRealLegendSize) {
+        legendCard.style.width = savedRealLegendSize.w || "";
+        legendCard.style.height = savedRealLegendSize.h || "";
+        legendCard.style.maxHeight = savedRealLegendSize.mh || "";
+      }
+      legendCard.classList.toggle("minimized", realLegendMinimized);
+      btnMinRealLegend.textContent = realLegendMinimized ? "+" : "−";
+    });
+  }
+  if (realLegendResizeHandle && legendCard) {
+    let rlRes = null;
+    realLegendResizeHandle.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const cardRect = card.getBoundingClientRect();
+      const panelRect = legendCard.getBoundingClientRect();
+      const startLeft = panelRect.left - cardRect.left;
+      const startTop = panelRect.top - cardRect.top;
+      legendCard.style.left = `${startLeft}px`;
+      legendCard.style.top = `${startTop}px`;
+      legendCard.style.right = "auto";
+      legendCard.style.bottom = "auto";
+      rlRes = { startX: e.clientX, startY: e.clientY, startW: panelRect.width, startH: panelRect.height, startLeft, startTop };
+      legendCard.classList.add("dragging");
+      if (realLegendResizeHandle.setPointerCapture) realLegendResizeHandle.setPointerCapture(e.pointerId);
+    });
+    realLegendResizeHandle.addEventListener("pointermove", (e) => {
+      if (!rlRes) return;
+      const maxW = Math.max(200, card.clientWidth - rlRes.startLeft - 8);
+      const maxH = Math.max(90, card.clientHeight - rlRes.startTop - 8);
+      const nw = Math.max(195, Math.min(maxW, rlRes.startW + (e.clientX - rlRes.startX)));
+      const nh = Math.max(82, Math.min(maxH, rlRes.startH + (e.clientY - rlRes.startY)));
+      legendCard.style.width = `${Math.round(nw)}px`;
+      legendCard.style.height = `${Math.round(nh)}px`;
+      legendCard.style.maxWidth = "none";
+      legendCard.style.maxHeight = "none";
+    });
+    const endRlRes = () => {
+      if (!rlRes) return;
+      rlRes = null;
+      legendCard.classList.remove("dragging");
+    };
+    realLegendResizeHandle.addEventListener("pointerup", endRlRes);
+    realLegendResizeHandle.addEventListener("pointercancel", endRlRes);
+  }
+  if (legendHdr && legendCard) {
+    let rlDrag = null;
+    legendHdr.addEventListener("pointerdown", (e) => {
+      if (e.target && e.target.closest && e.target.closest("#btn-min-real-legend")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const cardRect = card.getBoundingClientRect();
+      const panelRect = legendCard.getBoundingClientRect();
+      const startLeft = panelRect.left - cardRect.left;
+      const startTop = panelRect.top - cardRect.top;
+      legendCard.style.left = `${startLeft}px`;
+      legendCard.style.top = `${startTop}px`;
+      legendCard.style.right = "auto";
+      legendCard.style.bottom = "auto";
+      rlDrag = { startX: e.clientX, startY: e.clientY, startLeft, startTop };
+      legendCard.classList.add("dragging");
+      if (legendHdr.setPointerCapture) legendHdr.setPointerCapture(e.pointerId);
+    });
+    legendHdr.addEventListener("pointermove", (e) => {
+      if (!rlDrag) return;
+      const maxL = Math.max(6, card.clientWidth - legendCard.offsetWidth - 6);
+      const maxT = Math.max(6, card.clientHeight - legendCard.offsetHeight - 6);
+      const nl = Math.max(6, Math.min(maxL, rlDrag.startLeft + (e.clientX - rlDrag.startX)));
+      const nt = Math.max(6, Math.min(maxT, rlDrag.startTop + (e.clientY - rlDrag.startY)));
+      legendCard.style.left = `${Math.round(nl)}px`;
+      legendCard.style.top = `${Math.round(nt)}px`;
+    });
+    const endRlDrag = () => {
+      if (!rlDrag) return;
+      rlDrag = null;
+      legendCard.classList.remove("dragging");
+    };
+    legendHdr.addEventListener("pointerup", endRlDrag);
+    legendHdr.addEventListener("pointercancel", endRlDrag);
+  }
   const btnRealSelAll = document.getElementById("btn-real-select-all");
   if (btnRealSelAll) btnRealSelAll.addEventListener("click", () => selectAllPolygons());
   const btnRealDelPolys = document.getElementById("btn-real-del-polys");
@@ -1752,11 +3313,11 @@
   if (btnRealSelClear) btnRealSelClear.addEventListener("click", () => clearPolySelection());
 
   window.addEventListener("keydown", (e) => {
-    if (!state.active || (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA"))) return;
+    if (!state.active || (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable))) return;
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) {
-      if (state.polyUndoStack.length > 0) {
+      if (state.shapeUndoStack.length > 0 || state.polyUndoStack.length > 0) {
         e.preventDefault();
-        undoPolygonAction();
+        undoRealAction();
       }
       return;
     }
@@ -1764,22 +3325,35 @@
       if (state.polygons.length > 0) {
         e.preventDefault();
         selectAllPolygons();
+      } else if (state.shapes.length > 0 || state.points.length > 0) {
+        e.preventDefault();
+        state.selectedShapeIds = new Set(state.shapes.filter((s) => s.visible !== false).map((s) => s.id));
+        state.selectedPointIds = new Set(state.points.filter((p) => p.visible !== false).map((p) => p.id));
+        syncPrimarySelection();
+        notifyDomain();
+        requestRender();
       }
       return;
     }
     if (e.key === "Escape") {
       clearPolySelection();
+      clearSelection();
+      state.polyDraft = null;
+      notifyDomain();
+      requestRender();
       return;
     }
     if (e.key === "Delete" || e.key === "Backspace") {
-      if (state.selectedPolyIds.size > 0 || state.selectedPointId !== null || state.selectedLineId !== null) {
+      if (state.selectedPolyIds.size > 0) {
         e.preventDefault();
         deleteSelectedPolygons();
+      } else if (deleteSelectedItems()) {
+        e.preventDefault();
       }
       return;
     }
     if (e.code === "Space") { state.spaceHeld = true; updatePolyUI(); }
-    else if (state.polygons.length > 0 || state.polyTool !== "pan") {
+    else if (state.polygons.length > 0) {
       if (e.key === "v" || e.key === "V") setPolyTool("select");
       else if (e.key === "d" || e.key === "D") setPolyTool("deselect");
       else if (e.key === "a" || e.key === "A") setPolyTool("add");
@@ -1788,7 +3362,7 @@
   window.addEventListener("keyup", (e) => {
     if (e.code === "Space") { state.spaceHeld = false; updatePolyUI(); }
   });
-  canvas.addEventListener("pointerleave", () => { state.hoverX = null; state.hoverPx = null; updateLegend(); requestRender(); });
+  canvas.addEventListener("pointerleave", () => { state.hoverX = null; state.hoverPx = null; state.snapHint = null; updateLegend(); requestRender(); });
   canvas.addEventListener("wheel", (e) => {
     e.preventDefault();
     const pos = localPos(e), f = e.deltaY < 0 ? 1 / 1.16 : 1.16;
@@ -1885,6 +3459,7 @@
   });
 
   function addPoint(opts = {}, silent = false) {
+    if (!silent) pushShapeUndo();
     const cx = 0.5 * (state.view.xmin + state.view.xmax);
     const cy = 0.5 * (state.view.ymin + state.view.ymax);
     const col = opts.color || PALETTE[state.colorIdx++ % PALETTE.length];
@@ -1902,8 +3477,9 @@
       showLabel: opts.showLabel !== undefined ? Boolean(opts.showLabel) : true,
     };
     state.points.push(p);
+    clearSelection();
     state.selectedPointId = p.id;
-    state.selectedLineId = null;
+    state.selectedPointIds.add(p.id);
     notifyDomain();
     if (!silent) notifyState(true);
     requestRender();
@@ -1911,21 +3487,27 @@
   }
 
   function deletePoint(id) {
+    const target = state.points.find((p) => p.id === id);
+    if (!target || target.locked) return;
+    pushShapeUndo();
     state.points = state.points.filter((p) => p.id !== id);
-    if (state.selectedPointId === id) state.selectedPointId = null;
+    state.selectedPointIds.delete(id);
+    syncPrimarySelection();
     notifyDomain();
     notifyState(true);
     requestRender();
   }
 
   function selectPoint(id) {
+    clearSelection();
     state.selectedPointId = id;
-    state.selectedLineId = null;
+    if (id !== null && id !== undefined) state.selectedPointIds.add(id);
     notifyDomain();
     requestRender();
   }
 
   function addGuideLine(opts = {}, silent = false) {
+    if (!silent) pushShapeUndo();
     const orient = opts.orientation === "horizontal" ? "horizontal" : "vertical";
     const defVal = orient === "horizontal"
       ? Number((0.5 * (state.view.ymin + state.view.ymax)).toFixed(3))
@@ -1945,8 +3527,8 @@
       showLabel: opts.showLabel !== undefined ? Boolean(opts.showLabel) : true,
     };
     state.lines.push(ln);
+    clearSelection();
     state.selectedLineId = ln.id;
-    state.selectedPointId = null;
     notifyDomain();
     if (!silent) notifyState(true);
     requestRender();
@@ -1954,6 +3536,9 @@
   }
 
   function deleteGuideLine(id) {
+    const target = state.lines.find((l) => l.id === id);
+    if (!target || target.locked) return;
+    pushShapeUndo();
     state.lines = state.lines.filter((l) => l.id !== id);
     if (state.selectedLineId === id) state.selectedLineId = null;
     notifyDomain();
@@ -1962,8 +3547,91 @@
   }
 
   function selectGuideLine(id) {
+    clearSelection();
     state.selectedLineId = id;
-    state.selectedPointId = null;
+    notifyDomain();
+    requestRender();
+  }
+
+  function addQuickShape(kind) {
+    const cx = 0.5 * (state.view.xmin + state.view.xmax);
+    const cy = 0.5 * (state.view.ymin + state.view.ymax);
+    const r = Math.max(0.25, 0.2 * Math.min(state.view.xmax - state.view.xmin, state.view.ymax - state.view.ymin));
+    const rawPts = [];
+    let closed = false, label = "Segment";
+    if (kind === "arc") {
+      label = `Arc (${state.shapes.length + 1})`;
+      for (let i = 0; i <= 48; i++) {
+        const a = (i / 48) * Math.PI;
+        rawPts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+      }
+    } else if (kind === "circle") {
+      label = `Circle (${state.shapes.length + 1})`;
+      closed = true;
+      for (let i = 0; i < 64; i++) {
+        const a = (i / 64) * Math.PI * 2;
+        rawPts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+      }
+    } else if (kind === "rect") {
+      label = `Rect (${state.shapes.length + 1})`;
+      closed = true;
+      rawPts.push({ x: cx - r, y: cy - r * 0.75 }, { x: cx + r, y: cy - r * 0.75 }, { x: cx + r, y: cy + r * 0.75 }, { x: cx - r, y: cy + r * 0.75 });
+    } else {
+      label = `Segment (${state.shapes.length + 1})`;
+      rawPts.push({ x: cx - r * 1.2, y: cy }, { x: cx + r * 1.2, y: cy });
+    }
+    return addShape({ kind: kind === "line" ? "line" : kind, label, rawPts, closed }, false);
+  }
+
+  function addTextBox(opts = {}, silent = false) {
+    if (!silent) pushShapeUndo();
+    const cx = 0.5 * (state.view.xmin + state.view.xmax);
+    const cy = 0.5 * (state.view.ymin + state.view.ymax);
+    const tb = {
+      id: state.nextTextId++,
+      kind: "text",
+      title: opts.title !== undefined ? String(opts.title) : "Note",
+      text: opts.text !== undefined ? String(opts.text) : "Explain the theorem or what to explore here…",
+      anchor: opts.anchor || "bottom-left",
+      x: opts.x !== undefined ? Number(opts.x) : Number(cx.toFixed(3)),
+      y: opts.y !== undefined ? Number(opts.y) : Number(cy.toFixed(3)),
+      nx: Number.isFinite(Number(opts.nx)) ? Number(opts.nx) : undefined,
+      ny: Number.isFinite(Number(opts.ny)) ? Number(opts.ny) : undefined,
+      xExpr: opts.xExpr ? String(opts.xExpr) : "",
+      yExpr: opts.yExpr ? String(opts.yExpr) : "",
+      color: opts.color || "#38bdf8",
+      width: Number(opts.width || opts.maxWidth) || 305,
+      height: Number(opts.height) > 0 ? Number(opts.height) : 0,
+      fontSize: Number(opts.fontSize) || 12,
+      opacity: normOpacity(opts.opacity, 0.94),
+      locked: Boolean(opts.locked),
+      visible: opts.visible !== undefined ? Boolean(opts.visible) : true,
+      collapsed: Boolean(opts.collapsed),
+      cardHeight: Number(opts.cardHeight) > 0 ? Number(opts.cardHeight) : 0,
+    };
+    state.texts.push(tb);
+    clearSelection();
+    state.selectedTextId = tb.id;
+    notifyDomain();
+    if (!silent) notifyState(true);
+    requestRender();
+    return tb;
+  }
+
+  function deleteTextBox(id) {
+    const target = state.texts.find((t) => t.id === id);
+    if (!target || target.locked) return;
+    pushShapeUndo();
+    state.texts = state.texts.filter((t) => t.id !== id);
+    if (state.selectedTextId === id) state.selectedTextId = null;
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+  }
+
+  function selectTextBox(id) {
+    clearSelection();
+    state.selectedTextId = id;
     notifyDomain();
     requestRender();
   }
@@ -1972,25 +3640,68 @@
 
   function exportSnapshot() {
     const ordered = getOrderedElements();
+    const shIdx = new Map(state.shapes.map((s, i) => [s.id, i]));
     const ptIdx = new Map(state.points.map((p, i) => [p.id, i]));
     const lnIdx = new Map(state.lines.map((l, i) => [l.id, i]));
-    const lo = ordered.map((e) => (e.kind === "point" ? `p:${ptIdx.get(e.id)}` : `l:${lnIdx.get(e.id)}`));
+    const txIdx = new Map(state.texts.map((t, i) => [t.id, i]));
+    const lo = ordered.map((e) => (
+      e.kind === "shape" ? `s:${shIdx.get(e.id)}` :
+      e.kind === "point" ? `p:${ptIdx.get(e.id)}` :
+      e.kind === "text" ? `t:${txIdx.get(e.id)}` : `l:${lnIdx.get(e.id)}`
+    ));
     const snap = {
       vw: [r4(state.view.xmin), r4(state.view.xmax), r4(state.view.ymin), r4(state.view.ymax)],
       sq: state.squareAspect ? 1 : 0,
+      cs: state.coordSystem || "cartesian",
       sp: state.showPrimes ? 1 : 0,
       sz: state.showZeros ? 1 : 0,
       lo,
+      sh: state.shapes.map((s) => ({
+        k: s.kind || "polygon",
+        l: s.label || "",
+        c: s.color || "#38bdf8",
+        w: normLineWidth(s.lineWidth, 2.2),
+        op: r4(normOpacity(s.opacity, s.closed ? 0.22 : 1.0)),
+        st: s.lineStyle || "solid",
+        cl: s.closed ? 1 : 0,
+        lk: s.locked ? 1 : 0,
+        v: s.visible !== false ? 1 : 0,
+        ...(s.collapsed ? { col: 1 } : {}),
+        ...(Number(s.cardHeight) > 0 ? { ch: Math.round(Number(s.cardHeight)) } : {}),
+        p: (s.rawPts || []).reduce((acc, q) => { acc.push(r4(q.x), r4(q.y)); return acc; }, []),
+      })),
       pt: state.points.map((p) => ({
-        x: r4(p.x), y: r4(p.y), l: p.label || "", i: p.icon || "dot", c: p.color || "#34d399",
+        x: r4(p.x), y: r4(p.y),
+        ...(p.xExpr ? { xe: p.xExpr } : {}),
+        ...(p.yExpr ? { ye: p.yExpr } : {}),
+        l: p.label || "", i: p.icon || "dot", c: p.color || "#34d399",
         s: Number(p.size) || 5, op: r4(normOpacity(p.opacity, 1.0)),
         lk: p.locked ? 1 : 0, v: p.visible !== false ? 1 : 0, sl: p.showLabel !== false ? 1 : 0,
+        ...(p.collapsed ? { col: 1 } : {}),
+        ...(Number(p.cardHeight) > 0 ? { ch: Math.round(Number(p.cardHeight)) } : {}),
       })),
       ln: state.lines.map((ln) => ({
         o: ln.orientation === "horizontal" ? "h" : "v", val: r4(ln.value),
+        ...(ln.valExpr ? { ve: ln.valExpr } : {}),
         l: ln.label || "", c: ln.color || "#fbbf24", w: normLineWidth(ln.lineWidth, 1.5),
         op: r4(normOpacity(ln.opacity, 1.0)),
         st: ln.lineStyle || "dashed", lk: ln.locked ? 1 : 0, v: ln.visible !== false ? 1 : 0, sl: ln.showLabel !== false ? 1 : 0,
+        ...(ln.collapsed ? { col: 1 } : {}),
+        ...(Number(ln.cardHeight) > 0 ? { ch: Math.round(Number(ln.cardHeight)) } : {}),
+      })),
+      tx: state.texts.map((tb) => ({
+        t: tb.title || "", b: tb.text || "", a: tb.anchor || "bottom-left",
+        x: r4(tb.x || 0), y: r4(tb.y || 0),
+        ...(Number.isFinite(Number(tb.nx)) ? { nx: r4(Number(tb.nx)) } : {}),
+        ...(Number.isFinite(Number(tb.ny)) ? { ny: r4(Number(tb.ny)) } : {}),
+        ...(tb.xExpr ? { xe: tb.xExpr } : {}),
+        ...(tb.yExpr ? { ye: tb.yExpr } : {}),
+        c: tb.color || "#38bdf8", w: Number(tb.width) || 305,
+        ...(Number(tb.height) > 0 ? { h: Math.round(Number(tb.height)) } : {}),
+        fs: Number(tb.fontSize) || 12,
+        op: r4(normOpacity(tb.opacity, 0.94)), lk: tb.locked ? 1 : 0, v: tb.visible !== false ? 1 : 0,
+        ...(tb.collapsed ? { col: 1 } : {}),
+        ...(Number(tb.cardHeight) > 0 ? { ch: Math.round(Number(tb.cardHeight)) } : {}),
       })),
     };
     if (state.polygons.length > 0 && state.polygons.length <= 15000) {
@@ -2008,8 +3719,10 @@
         const parts = String(r).split(":");
         if (parts.length !== 2) continue;
         const idx = parseInt(parts[1], 10);
-        if (parts[0] === "p" && state.points[idx]) state.layerOrder.push({ kind: "point", id: state.points[idx].id });
+        if (parts[0] === "s" && state.shapes[idx]) state.layerOrder.push({ kind: "shape", id: state.shapes[idx].id });
+        else if (parts[0] === "p" && state.points[idx]) state.layerOrder.push({ kind: "point", id: state.points[idx].id });
         else if (parts[0] === "l" && state.lines[idx]) state.layerOrder.push({ kind: "guide_line", id: state.lines[idx].id });
+        else if (parts[0] === "t" && state.texts[idx]) state.layerOrder.push({ kind: "text", id: state.texts[idx].id });
       }
     }
     syncLayerOrder();
@@ -2026,14 +3739,38 @@
     ensureCanvasSize();
     const wantSq = snap.sq !== undefined ? Boolean(snap.sq) : true;
     state.squareAspect = wantSq;
+    setCoordSystem(snap.cs || "cartesian", true);
     const sqBtn = document.getElementById("real-square");
     if (sqBtn) sqBtn.classList.toggle("active", wantSq);
     if (wantSq) enforceSquareView(true);
+    state.shapes = (snap.sh || []).map((s) => {
+      const pts = [];
+      const flat = Array.isArray(s.p) ? s.p : [];
+      for (let i = 0; i + 1 < flat.length; i += 2) pts.push({ x: Number(flat[i]) || 0, y: Number(flat[i + 1]) || 0 });
+      const closed = Boolean(s.cl);
+      return {
+        id: state.nextShapeId++,
+        kind: s.k || "polygon",
+        label: s.l || "Shape",
+        color: s.c || "#38bdf8",
+        lineWidth: normLineWidth(s.w, 2.2),
+        opacity: normOpacity(s.op, closed ? 0.22 : 1.0),
+        lineStyle: s.st || "solid",
+        closed,
+        locked: Boolean(s.lk),
+        visible: s.v !== 0,
+        collapsed: Boolean(s.col),
+        cardHeight: Number(s.ch) > 0 ? Number(s.ch) : 0,
+        rawPts: pts,
+      };
+    });
     state.points = (snap.pt || []).map((p) => ({
       id: state.nextPointId++,
       kind: "point",
       x: Number(p.x) || 0,
       y: Number(p.y) || 0,
+      xExpr: p.xe ? String(p.xe) : "",
+      yExpr: p.ye ? String(p.ye) : "",
       label: p.l || "",
       icon: p.i || "diamond",
       color: p.c || "#34d399",
@@ -2042,12 +3779,15 @@
       locked: Boolean(p.lk),
       visible: p.v !== 0,
       showLabel: p.sl !== 0,
+      collapsed: Boolean(p.col),
+      cardHeight: Number(p.ch) > 0 ? Number(p.ch) : 0,
     }));
     state.lines = (snap.ln || []).map((ln) => ({
       id: state.nextLineId++,
       kind: "guide_line",
       orientation: ln.o === "h" ? "horizontal" : "vertical",
       value: Number(ln.val) || 0,
+      valExpr: ln.ve ? String(ln.ve) : "",
       label: ln.l || "",
       color: ln.c || "#fbbf24",
       lineWidth: normLineWidth(ln.w, 1.5),
@@ -2056,9 +3796,34 @@
       locked: Boolean(ln.lk),
       visible: ln.v !== 0,
       showLabel: ln.sl !== 0,
+      collapsed: Boolean(ln.col),
+      cardHeight: Number(ln.ch) > 0 ? Number(ln.ch) : 0,
+    }));
+    state.texts = (snap.tx || []).map((tb) => ({
+      id: state.nextTextId++,
+      kind: "text",
+      title: tb.t || "",
+      text: tb.b || "",
+      anchor: tb.a || "bottom-left",
+      x: Number(tb.x) || 0,
+      y: Number(tb.y) || 0,
+      nx: Number.isFinite(Number(tb.nx)) ? Number(tb.nx) : undefined,
+      ny: Number.isFinite(Number(tb.ny)) ? Number(tb.ny) : undefined,
+      xExpr: tb.xe ? String(tb.xe) : "",
+      yExpr: tb.ye ? String(tb.ye) : "",
+      color: tb.c || "#38bdf8",
+      width: Number(tb.w) || 305,
+      height: Number(tb.h) > 0 ? Number(tb.h) : 0,
+      fontSize: Number(tb.fs) || 12,
+      opacity: normOpacity(tb.op, 0.94),
+      locked: Boolean(tb.lk),
+      visible: tb.v !== 0,
+      collapsed: Boolean(tb.col),
+      cardHeight: Number(tb.ch) > 0 ? Number(tb.ch) : 0,
     }));
     applyLayerRefs(snap.lo);
     state.polyUndoStack = [];
+    state.shapeUndoStack = [];
     if (Array.isArray(snap.pg) && snap.pg.length >= 2) {
       const cells = [];
       for (let i = 0; i + 1 < snap.pg.length; i += 2) cells.push([snap.pg[i], snap.pg[i + 1]]);
@@ -2068,10 +3833,9 @@
       state.polygons = [];
       state.polyGridMap.clear();
       state.selectedPolyIds.clear();
-      setPolyTool("pan");
+      setPolyTool("move");
     }
-    state.selectedPointId = null;
-    state.selectedLineId = null;
+    clearSelection();
     ensureCanvasSize();
     notifyDomain();
     scheduleSample(true);
@@ -2086,16 +3850,30 @@
     isFetchBusy: () => state.fetchBusy,
     refreshCalculus,
     stopAudio,
+    addShape,
+    addQuickShape,
+    deleteShape,
+    selectShape,
+    toggleCloseShape,
+    undoShapeAction,
+    undoRealAction,
+    deleteSelectedItems,
+    clearShapes,
     addPoint,
     deletePoint,
     selectPoint,
     addGuideLine,
     deleteGuideLine,
     selectGuideLine,
+    addTextBox,
+    deleteTextBox,
+    selectTextBox,
+    rebuildFormulaElements,
     getOrderedElements,
     reorderElement,
     moveElementLayer,
     setPolyTool,
+    setCoordSystem,
     setPolygonsFromCells,
     getActiveGridDims,
     fillGridPolygons,
@@ -2112,15 +3890,21 @@
     clearToBlank() {
       state.showPrimes = false;
       state.showZeros = false;
+      state.shapes = [];
       state.points = [];
       state.lines = [];
+      state.texts = [];
+      clearSelection();
+      state.layerOrder = [];
       state.polygons = [];
       state.polyGridMap.clear();
       state.selectedPolyIds.clear();
       state.polyUndoStack = [];
-      state.polyTool = "pan";
-      state.selectedPointId = null;
-      state.selectedLineId = null;
+      state.shapeUndoStack = [];
+      state.drawing = null;
+      state.polyDraft = null;
+      state.polyTool = "move";
+      setCoordSystem("cartesian", true);
       state.defaultView = { xmin: -10, xmax: 10, ymin: -10, ymax: 10 };
       state.view = { ...state.defaultView };
       state.squareAspect = true;
@@ -2146,6 +3930,7 @@
       const pr = preset || (ex.presets && ex.presets[0]) || {};
       state.showPrimes = Boolean(ex.showPrimes);
       state.showZeros = Boolean(ex.showZeros);
+      setCoordSystem(pr.coordSystem || ex.coordSystem || "cartesian", true);
       state.defaultView = pr.view ? { ...pr.view } : { xmin: -10, xmax: 10, ymin: -10, ymax: 10 };
       state.view = { ...state.defaultView };
       ensureCanvasSize();
@@ -2158,8 +3943,10 @@
       state.points = srcPts.map((pt) => ({
         id: state.nextPointId++,
         kind: "point",
-        x: pt.x,
-        y: pt.y,
+        x: Number(pt.x) || 0,
+        y: Number(pt.y) || 0,
+        xExpr: pt.xExpr ? String(pt.xExpr) : "",
+        yExpr: pt.yExpr ? String(pt.yExpr) : "",
         label: pt.label || "",
         icon: pt.icon || "diamond",
         color: pt.color || "#34d399",
@@ -2174,6 +3961,7 @@
         kind: "guide_line",
         orientation: ln.orientation || "vertical",
         value: Number(ln.value) || 0,
+        valExpr: ln.valExpr ? String(ln.valExpr) : "",
         label: ln.label || "",
         color: ln.color || "#fbbf24",
         lineWidth: Number(ln.lineWidth) || 1.5,
@@ -2182,9 +3970,53 @@
         visible: ln.visible !== undefined ? Boolean(ln.visible) : true,
         showLabel: ln.showLabel !== undefined ? Boolean(ln.showLabel) : true,
       }));
+      const srcTexts = pr.texts !== undefined ? pr.texts : (ex.defaultTexts || []);
+      state.texts = (srcTexts || []).map((tb) => ({
+        id: state.nextTextId++,
+        kind: "text",
+        title: tb.title || "",
+        text: tb.text || "",
+        anchor: tb.anchor || "bottom-left",
+        x: Number(tb.x) || 0,
+        y: Number(tb.y) || 0,
+        nx: Number.isFinite(Number(tb.nx)) ? Number(tb.nx) : undefined,
+        ny: Number.isFinite(Number(tb.ny)) ? Number(tb.ny) : undefined,
+        xExpr: tb.xExpr ? String(tb.xExpr) : "",
+        yExpr: tb.yExpr ? String(tb.yExpr) : "",
+        color: tb.color || "#38bdf8",
+        width: Number(tb.width || tb.maxWidth) || 305,
+        height: Number(tb.height) > 0 ? Number(tb.height) : 0,
+        fontSize: Number(tb.fontSize) || 12,
+        opacity: normOpacity(tb.opacity, 0.94),
+        locked: tb.locked !== undefined ? Boolean(tb.locked) : false,
+        visible: tb.visible !== undefined ? Boolean(tb.visible) : true,
+        collapsed: Boolean(tb.collapsed),
+        cardHeight: Number(tb.cardHeight) > 0 ? Number(tb.cardHeight) : 0,
+      }));
+      const srcShapes = pr.shapes || ex.defaultShapes || [];
+      state.shapes = srcShapes.map((sh) => {
+        const closed = sh.closed !== undefined ? Boolean(sh.closed) : true;
+        return {
+          id: state.nextShapeId++,
+          kind: sh.kind || "polygon",
+          label: sh.label || "Shape",
+          color: sh.color || "#38bdf8",
+          lineWidth: normLineWidth(sh.lineWidth, 2.2),
+          opacity: normOpacity(sh.opacity, closed ? 0.22 : 1.0),
+          lineStyle: sh.lineStyle || "solid",
+          closed,
+          locked: Boolean(sh.locked),
+          visible: sh.visible !== undefined ? Boolean(sh.visible) : true,
+          collapsed: Boolean(sh.collapsed),
+          cardHeight: Number(sh.cardHeight) > 0 ? Number(sh.cardHeight) : 0,
+          rawPts: Array.isArray(sh.rawPts) ? sh.rawPts.map((p) => ({ x: Number(p.x) || 0, y: Number(p.y) || 0 })) : [],
+        };
+      });
+      state.selectedShapeId = null;
       state.selectedPointId = null;
       state.selectedLineId = null;
       state.polyUndoStack = [];
+      state.shapeUndoStack = [];
       if (pr.fillGrid) {
         const dims = getActiveGridDims();
         const r = pr.fillGrid.r ? Math.min(60, Math.max(4, Math.round(pr.fillGrid.r))) : dims.r;
@@ -2208,7 +4040,7 @@
         state.polygons = [];
         state.polyGridMap.clear();
         state.selectedPolyIds.clear();
-        setPolyTool("pan");
+        setPolyTool("move");
       }
       ensureCanvasSize();
       updatePolyUI();

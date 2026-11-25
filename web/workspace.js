@@ -43,9 +43,10 @@
     projectPresets: [],          /* Presets belonging ONLY to the current project */
     activePresetId: null,        /* Set ONLY while unmodified in a loaded preset */
     savedProjects: [],           /* Repo-backed (projects/*.json) + localStorage user projects */
-    libraryMeta: { folders: [], exampleRenames: {}, deletedExamples: [] },
-    folderCollapsed: { my: false, examples: false },
+    libraryMeta: { folders: [], exampleRenames: {}, exampleDescriptions: {}, deletedExamples: [] },
+    folderCollapsed: {},
     pendingDelete: null,
+    pendingEditProject: null,
 
     splitPct: 50,
     savedSidebarWidth: 372,
@@ -81,8 +82,12 @@
   const miniSlidersCount = document.getElementById("mini-sliders-count");
   const btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
   const btnShowSidebar = document.getElementById("btn-show-sidebar");
+  const btnMiniShowSidebar = document.getElementById("btn-mini-show-sidebar");
   const stageColumn = document.getElementById("stage-column");
+  const sidebarToolsDock = document.getElementById("sidebar-tools-dock");
+  const sidebarToolsTitle = document.getElementById("sidebar-tools-title");
   const complexDrawDock = document.getElementById("complex-draw-dock");
+  const realDrawDock = document.getElementById("real-draw-dock");
   const realPolyDockEl = document.getElementById("real-poly-dock");
   const panelRestoreBar = document.getElementById("panel-restore-bar");
   const bottomRestoreSep = document.getElementById("bottom-restore-sep");
@@ -108,11 +113,13 @@
   const btnFnGuide = document.getElementById("btn-fn-guide");
   const fnSyntaxGuide = document.getElementById("fn-syntax-guide");
 
-  const projectDescBar = document.getElementById("project-desc-bar");
-  const btnToggleDesc = document.getElementById("btn-toggle-desc");
-  const projectDescPreview = document.getElementById("project-desc-preview");
-  const projectDescEditor = document.getElementById("project-desc-editor");
-  const projectDescInput = document.getElementById("project-desc-input");
+  const editProjectModal = document.getElementById("edit-project-modal");
+  const editProjectSub = document.getElementById("edit-project-sub");
+  const editProjectName = document.getElementById("edit-project-name");
+  const editProjectDesc = document.getElementById("edit-project-desc");
+  const btnConfirmEditProject = document.getElementById("btn-confirm-edit-project");
+  const btnCancelEditProject = document.getElementById("btn-cancel-edit-project");
+  const btnCloseEditProject = document.getElementById("btn-close-edit-project");
 
   const btnToggleTheme = document.getElementById("btn-toggle-theme");
   const themeIconSun = document.getElementById("theme-icon-sun");
@@ -161,6 +168,7 @@
 
   const unsavedModal = document.getElementById("unsaved-modal");
   const unsavedPresetName = document.getElementById("unsaved-preset-name");
+  const unsavedProjectDesc = document.getElementById("unsaved-project-desc");
   const btnUnsavedSave = document.getElementById("btn-unsaved-save");
   const btnUnsavedDiscard = document.getElementById("btn-unsaved-discard");
   const btnUnsavedCancel = document.getElementById("btn-unsaved-cancel");
@@ -234,23 +242,33 @@
   }
 
   function applyViewportGlobals(vp) {
-    if (!vp) return { changed: false, realBoundsChanged: false };
-    let changed = false;
+    if (!vp) return { changed: false, sphereOnly: false, realBoundsChanged: false };
+    let changedSphere = false;
+    let changedPlane = false;
     let realBoundsChanged = false;
     if (window.RiemannSphere && window.RiemannSphere.state) {
       const sp = window.RiemannSphere.state;
-      if (vp.sphere_yaw !== undefined && Number.isFinite(vp.sphere_yaw)) { sp.yaw = vp.sphere_yaw; changed = true; }
+      const spIn = window.RiemannSphereIn && window.RiemannSphereIn.state;
+      if (vp.sphere_yaw !== undefined && Number.isFinite(vp.sphere_yaw)) {
+        sp.yaw = vp.sphere_yaw;
+        if (spIn) spIn.yaw = vp.sphere_yaw;
+        changedSphere = true;
+      }
       if (vp.sphere_pitch !== undefined && Number.isFinite(vp.sphere_pitch)) {
-        sp.pitch = Math.max(-1.48, Math.min(1.48, vp.sphere_pitch));
-        changed = true;
+        const p = Math.max(-1.48, Math.min(1.48, vp.sphere_pitch));
+        sp.pitch = p;
+        if (spIn) spIn.pitch = p;
+        changedSphere = true;
       }
       if (vp.sphere_zoom !== undefined && Number.isFinite(vp.sphere_zoom)) {
-        sp.zoom = Math.max(0.45, Math.min(3.0, vp.sphere_zoom));
-        changed = true;
+        const z = Math.max(0.45, Math.min(3.0, vp.sphere_zoom));
+        sp.zoom = z;
+        if (spIn) spIn.zoom = z;
+        changedSphere = true;
       }
     }
     if (!isRealMode() && window.CFVComplex && typeof window.CFVComplex.setViewportValues === "function") {
-      if (window.CFVComplex.setViewportValues(vp)) changed = true;
+      if (window.CFVComplex.setViewportValues(vp)) changedPlane = true;
     }
     if (isRealMode() && window.CFVReal && window.CFVReal.state) {
       const rv = window.CFVReal.state.view;
@@ -260,14 +278,18 @@
       const nY1 = vp.real_ymax !== undefined && Number.isFinite(vp.real_ymax) ? vp.real_ymax : rv.ymax;
       if (nX1 > nX0 + 1e-4 && nY1 > nY0 + 1e-4 && (nX0 !== rv.xmin || nX1 !== rv.xmax || nY0 !== rv.ymin || nY1 !== rv.ymax)) {
         rv.xmin = nX0; rv.xmax = nX1; rv.ymin = nY0; rv.ymax = nY1;
-        changed = true;
+        changedPlane = true;
         realBoundsChanged = true;
       }
     }
-    return { changed, realBoundsChanged };
+    return { changed: changedSphere || changedPlane, sphereOnly: changedSphere && !changedPlane, realBoundsChanged };
   }
 
   function isRealMode() { return state.mode === "real"; }
+  function isContourMode() {
+    return !isRealMode() && Boolean(window.CFVComplex && window.CFVComplex.state && window.CFVComplex.state.contourMode);
+  }
+  function normMode(m) { return m === "real" ? "real" : "map"; }
   function fnCards() { return state.cards.filter((c) => c.kind === "fn"); }
   function sliderCards() { return state.cards.filter((c) => c.kind === "slider"); }
   function varCards() { return state.cards.filter((c) => c.kind === "var"); }
@@ -324,10 +346,30 @@
     }
     if (!touchesViewport) return true;
     if (touchesRealBounds) return true;
-    /* Check if any active C card or formula-driven domain shape references any affected identifier */
-    const activeFns = isRealMode()
-      ? fnCards().filter((c) => c.visible !== false)
-      : fnCards();
+    /* Check ONLY the active graphed C card (plus any helper fK() it transitively calls) — NEVER inactive cards! */
+    let activeFns;
+    if (isRealMode()) {
+      activeFns = fnCards().filter((c) => c.visible !== false);
+    } else {
+      const allFns = fnCards();
+      const prim = getActiveComplexCard();
+      const reachable = new Set();
+      if (prim) {
+        const queue = [prim];
+        while (queue.length > 0) {
+          const cur = queue.shift();
+          if (!cur || reachable.has(cur)) continue;
+          reachable.add(cur);
+          const code = String(cur.code || "");
+          allFns.forEach((cand, idx) => {
+            if (!reachable.has(cand) && new RegExp(`\\bf${idx + 1}\\s*\\(`).test(code)) {
+              queue.push(cand);
+            }
+          });
+        }
+      }
+      activeFns = Array.from(reachable);
+    }
     for (const c of activeFns) {
       const code = String(c.code || "");
       for (const nm of affected) {
@@ -372,6 +414,14 @@
     if (applyViewport && Object.keys(vpUpdates).length > 0) {
       vpRes = applyViewportGlobals(vpUpdates);
     }
+    /* Keep formula-bound points, guide lines, text boxes & shapes moving even when locked! */
+    if (isRealMode()) {
+      if (window.CFVReal && typeof window.CFVReal.rebuildFormulaElements === "function") {
+        window.CFVReal.rebuildFormulaElements();
+      }
+    } else if (window.CFVComplex && typeof window.CFVComplex.rebuildFormulaShapes === "function") {
+      window.CFVComplex.rebuildFormulaShapes();
+    }
     if (updateDom && fnCardsEl) {
       for (const s of sliderCards()) {
         const vStr = String(s.value);
@@ -394,6 +444,7 @@
     if (state.cards.length > 0) return false;
     if (isRealMode()) {
       return (
+        (window.CFVReal.state.shapes || []).length === 0 &&
         window.CFVReal.state.points.length === 0 &&
         window.CFVReal.state.lines.length === 0 &&
         (window.CFVReal.state.polygons || []).length === 0
@@ -414,9 +465,49 @@
     return Boolean(state.hasUnsavedWork) && (!isBlankWorkspace() || state.projectPresets.length > 0);
   }
 
+  const btnTopLockProject = document.getElementById("btn-top-lock-project");
+
+  function isProjectLocked(id, isCustom) {
+    if (!id) return false;
+    const lp = state.libraryMeta && state.libraryMeta.lockedProjects;
+    if (lp && Object.prototype.hasOwnProperty.call(lp, id)) {
+      return Boolean(lp[id]);
+    }
+    /* Built-in example projects default to LOCKED; user-created projects default to UNLOCKED! */
+    const isBuiltIn = !isCustom || Boolean(window.CFVExamples && window.CFVExamples.list.some((e) => e.id === id));
+    return isBuiltIn && !isCustom;
+  }
+
+  function isCurrentProjectLocked() {
+    if (!state.activeProjectId) return false;
+    return isProjectLocked(state.activeProjectId, state.activeProjectIsCustom);
+  }
+
+  function setProjectLocked(id, locked, isCustom) {
+    if (!id) return;
+    if (!state.libraryMeta.lockedProjects) state.libraryMeta.lockedProjects = {};
+    state.libraryMeta.lockedProjects[id] = Boolean(locked);
+    saveLibraryMeta(true);
+    updateProjectHeaderUI();
+    renderExamplesMenu();
+    renderPresetBar();
+  }
+
+  function toggleProjectLock(id, isCustom) {
+    if (!id) return;
+    const cur = isProjectLocked(id, isCustom);
+    setProjectLocked(id, !cur, isCustom);
+  }
+
+  function canSaveInPlace() {
+    if (!state.activeProjectId) return false;
+    return !isCurrentProjectLocked();
+  }
+
   function updateProjectHeaderUI() {
     const dirty = hasUnsavedChanges();
-    const inSaved = isInSavedProject();
+    const locked = isCurrentProjectLocked();
+    const canSave = canSaveInPlace();
     if (activeExampleName) {
       if (isBlankWorkspace() && !state.activeProjectId && state.projectPresets.length === 0) {
         activeExampleName.textContent = "New Project";
@@ -425,35 +516,59 @@
         activeExampleName.textContent = dirty ? `${baseName} •` : baseName;
       }
     }
+    if (btnTopLockProject) {
+      const hasProj = Boolean(state.activeProjectId);
+      btnTopLockProject.disabled = !hasProj;
+      btnTopLockProject.textContent = locked ? "🔒" : "🔓";
+      btnTopLockProject.classList.toggle("locked", hasProj && locked);
+      btnTopLockProject.classList.toggle("unlocked", hasProj && !locked);
+      btnTopLockProject.title = !hasProj
+        ? "Save a project first to lock/unlock it"
+        : locked
+          ? `"${state.activeProjectName}" is LOCKED (click to unlock for saving, renaming & deleting)`
+          : `"${state.activeProjectName}" is UNLOCKED (click to lock against accidental overwrite/deletion)`;
+    }
     if (btnSaveProject) {
-      btnSaveProject.disabled = !inSaved;
-      btnSaveProject.setAttribute("aria-disabled", String(!inSaved));
-      btnSaveProject.classList.toggle("unsaved", inSaved && dirty);
+      btnSaveProject.disabled = !canSave;
+      btnSaveProject.setAttribute("aria-disabled", String(!canSave));
+      btnSaveProject.classList.toggle("unsaved", canSave && dirty);
       if (!btnSaveProject.classList.contains("saved-flash")) {
-        btnSaveProject.textContent = inSaved ? (dirty ? "Save*" : "Save") : "Save";
+        btnSaveProject.textContent = canSave && dirty ? "Save*" : "Save";
       }
-      btnSaveProject.title = inSaved
-        ? `Save changes directly to "${state.activeProjectName}" (Ctrl+S)`
-        : "Save is only available inside an already-saved project (use Save As to create a new saved project)";
+      btnSaveProject.title = canSave
+        ? `Save changes directly to "${state.activeProjectName || "current project"}" (Ctrl+S)`
+        : locked
+          ? `"${state.activeProjectName}" is locked — click 🔒 to unlock or use Save As`
+          : "Use Save As to save a new blank project";
     }
     if (btnSaveAsProject) {
-      btnSaveAsProject.classList.toggle("unsaved", !inSaved && dirty);
+      btnSaveAsProject.classList.toggle("unsaved", !canSave && dirty);
       btnSaveAsProject.textContent = "Save As";
     }
     if (btnTopRenameProject) {
-      const canRename = Boolean(state.activeProjectId || !isBlankWorkspace());
+      const canRename = !locked && Boolean(state.activeProjectId || !isBlankWorkspace());
       btnTopRenameProject.disabled = !canRename;
-      btnTopRenameProject.title = state.activeProjectId
-        ? `Rename "${state.activeProjectName}"`
-        : "Set project name";
+      btnTopRenameProject.title = locked
+        ? "Unlock project (🔒) to rename or edit description"
+        : state.activeProjectId
+          ? `Rename "${state.activeProjectName}"`
+          : "Set project name";
     }
     if (btnTopDeleteProject) {
-      const canDel = Boolean(state.activeProjectId);
+      const canDel = !locked && Boolean(state.activeProjectId);
       btnTopDeleteProject.disabled = !canDel;
       btnTopDeleteProject.setAttribute("aria-disabled", String(!canDel));
-      btnTopDeleteProject.title = canDel
-        ? `Delete "${state.activeProjectName}"`
-        : "Open a saved or example project to delete it";
+      btnTopDeleteProject.title = locked
+        ? "Unlock project (🔒) to delete it"
+        : canDel
+          ? `Delete "${state.activeProjectName}"`
+          : "Open a saved or example project to delete it";
+    }
+    if (btnSavePreset) {
+      btnSavePreset.disabled = locked;
+      btnSavePreset.title = locked
+        ? "Unlock project (🔒) to add presets, or use Save As"
+        : "Add current view & shapes as a preset inside this project";
     }
   }
 
@@ -718,17 +833,20 @@
 
   function defaultProjectName() {
     if (state.activeProjectIsCustom && state.activeProjectName) return state.activeProjectName;
-    const modeName = state.mode === "real" ? "2D Real" : state.mode === "integral" ? "Integral" : "Complex Map";
+    const modeName = state.mode === "real" ? "Real" : isContourMode() ? "Complex Contour" : "Complex";
     return `My ${modeName} Project`;
   }
 
   function guardNavigation(actionFn) {
+    closeFnLibraryDropdown();
+    closeFnGuidePanel();
     if (!hasUnsavedChanges()) {
       actionFn();
       return;
     }
     state.pendingNavAction = actionFn;
     if (unsavedPresetName) unsavedPresetName.value = defaultProjectName();
+    if (unsavedProjectDesc) unsavedProjectDesc.value = state.activeProjectDescription || "";
     if (unsavedModal) unsavedModal.classList.remove("hidden");
     if (unsavedPresetName && unsavedPresetName.focus) unsavedPresetName.focus();
   }
@@ -736,6 +854,7 @@
   if (btnUnsavedSave) {
     btnUnsavedSave.addEventListener("click", () => {
       const nm = (unsavedPresetName && unsavedPresetName.value.trim()) || defaultProjectName();
+      if (unsavedProjectDesc) state.activeProjectDescription = unsavedProjectDesc.value.trim();
       saveCurrentProject(nm);
       const fn = state.pendingNavAction;
       closeUnsavedModal();
@@ -808,6 +927,14 @@
       ex: (!state.activeProjectIsCustom && state.activeProjectId) ? state.activeProjectId : "",
       pr: state.activePresetId || "",
       sp: isRealMode() ? undefined : Math.round(state.splitPct * 10) / 10,
+      ly: {
+        sb: state.sidebarCollapsed ? 1 : 0,
+        inH: state.inputHidden ? 1 : 0,
+        outH: state.outputHidden ? 1 : 0,
+        rH: state.realHidden ? 1 : 0,
+        sbW: Math.round(state.savedSidebarWidth || 372),
+        sp: Math.round((state.splitPct || 50) * 10) / 10,
+      },
       pi: primaryIdx,
       fn: fns.map((c) => ({
         t: c.title || "",
@@ -842,7 +969,7 @@
   }
 
   function syncUrl(push = false, withStateHash = false) {
-    const base = state.mode === "real" ? "/real" : state.mode === "integral" ? "/integral" : "/map";
+    const base = state.mode === "real" ? "/real" : "/map";
     const qs = new URLSearchParams();
     if (!state.activeProjectIsCustom && state.activeProjectId && !withStateHash) {
       qs.set("ex", state.activeProjectId);
@@ -878,25 +1005,13 @@
     if (state.restoringState) return;
 
     if (markDirty) {
-      /* Any structural/content edit exits any active preset & transitions built-in example -> Unsaved Project
-         WITHOUT wiping the current project's presets! */
-      const wasInPreset = state.activePresetId !== null;
-      const wasBuiltIn = Boolean(state.activeProjectId && !state.activeProjectIsCustom);
-      state.activePresetId = null;
-
-      if (wasBuiltIn) {
-        state.activeProjectId = null;
-        state.activeProjectName = "Unsaved Project";
-      } else if (!state.activeProjectId) {
+      /* Keep the user inside the current project (even if it is a locked built-in example!)
+         so they can freely experiment, unlock to Save in-place, or Save As a new unlocked project. */
+      if (!state.activeProjectId) {
         state.activeProjectName = isBlankWorkspace() && state.projectPresets.length === 0 ? "New Project" : "Unsaved Project";
       }
-
       state.hasUnsavedWork = !isBlankWorkspace() || state.projectPresets.length > 0;
       updateProjectHeaderUI();
-      if (wasInPreset || wasBuiltIn) {
-        renderPresetBar();
-        renderExamplesMenu();
-      }
     }
 
     if (isBlankWorkspace() && !state.activeProjectId && state.projectPresets.length === 0) {
@@ -957,7 +1072,8 @@
     const params = new URLSearchParams(window.location.search);
     const exParam = params.get("ex");
     const presetParam = params.get("preset");
-    const modeFromPath = path === "/real" ? "real" : path === "/integral" ? "integral" : "map";
+    const modeFromPath = path === "/real" ? "real" : "map";
+    const contourFromPath = path === "/integral";
 
     if (exParam) {
       const ex = window.CFVExamples.list.find((e) => e.id === exParam);
@@ -969,7 +1085,7 @@
         return { kind: "example", ex, preset: pr };
       }
     }
-    return { kind: "blank", mode: modeFromPath };
+    return { kind: "blank", mode: modeFromPath, contourMode: contourFromPath };
   }
 
   /* -------------------------------------------------------------------------
@@ -1066,12 +1182,23 @@
     if (snap.format === "cfv_project_v1" || Array.isArray(snap.cards)) {
       return JSON.parse(JSON.stringify(snap));
     }
-    const mode = snap.m === "real" || snap.m === "integral" ? snap.m : "map";
+    const rawMode = snap.m === "real" || snap.m === "integral" ? snap.m : "map";
+    const mode = rawMode === "real" ? "real" : "map";
     const pi = typeof snap.pi === "number" ? snap.pi : 0;
     const out = {
       mode,
       ...(snap.desc ? { description: snap.desc } : {}),
       splitPct: mode === "real" ? undefined : (typeof snap.sp === "number" ? snap.sp : 50),
+      ...(snap.ly ? {
+        layout: {
+          sidebarCollapsed: Boolean(snap.ly.sb),
+          inputHidden: Boolean(snap.ly.inH),
+          outputHidden: Boolean(snap.ly.outH),
+          realHidden: Boolean(snap.ly.rH),
+          ...(snap.ly.sbW ? { sidebarWidth: Number(snap.ly.sbW) } : {}),
+          ...(snap.ly.sp !== undefined ? { splitPct: Number(snap.ly.sp) } : {}),
+        },
+      } : {}),
       cards: (snap.fn || []).map((c, idx) => ({
         title: c.t || `Function ${idx + 1}`,
         code: c.cd || "",
@@ -1101,9 +1228,33 @@
     };
     const c = snap.c || {};
     if (mode === "real") {
+      if (Array.isArray(c.sh) && c.sh.length > 0) {
+        out.shapes = c.sh.map((s) => {
+          const pts = [];
+          const flat = Array.isArray(s.p) ? s.p : [];
+          for (let i = 0; i + 1 < flat.length; i += 2) pts.push([Number(flat[i]) || 0, Number(flat[i + 1]) || 0]);
+          const closed = Boolean(s.cl);
+          return {
+            kind: s.k || "polygon",
+            label: s.l || "",
+            color: s.c || "#38bdf8",
+            lineWidth: normLineWidthWs(s.w, 2.2),
+            opacity: normOpacityWs(s.op, closed ? 0.22 : 1.0),
+            lineStyle: s.st || "solid",
+            closed,
+            locked: Boolean(s.lk),
+            visible: s.v !== 0,
+            ...(s.col ? { collapsed: true } : {}),
+            ...(Number(s.ch) > 0 ? { cardHeight: Number(s.ch) } : {}),
+            points: pts,
+          };
+        });
+      }
       out.points = (c.pt || []).map((p) => ({
         x: Number(p.x) || 0,
         y: Number(p.y) || 0,
+        ...(p.xe ? { xExpr: String(p.xe) } : {}),
+        ...(p.ye ? { yExpr: String(p.ye) } : {}),
         label: p.l || "",
         icon: p.i || "diamond",
         color: p.c || "#34d399",
@@ -1112,10 +1263,13 @@
         locked: Boolean(p.lk),
         visible: p.v !== 0,
         showLabel: p.sl !== 0,
+        ...(p.col ? { collapsed: true } : {}),
+        ...(Number(p.ch) > 0 ? { cardHeight: Number(p.ch) } : {}),
       }));
       out.lines = (c.ln || []).map((ln) => ({
         orientation: ln.o === "h" ? "horizontal" : "vertical",
         value: Number(ln.val) || 0,
+        ...(ln.ve ? { valExpr: String(ln.ve) } : {}),
         label: ln.l || "",
         color: ln.c || "#fbbf24",
         lineWidth: normLineWidthWs(ln.w, 1.5),
@@ -1124,6 +1278,28 @@
         locked: Boolean(ln.lk),
         visible: ln.v !== 0,
         showLabel: ln.sl !== 0,
+        ...(ln.col ? { collapsed: true } : {}),
+        ...(Number(ln.ch) > 0 ? { cardHeight: Number(ln.ch) } : {}),
+      }));
+      out.texts = (c.tx || []).map((tb) => ({
+        title: tb.t || "",
+        text: tb.b || "",
+        anchor: tb.a || "bottom-left",
+        x: Number(tb.x) || 0,
+        y: Number(tb.y) || 0,
+        ...(Number.isFinite(Number(tb.nx)) ? { nx: Number(tb.nx) } : {}),
+        ...(Number.isFinite(Number(tb.ny)) ? { ny: Number(tb.ny) } : {}),
+        ...(tb.xe ? { xExpr: String(tb.xe) } : {}),
+        ...(tb.ye ? { yExpr: String(tb.ye) } : {}),
+        color: tb.c || "#38bdf8",
+        width: Number(tb.w) || 305,
+        ...(Number(tb.h) > 0 ? { height: Number(tb.h) } : {}),
+        fontSize: Number(tb.fs) || 12,
+        opacity: normOpacityWs(tb.op, 0.94),
+        locked: Boolean(tb.lk),
+        visible: tb.v !== 0,
+        ...(tb.col ? { collapsed: true } : {}),
+        ...(Number(tb.ch) > 0 ? { cardHeight: Number(tb.ch) } : {}),
       }));
       if (Array.isArray(c.lo) && c.lo.length > 0) out.layerOrder = [...c.lo];
       if (Array.isArray(c.pg) && c.pg.length >= 2) {
@@ -1135,6 +1311,7 @@
       out.viewport = {
         view: { xmin: Number(vw[0]), xmax: Number(vw[1]), ymin: Number(vw[2]), ymax: Number(vw[3]) },
         squareAspect: c.sq !== undefined ? Boolean(c.sq) : true,
+        ...(c.cs && c.cs !== "cartesian" ? { coordSystem: c.cs } : {}),
         showPrimes: Boolean(c.sp),
         showZeros: Boolean(c.sz),
       };
@@ -1145,11 +1322,14 @@
           label: s.l || "Shape",
           color: s.c || "#38bdf8",
           lineWidth: normLineWidthWs(s.w, 2.2),
-          opacity: normOpacityWs(s.op, 1.0),
+          opacity: normOpacityWs(s.op, s.cl ? 0.22 : 1.0),
+          ...(s.oc ? { isOcean: true } : {}),
           lineStyle: s.st || "solid",
           locked: Boolean(s.lk),
           closed: Boolean(s.cl),
           visible: s.v !== 0,
+          ...(s.col ? { collapsed: true } : {}),
+          ...(Number(s.ch) > 0 ? { cardHeight: Number(s.ch) } : {}),
         };
         if (s.f) {
           item.formula = { ...s.f };
@@ -1166,6 +1346,8 @@
       out.points = (c.pt || []).map((p) => ({
         x: Number(p.x) || 0,
         y: Number(p.y) || 0,
+        ...(p.xe ? { xExpr: String(p.xe) } : {}),
+        ...(p.ye ? { yExpr: String(p.ye) } : {}),
         label: p.l || "",
         icon: p.i || "dot",
         color: p.c || "#34d399",
@@ -1174,10 +1356,13 @@
         locked: Boolean(p.lk),
         visible: p.v !== 0,
         showLabel: p.sl !== 0,
+        ...(p.col ? { collapsed: true } : {}),
+        ...(Number(p.ch) > 0 ? { cardHeight: Number(p.ch) } : {}),
       }));
       out.lines = (c.ln || []).map((ln) => ({
         orientation: ln.o === "h" ? "horizontal" : "vertical",
         value: Number(ln.val) || 0,
+        ...(ln.ve ? { valExpr: String(ln.ve) } : {}),
         label: ln.l || "",
         color: ln.c || "#fbbf24",
         lineWidth: normLineWidthWs(ln.w, 1.5),
@@ -1186,21 +1371,51 @@
         locked: Boolean(ln.lk),
         visible: ln.v !== 0,
         showLabel: ln.sl !== 0,
+        ...(ln.col ? { collapsed: true } : {}),
+        ...(Number(ln.ch) > 0 ? { cardHeight: Number(ln.ch) } : {}),
+      }));
+      out.texts = (c.tx || []).map((tb) => ({
+        title: tb.t || "",
+        text: tb.b || "",
+        anchor: tb.a || "bottom-left",
+        plane: tb.pl === "out" ? "out" : "in",
+        x: Number(tb.x) || 0,
+        y: Number(tb.y) || 0,
+        ...(Number.isFinite(Number(tb.nx)) ? { nx: Number(tb.nx) } : {}),
+        ...(Number.isFinite(Number(tb.ny)) ? { ny: Number(tb.ny) } : {}),
+        ...(tb.xe ? { xExpr: String(tb.xe) } : {}),
+        ...(tb.ye ? { yExpr: String(tb.ye) } : {}),
+        color: tb.c || "#38bdf8",
+        width: Number(tb.w) || 305,
+        ...(Number(tb.h) > 0 ? { height: Number(tb.h) } : {}),
+        fontSize: Number(tb.fs) || 12,
+        opacity: normOpacityWs(tb.op, 0.94),
+        locked: Boolean(tb.lk),
+        visible: tb.v !== 0,
+        ...(tb.col ? { collapsed: true } : {}),
+        ...(Number(tb.ch) > 0 ? { cardHeight: Number(tb.ch) } : {}),
       }));
       if (Array.isArray(c.lo) && c.lo.length > 0) out.layerOrder = [...c.lo];
       const iv = Array.isArray(c.iv) && c.iv.length >= 3 ? c.iv : [0, 0, 4];
       const ov = Array.isArray(c.ov) && c.ov.length >= 3 ? c.ov : [0, 0, 4];
       const spv = Array.isArray(c.spv) && c.spv.length >= 3 ? c.spv : [-0.58, 0.22, 1.0];
+      const contourOn = c.cm !== undefined ? Boolean(c.cm) : (rawMode === "integral");
       out.viewport = {
         inView: { cx: Number(iv[0]), cy: Number(iv[1]), r: Number(iv[2]) },
         outView: { cx: Number(ov[0]), cy: Number(ov[1]), r: Number(ov[2]) },
         inSquare: c.isq !== undefined ? Boolean(c.isq) : true,
         outSquare: c.osq !== undefined ? Boolean(c.osq) : true,
+        contourMode: contourOn,
+        showMesh: c.msh !== undefined ? Boolean(c.msh) : true,
+        showLandmarks: c.lmk !== undefined ? Boolean(c.lmk) : true,
+        ...(c.cln ? { showCriticalLine: true } : {}),
+        ...(c.dwa ? { showDirichletWall: true } : {}),
         showSphere: c.proj === "sphere" || Boolean(c.sph),
+        ...(c.iproj && c.iproj !== "planar" ? { inProjection: c.iproj } : {}),
         projection: c.proj || (c.sph ? "sphere" : "planar"),
-        ...(c.pexpr ? { projectionExpr: c.pexpr } : {}),
         sphereView: { yaw: Number(spv[0]), pitch: Number(spv[1]), zoom: Number(spv[2]) },
         ...(c.dom ? { showDomain: true, domainScheme: c.dscm || "classic", domainOpacity: normOpacityWs(c.dop, 0.72) } : {}),
+        ...(c.odom ? { showOutDomain: true, ...(c.odm ? { outDomainMapping: c.odm } : {}) } : {}),
       };
     }
     return out;
@@ -1221,18 +1436,19 @@
     const base = baseObj && baseObj.baseState && !Array.isArray(baseObj.cards)
       ? snapshotToReadableState(baseObj.baseState)
       : (baseObj || {});
-    const mode =
+    const rawMode =
       obj.mode === "real" || obj.mode === "integral" || obj.mode === "map"
         ? obj.mode
         : (base.mode === "real" || base.mode === "integral" || base.mode === "map" ? base.mode : state.mode);
+    const mode = rawMode === "real" ? "real" : "map";
 
     const rawCards = Array.isArray(obj.cards) ? obj.cards : (Array.isArray(base.cards) ? base.cards : []);
     const visIdx = Array.isArray(obj.visibleFnIndices) ? obj.visibleFnIndices : null;
-    let primaryIdx = 0;
+    let primaryIdx = typeof obj.activeFnIndex === "number" ? obj.activeFnIndex : 0;
     const fn = rawCards.map((c, idx) => {
       const isObj = typeof c === "object" && c !== null;
       const code = typeof c === "string" ? c : (c.code || (mode === "real" ? "sin(x)" : "c_zeta(s)"));
-      if (isObj && c.active === true) primaryIdx = idx;
+      if (typeof obj.activeFnIndex !== "number" && isObj && c.active === true) primaryIdx = idx;
       const vis = visIdx ? visIdx.includes(idx) : (isObj && c.visible !== undefined ? Boolean(c.visible) : true);
       return {
         t: (isObj && c.title) ? c.title : `Function ${idx + 1}`,
@@ -1297,7 +1513,21 @@
     if (obj.outView || base.outView) vpObj.outView = obj.outView || vpObj.outView || base.outView;
     if (obj.inSquare !== undefined) vpObj.inSquare = obj.inSquare;
     if (obj.outSquare !== undefined) vpObj.outSquare = obj.outSquare;
+    if (obj.contourMode !== undefined) vpObj.contourMode = Boolean(obj.contourMode);
+    if (obj.showMesh !== undefined) vpObj.showMesh = Boolean(obj.showMesh);
+    if (obj.showLandmarks !== undefined) vpObj.showLandmarks = Boolean(obj.showLandmarks);
+    if (obj.showCriticalLine !== undefined) vpObj.showCriticalLine = Boolean(obj.showCriticalLine);
+    if (obj.showDirichletWall !== undefined) vpObj.showDirichletWall = Boolean(obj.showDirichletWall);
     if (obj.showSphere !== undefined) vpObj.showSphere = obj.showSphere;
+    if (obj.enableSphere !== undefined) vpObj.showSphere = obj.enableSphere;
+    if (obj.inProjection !== undefined) vpObj.inProjection = obj.inProjection;
+    if (obj.projection !== undefined) vpObj.projection = obj.projection;
+    if (obj.coordSystem !== undefined) vpObj.coordSystem = obj.coordSystem;
+    if (obj.showDomain !== undefined) vpObj.showDomain = Boolean(obj.showDomain);
+    if (obj.showOutDomain !== undefined) vpObj.showOutDomain = Boolean(obj.showOutDomain);
+    if (obj.outDomainMapping !== undefined) vpObj.outDomainMapping = obj.outDomainMapping;
+    if (obj.domainScheme !== undefined) vpObj.domainScheme = obj.domainScheme;
+    if (obj.domainOpacity !== undefined) vpObj.domainOpacity = obj.domainOpacity;
     if (obj.sphereView || base.sphereView) vpObj.sphereView = obj.sphereView || vpObj.sphereView || base.sphereView;
     if (obj.view || base.view) vpObj.view = obj.view || vpObj.view || base.view;
     if (obj.squareAspect !== undefined) vpObj.squareAspect = obj.squareAspect;
@@ -1306,9 +1536,12 @@
 
     const rawPts = Array.isArray(obj.points) ? obj.points : (Array.isArray(base.points) ? base.points : []);
     const rawLns = Array.isArray(obj.lines) ? obj.lines : (Array.isArray(base.lines) ? base.lines : []);
+    const rawTxs = Array.isArray(obj.texts) ? obj.texts : (Array.isArray(base.texts) ? base.texts : []);
     const pt = rawPts.map((p) => ({
       x: Number(p.x) || 0,
       y: Number(p.y) || 0,
+      ...(p.xExpr || p.xe ? { xe: String(p.xExpr || p.xe) } : {}),
+      ...(p.yExpr || p.ye ? { ye: String(p.yExpr || p.ye) } : {}),
       l: p.label || "",
       i: p.icon || (mode === "real" ? "diamond" : "dot"),
       c: p.color || "#34d399",
@@ -1317,10 +1550,13 @@
       lk: p.locked ? 1 : 0,
       v: p.visible !== false ? 1 : 0,
       sl: p.showLabel !== false ? 1 : 0,
+      ...(p.collapsed || p.col ? { col: 1 } : {}),
+      ...(Number(p.cardHeight ?? p.ch) > 0 ? { ch: Math.round(Number(p.cardHeight ?? p.ch)) } : {}),
     }));
     const ln = rawLns.map((l) => ({
       o: l.orientation === "horizontal" || l.o === "h" ? "h" : "v",
       val: Number(l.value ?? l.val ?? 0),
+      ...(l.valExpr || l.ve ? { ve: String(l.valExpr || l.ve) } : {}),
       l: l.label || "",
       c: l.color || "#fbbf24",
       w: normLineWidthWs(l.lineWidth ?? l.w, 1.5),
@@ -1329,6 +1565,29 @@
       lk: l.locked ? 1 : 0,
       v: l.visible !== false ? 1 : 0,
       sl: l.showLabel !== false ? 1 : 0,
+      ...(l.collapsed || l.col ? { col: 1 } : {}),
+      ...(Number(l.cardHeight ?? l.ch) > 0 ? { ch: Math.round(Number(l.cardHeight ?? l.ch)) } : {}),
+    }));
+    const tx = rawTxs.map((t) => ({
+      t: t.title || t.t || "",
+      b: t.text || t.b || "",
+      a: t.anchor || t.a || "bottom-left",
+      ...(mode !== "real" ? { pl: (t.plane || t.pl) === "out" ? "out" : "in" } : {}),
+      x: Number(t.x) || 0,
+      y: Number(t.y) || 0,
+      ...(Number.isFinite(Number(t.nx)) ? { nx: Number(t.nx) } : {}),
+      ...(Number.isFinite(Number(t.ny)) ? { ny: Number(t.ny) } : {}),
+      ...(t.xExpr || t.xe ? { xe: String(t.xExpr || t.xe) } : {}),
+      ...(t.yExpr || t.ye ? { ye: String(t.yExpr || t.ye) } : {}),
+      c: t.color || t.c || "#38bdf8",
+      w: Number(t.width ?? t.maxWidth ?? t.w) || 305,
+      ...(Number(t.height ?? t.h) > 0 ? { h: Math.round(Number(t.height ?? t.h)) } : {}),
+      fs: Number(t.fontSize ?? t.fs) || 12,
+      op: normOpacityWs(t.opacity ?? t.op, 0.94),
+      lk: t.locked ? 1 : 0,
+      v: t.visible !== false ? 1 : 0,
+      ...(t.collapsed || t.col ? { col: 1 } : {}),
+      ...(Number(t.cardHeight ?? t.ch) > 0 ? { ch: Math.round(Number(t.cardHeight ?? t.ch)) } : {}),
     }));
 
     const layerRefs = Array.isArray(obj.layerOrder) ? obj.layerOrder : (Array.isArray(base.layerOrder) ? base.layerOrder : undefined);
@@ -1339,14 +1598,48 @@
       const vw = Array.isArray(vwObj)
         ? [Number(vwObj[0]), Number(vwObj[1]), Number(vwObj[2]), Number(vwObj[3])]
         : [Number(vwObj.xmin ?? -10), Number(vwObj.xmax ?? 10), Number(vwObj.ymin ?? -10), Number(vwObj.ymax ?? 10)];
+      const rawShapes = Array.isArray(obj.shapes) ? obj.shapes : (Array.isArray(base.shapes) ? base.shapes : []);
+      const sh = rawShapes.map((s) => {
+        const flat = [];
+        const src = Array.isArray(s.rawPts) ? s.rawPts : (Array.isArray(s.points) ? s.points : null);
+        let closed = s.closed !== undefined ? Boolean(s.closed) : true;
+        if (src && src.length > 0) {
+          if (typeof src[0] === "number") {
+            for (let i = 0; i + 1 < src.length; i += 2) flat.push(Number(src[i]) || 0, Number(src[i + 1]) || 0);
+          } else {
+            for (const q of src) flat.push(Number(Array.isArray(q) ? q[0] : q.x) || 0, Number(Array.isArray(q) ? q[1] : q.y) || 0);
+          }
+        } else {
+          const gen = makePrimitivePtsForSnapshot(s, pm);
+          closed = gen.closed;
+          for (const q of gen.pts) flat.push(q.x, q.y);
+        }
+        return {
+          k: s.kind || "polygon",
+          l: s.label || "",
+          c: s.color || "#38bdf8",
+          w: normLineWidthWs(s.lineWidth, 2.2),
+          op: normOpacityWs(s.opacity, closed ? 0.22 : 1.0),
+          st: s.lineStyle || "solid",
+          cl: closed ? 1 : 0,
+          lk: s.locked ? 1 : 0,
+          v: s.visible !== false ? 1 : 0,
+          ...(s.collapsed || s.col ? { col: 1 } : {}),
+          ...(Number(s.cardHeight ?? s.ch) > 0 ? { ch: Math.round(Number(s.cardHeight ?? s.ch)) } : {}),
+          p: flat,
+        };
+      });
       cSnap = {
         vw,
         sq: vpObj.squareAspect !== undefined ? (vpObj.squareAspect ? 1 : 0) : 1,
+        ...(vpObj.coordSystem && vpObj.coordSystem !== "cartesian" ? { cs: vpObj.coordSystem } : {}),
         sp: vpObj.showPrimes ? 1 : 0,
         sz: vpObj.showZeros ? 1 : 0,
         ...(layerRefs ? { lo: [...layerRefs] } : {}),
+        ...(sh.length > 0 ? { sh } : {}),
         pt,
         ln,
+        ...(tx.length > 0 ? { tx } : {}),
       };
       const rawCells = obj.seedCells ?? obj.polygons ?? base.seedCells ?? base.polygons;
       if (obj.fillGrid) {
@@ -1386,37 +1679,65 @@
           l: s.label || s.kind || `Shape ${idx + 1}`,
           c: s.color || COLORS[idx % COLORS.length],
           w: normLineWidthWs(s.lineWidth, 2.2),
-          op: normOpacityWs(s.opacity ?? s.op, 1.0),
+          op: normOpacityWs(s.opacity ?? s.op, built.closed ? 0.22 : 1.0),
+          ...(s.isOcean ? { oc: 1 } : {}),
           st: s.lineStyle || "solid",
           lk: s.locked ? 1 : 0,
           cl: built.closed ? 1 : 0,
           v: s.visible !== false ? 1 : 0,
+          ...(s.collapsed || s.col ? { col: 1 } : {}),
+          ...(Number(s.cardHeight ?? s.ch) > 0 ? { ch: Math.round(Number(s.cardHeight ?? s.ch)) } : {}),
           p: flat,
         };
         if (s.formula) rec.f = { ...s.formula };
         return rec;
       });
+      const inProjMode = vpObj.inProjection || obj.inProjection || "planar";
       const projMode = vpObj.projection || obj.projection || (vpObj.showSphere ? "sphere" : "planar");
-      const projExpr = vpObj.projectionExpr || obj.projectionExpr || "";
       const showDom = vpObj.showDomain !== undefined ? Boolean(vpObj.showDomain) : Boolean(obj.showDomain);
+      const showOutDom = vpObj.showOutDomain !== undefined ? Boolean(vpObj.showOutDomain) : Boolean(obj.showOutDomain);
+      const outDomMap = vpObj.outDomainMapping || obj.outDomainMapping || "";
       const domScheme = vpObj.domainScheme || obj.domainScheme || "classic";
       const domOp = normOpacityWs(vpObj.domainOpacity ?? obj.domainOpacity, domScheme === "classic" ? 0.72 : 1.0);
+      const contourOn = vpObj.contourMode !== undefined
+        ? Boolean(vpObj.contourMode)
+        : (obj.contourMode !== undefined ? Boolean(obj.contourMode) : (rawMode === "integral" || base.contourMode === true));
       cSnap = {
         iv,
         ov,
         isq: vpObj.inSquare !== undefined ? (vpObj.inSquare ? 1 : 0) : 1,
         osq: vpObj.outSquare !== undefined ? (vpObj.outSquare ? 1 : 0) : 1,
+        cm: contourOn ? 1 : 0,
+        msh: vpObj.showMesh !== undefined ? (vpObj.showMesh ? 1 : 0) : 1,
+        lmk: vpObj.showLandmarks !== undefined ? (vpObj.showLandmarks ? 1 : 0) : 1,
+        ...(vpObj.showCriticalLine ? { cln: 1 } : {}),
+        ...(vpObj.showDirichletWall ? { dwa: 1 } : {}),
         sph: projMode === "sphere" || vpObj.showSphere ? 1 : 0,
+        ...(inProjMode && inProjMode !== "planar" ? { iproj: inProjMode } : {}),
         proj: projMode,
-        ...(projExpr ? { pexpr: projExpr } : {}),
         spv,
-        ...(showDom ? { dom: 1, dscm: domScheme, dop: domOp } : {}),
+        ...(showDom || showOutDom ? { dscm: domScheme, dop: domOp } : {}),
+        ...(showDom ? { dom: 1 } : {}),
+        ...(showOutDom ? { odom: 1, ...(outDomMap ? { odm: outDomMap } : {}) } : {}),
         ...(layerRefs ? { lo: [...layerRefs] } : {}),
         sh,
         pt,
         ln,
+        ...(tx.length > 0 ? { tx } : {}),
       };
     }
+
+    const layObj = obj.layout || base.layout || null;
+    const lySnap = layObj
+      ? {
+          sb: layObj.sidebarCollapsed ? 1 : 0,
+          inH: layObj.inputHidden ? 1 : 0,
+          outH: layObj.outputHidden ? 1 : 0,
+          rH: layObj.realHidden ? 1 : 0,
+          ...(layObj.sidebarWidth ? { sbW: Number(layObj.sidebarWidth) } : {}),
+          ...(layObj.splitPct !== undefined ? { sp: Number(layObj.splitPct) } : {}),
+        }
+      : undefined;
 
     return {
       v: 1,
@@ -1425,6 +1746,7 @@
       ex: "",
       pr: obj.id || "",
       sp: mode === "real" ? undefined : (Number(obj.splitPct ?? base.splitPct) || 50),
+      ...(lySnap ? { ly: lySnap } : {}),
       pi: primaryIdx,
       fn,
       sl,
@@ -1471,21 +1793,40 @@
             view: bp.view ? { ...bp.view } : { ...readable.viewport.view },
             squareAspect: bp.squareAspect !== undefined ? Boolean(bp.squareAspect) : true,
           };
+          if (Array.isArray(bp.shapes)) pr.shapes = JSON.parse(JSON.stringify(bp.shapes));
           if (Array.isArray(bp.polygons)) pr.seedCells = bp.polygons.map((c) => [c[0], c[1]]);
           if (bp.fillGrid) pr.fillGrid = true;
         } else {
+          if (typeof bp.activeFnIndex === "number") pr.activeFnIndex = bp.activeFnIndex;
+          const bpProj = bp.projection || (ex && ex.defaultProjection) || (bp.enableSphere || bp.showSphere ? "sphere" : "planar");
+          const bpContour = bp.contourMode !== undefined ? Boolean(bp.contourMode) : Boolean(ex && (ex.contourMode || ex.mode === "integral"));
+          const bpDom = bp.showDomain !== undefined ? Boolean(bp.showDomain) : Boolean(ex && ex.showDomain);
+          const bpInProj = bp.inProjection || (ex && ex.defaultInProjection) || "planar";
+          const bpOutDom = bp.showOutDomain !== undefined ? Boolean(bp.showOutDomain) : Boolean(ex && ex.showOutDomain);
           pr.viewport = {
             inView: bp.inView ? { ...bp.inView } : { ...readable.viewport.inView },
             outView: bp.outView ? { ...bp.outView } : { ...readable.viewport.outView },
             inSquare: bp.inSquare !== undefined ? Boolean(bp.inSquare) : true,
             outSquare: bp.outSquare !== undefined ? Boolean(bp.outSquare) : true,
-            showSphere: bp.showSphere !== undefined ? Boolean(bp.showSphere) : Boolean(ex && ex.defaultSphere),
+            contourMode: bpContour,
+            showMesh: bp.showMesh !== undefined ? Boolean(bp.showMesh) : (ex && ex.showMesh !== undefined ? Boolean(ex.showMesh) : true),
+            ...(bpInProj && bpInProj !== "planar" ? { inProjection: bpInProj } : {}),
+            projection: bpProj,
+            showSphere: bpProj === "sphere" || Boolean(bp.showSphere || bp.enableSphere),
             sphereView: bp.sphereView ? { ...bp.sphereView } : { ...readable.viewport.sphereView },
+            ...(bpDom || bpOutDom ? {
+              domainScheme: bp.domainScheme || (ex && ex.domainScheme) || "classic",
+              domainOpacity: normOpacityWs(bp.domainOpacity ?? (ex && ex.domainOpacity), 1.0),
+            } : {}),
+            ...(bpDom ? { showDomain: true } : {}),
+            ...(bpOutDom ? { showOutDomain: true, ...(bp.outDomainMapping ? { outDomainMapping: bp.outDomainMapping } : {}) } : {}),
           };
           if (Array.isArray(bp.shapes)) pr.shapes = JSON.parse(JSON.stringify(bp.shapes));
         }
         if (Array.isArray(bp.points)) pr.points = JSON.parse(JSON.stringify(bp.points));
         if (Array.isArray(bp.lines)) pr.lines = JSON.parse(JSON.stringify(bp.lines));
+        if (Array.isArray(bp.texts)) pr.texts = JSON.parse(JSON.stringify(bp.texts));
+        if (bp.layout) pr.layout = { ...bp.layout };
         return pr;
       }
       return { id: p.id || `preset_${idx + 1}`, name: p.name || `Preset ${idx + 1}` };
@@ -1500,6 +1841,7 @@
       description: state.activeProjectDescription || (ex && ex.description) || "",
       mode: readable.mode,
       ...(readable.splitPct !== undefined ? { splitPct: readable.splitPct } : {}),
+      ...(readable.layout ? { layout: readable.layout } : {}),
       cards: readable.cards,
       sliders: readable.sliders,
       vars: readable.vars,
@@ -1507,6 +1849,7 @@
       ...(readable.seedCells ? { seedCells: readable.seedCells } : {}),
       points: readable.points || [],
       lines: readable.lines || [],
+      ...(readable.texts && readable.texts.length > 0 ? { texts: readable.texts } : {}),
       ...(readable.layerOrder ? { layerOrder: readable.layerOrder } : {}),
       viewport: readable.viewport,
       presets: presetsOut,
@@ -1522,23 +1865,63 @@
    * Persisted to localStorage AND projects/_cfv_library_meta.json!
    * ------------------------------------------------------------------------- */
 
+  const BUILTIN_CATEGORY_FOLDERS = {
+    map: [
+      { id: "cat_complex_analysis", name: "Complex Analysis & Conformal Maps" },
+      { id: "cat_contours", name: "Contour Integration & Residues" },
+      { id: "cat_fractals", name: "Fractals & Complex Dynamics" },
+      { id: "cat_art_atlas", name: "Spheres, Atlases & Conformal Art" },
+    ],
+    real: [
+      { id: "cat_calculus", name: "Calculus & Classroom Theorems" },
+      { id: "cat_measure_analysis", name: "Measure Theory & Real Analysis" },
+      { id: "cat_number_theory", name: "Number Theory & Primes" },
+      { id: "cat_physics", name: "Physics Simulations" },
+      { id: "cat_curves_art", name: "Curves, Epicycles & Automata" },
+    ],
+  };
+
+  function isBuiltinFolderId(id) {
+    if (!id || id === "my" || id === "examples") return true;
+    return BUILTIN_CATEGORY_FOLDERS.map.some((f) => f.id === id) ||
+      BUILTIN_CATEGORY_FOLDERS.real.some((f) => f.id === id);
+  }
+
+  function defaultCategoryFolderForMode(mode) {
+    return mode === "real" ? "cat_calculus" : "cat_complex_analysis";
+  }
+
+  function resolveExampleFolderId(ex) {
+    const mode = ex && ex.mode === "real" ? "real" : "map";
+    const cats = BUILTIN_CATEGORY_FOLDERS[mode];
+    if (ex && ex.folder && cats.some((f) => f.id === ex.folder)) return ex.folder;
+    if (mode === "map" && ex && (ex.contourMode || ex.mode === "integral")) return "cat_contours";
+    return cats[0].id;
+  }
+
   function normalizeLibraryMeta(raw) {
     const folders = Array.isArray(raw && raw.folders)
       ? raw.folders
-          .filter((f) => f && f.id && f.name && f.id !== "my" && f.id !== "examples")
+          .filter((f) => f && f.id && f.name && !isBuiltinFolderId(f.id))
           .map((f) => ({
             id: String(f.id),
             name: String(f.name).trim(),
-            mode: f.mode === "real" || f.mode === "integral" ? f.mode : "map",
+            mode: f.mode === "real" ? "real" : "map",
           }))
       : [];
     const exampleRenames = raw && raw.exampleRenames && typeof raw.exampleRenames === "object"
       ? { ...raw.exampleRenames }
       : {};
+    const exampleDescriptions = raw && raw.exampleDescriptions && typeof raw.exampleDescriptions === "object"
+      ? { ...raw.exampleDescriptions }
+      : {};
     const deletedExamples = Array.isArray(raw && raw.deletedExamples)
       ? Array.from(new Set(raw.deletedExamples.map(String)))
       : [];
-    return { folders, exampleRenames, deletedExamples };
+    const lockedProjects = raw && raw.lockedProjects && typeof raw.lockedProjects === "object"
+      ? { ...raw.lockedProjects }
+      : {};
+    return { folders, exampleRenames, exampleDescriptions, deletedExamples, lockedProjects };
   }
 
   function loadLibraryMeta() {
@@ -1573,15 +1956,17 @@
   }
 
   function getModeDisplayName(mode = state.mode) {
-    return mode === "real" ? "2D Real" : mode === "integral" ? "Contour Integral" : "Complex Map";
+    return mode === "real" ? "Real" : "Complex";
   }
 
   function getFoldersForMode(mode = state.mode) {
-    const custom = (state.libraryMeta.folders || []).filter((f) => f.mode === mode);
+    const m = normMode(mode);
+    const custom = (state.libraryMeta.folders || []).filter((f) => normMode(f.mode) === m);
+    const cats = (BUILTIN_CATEGORY_FOLDERS[m] || []).map((f) => ({ ...f, builtin: true, isCategory: true, mode: m }));
     return [
-      { id: "my", name: "My Saved Projects", builtin: true, mode },
-      ...custom.map((f) => ({ ...f, builtin: false })),
-      { id: "examples", name: `Example ${getModeDisplayName(mode)} Projects`, builtin: true, mode },
+      { id: "my", name: "My Saved Projects", builtin: true, mode: m },
+      ...custom.map((f) => ({ ...f, builtin: false, mode: m })),
+      ...cats,
     ];
   }
 
@@ -1612,7 +1997,7 @@
   }
 
   function deleteFolder(folderId) {
-    if (!folderId || folderId === "my" || folderId === "examples") return;
+    if (!folderId || isBuiltinFolderId(folderId)) return;
     state.libraryMeta.folders = (state.libraryMeta.folders || []).filter((x) => x.id !== folderId);
     const list = [...loadSavedProjects()];
     let moved = false;
@@ -1635,6 +2020,15 @@
     return (custom && String(custom).trim()) || ex.title;
   }
 
+  function getExampleDisplayDescription(ex) {
+    if (!ex) return "";
+    const customMap = state.libraryMeta && state.libraryMeta.exampleDescriptions;
+    if (customMap && Object.prototype.hasOwnProperty.call(customMap, ex.id)) {
+      return String(customMap[ex.id] || "");
+    }
+    return String(ex.description || ex.subtitle || "");
+  }
+
   function isExampleDeleted(exId) {
     return Boolean(
       state.libraryMeta &&
@@ -1643,13 +2037,18 @@
     );
   }
 
-  function renameBuiltInExample(exId, newName) {
+  function renameBuiltInExample(exId, newName, newDescription = undefined) {
     const trimmed = String(newName || "").trim();
     if (!exId || !trimmed) return false;
     state.libraryMeta.exampleRenames[exId] = trimmed;
+    if (newDescription !== undefined) {
+      if (!state.libraryMeta.exampleDescriptions) state.libraryMeta.exampleDescriptions = {};
+      state.libraryMeta.exampleDescriptions[exId] = String(newDescription || "").trim();
+    }
     saveLibraryMeta(true);
     if (!state.activeProjectIsCustom && state.activeProjectId === exId) {
       state.activeProjectName = trimmed;
+      if (newDescription !== undefined) state.activeProjectDescription = String(newDescription || "").trim();
       updateProjectHeaderUI();
     }
     renderExamplesMenu();
@@ -1676,8 +2075,11 @@
   function exampleToProjectObject(ex) {
     if (!ex) return null;
     const displayName = getExampleDisplayName(ex);
-    const mode = ex.mode === "real" || ex.mode === "integral" ? ex.mode : "map";
+    const mode = ex.mode === "real" ? "real" : "map";
     const firstPreset = (ex.presets && ex.presets[0]) || null;
+    const baseProj = (firstPreset && firstPreset.projection) || ex.defaultProjection || ((firstPreset && (firstPreset.enableSphere || firstPreset.showSphere)) || ex.defaultSphere ? "sphere" : "planar");
+    const baseContour = (firstPreset && firstPreset.contourMode !== undefined) ? Boolean(firstPreset.contourMode) : Boolean(ex.contourMode || ex.mode === "integral");
+    const baseDom = (firstPreset && firstPreset.showDomain !== undefined) ? Boolean(firstPreset.showDomain) : Boolean(ex.showDomain);
     const baseVp = mode === "real"
       ? {
           view: (firstPreset && firstPreset.view) || ex.defaultView || { xmin: -10, xmax: 10, ymin: -10, ymax: 10 },
@@ -1690,52 +2092,83 @@
           outView: (firstPreset && firstPreset.outView) || ex.defaultOutView || { cx: 0, cy: 0, r: 4 },
           inSquare: (firstPreset && firstPreset.inSquare !== undefined) ? Boolean(firstPreset.inSquare) : true,
           outSquare: (firstPreset && firstPreset.outSquare !== undefined) ? Boolean(firstPreset.outSquare) : true,
-          showSphere: (firstPreset && firstPreset.showSphere !== undefined) ? Boolean(firstPreset.showSphere) : Boolean(ex.defaultSphere),
+          contourMode: baseContour,
+          showMesh: (firstPreset && firstPreset.showMesh !== undefined) ? Boolean(firstPreset.showMesh) : (ex.showMesh !== undefined ? Boolean(ex.showMesh) : true),
+          projection: baseProj,
+          ...((firstPreset && firstPreset.projectionExpr) || ex.projectionExpr ? { projectionExpr: (firstPreset && firstPreset.projectionExpr) || ex.projectionExpr } : {}),
+          showSphere: baseProj === "sphere",
           sphereView: (firstPreset && firstPreset.sphereView) || ex.defaultSphereView || { yaw: -0.58, pitch: 0.22, zoom: 1.0 },
+          ...(baseDom ? {
+            showDomain: true,
+            domainScheme: (firstPreset && firstPreset.domainScheme) || ex.domainScheme || "classic",
+            domainOpacity: normOpacityWs((firstPreset && firstPreset.domainOpacity) ?? ex.domainOpacity, 1.0),
+          } : {}),
         };
     const presetsOut = (ex.presets || []).map((bp, idx) => {
       const pr = { id: bp.id || `preset_${idx + 1}`, name: bp.name || `Preset ${idx + 1}` };
       if (bp.sliderValues) pr.sliderValues = { ...bp.sliderValues };
       if (bp.startSlider) pr.startSlider = bp.startSlider;
       if (Array.isArray(bp.visibleFnIndices)) pr.visibleFnIndices = [...bp.visibleFnIndices];
+      if (typeof bp.activeFnIndex === "number") pr.activeFnIndex = bp.activeFnIndex;
       if (mode === "real") {
         pr.viewport = {
           view: bp.view ? { ...bp.view } : { ...baseVp.view },
           squareAspect: bp.squareAspect !== undefined ? Boolean(bp.squareAspect) : baseVp.squareAspect,
         };
+        if (Array.isArray(bp.shapes)) pr.shapes = JSON.parse(JSON.stringify(bp.shapes));
         if (Array.isArray(bp.polygons)) pr.seedCells = bp.polygons.map((c) => [c[0], c[1]]);
         if (bp.fillGrid) pr.fillGrid = true;
       } else {
+        const bpProj = bp.projection || ex.defaultProjection || (bp.enableSphere || bp.showSphere ? "sphere" : "planar");
+        const bpContour = bp.contourMode !== undefined ? Boolean(bp.contourMode) : baseContour;
+        const bpDom = bp.showDomain !== undefined ? Boolean(bp.showDomain) : Boolean(ex.showDomain);
         pr.viewport = {
           inView: bp.inView ? { ...bp.inView } : { ...baseVp.inView },
           outView: bp.outView ? { ...bp.outView } : { ...baseVp.outView },
           inSquare: bp.inSquare !== undefined ? Boolean(bp.inSquare) : baseVp.inSquare,
           outSquare: bp.outSquare !== undefined ? Boolean(bp.outSquare) : baseVp.outSquare,
-          showSphere: bp.showSphere !== undefined ? Boolean(bp.showSphere) : baseVp.showSphere,
+          contourMode: bpContour,
+          showMesh: bp.showMesh !== undefined ? Boolean(bp.showMesh) : baseVp.showMesh,
+          projection: bpProj,
+          ...(bp.projectionExpr ? { projectionExpr: bp.projectionExpr } : {}),
+          showSphere: bpProj === "sphere",
           sphereView: bp.sphereView ? { ...bp.sphereView } : { ...baseVp.sphereView },
+          ...(bpDom ? {
+            showDomain: true,
+            domainScheme: bp.domainScheme || ex.domainScheme || "classic",
+            domainOpacity: normOpacityWs(bp.domainOpacity ?? ex.domainOpacity, 1.0),
+          } : {}),
         };
         if (Array.isArray(bp.shapes)) pr.shapes = JSON.parse(JSON.stringify(bp.shapes));
       }
       if (Array.isArray(bp.points)) pr.points = JSON.parse(JSON.stringify(bp.points));
       if (Array.isArray(bp.lines)) pr.lines = JSON.parse(JSON.stringify(bp.lines));
+      if (Array.isArray(bp.texts)) pr.texts = JSON.parse(JSON.stringify(bp.texts));
+      if (bp.layout) pr.layout = { ...bp.layout };
       return pr;
     });
     const out = {
       format: "cfv_project_v1",
       id: ex.id,
       name: displayName,
-      folder: "examples",
+      folder: resolveExampleFolderId(ex),
       subtitle: ex.subtitle || "",
+      description: getExampleDisplayDescription(ex),
       mode,
       cards: JSON.parse(JSON.stringify(ex.fnCards || [])),
       sliders: JSON.parse(JSON.stringify(ex.sliders || [])),
       vars: JSON.parse(JSON.stringify(ex.vars || [])),
       points: JSON.parse(JSON.stringify((firstPreset && firstPreset.points) || ex.defaultPoints || [])),
       lines: JSON.parse(JSON.stringify((firstPreset && firstPreset.lines) || ex.defaultLines || [])),
+      texts: JSON.parse(JSON.stringify((firstPreset && firstPreset.texts) || ex.defaultTexts || [])),
+      ...(firstPreset && firstPreset.layout ? { layout: { ...firstPreset.layout } } : {}),
       viewport: baseVp,
       presets: presetsOut,
     };
     if (mode === "real") {
+      if (firstPreset && Array.isArray(firstPreset.shapes)) {
+        out.shapes = JSON.parse(JSON.stringify(firstPreset.shapes));
+      }
       if (firstPreset && Array.isArray(firstPreset.polygons)) {
         out.seedCells = firstPreset.polygons.map((c) => [c[0], c[1]]);
       }
@@ -1790,8 +2223,10 @@
     if (!rawProj || typeof rawProj !== "object" || isLibraryMetaRecord(rawProj)) return null;
     const id = String(rawProj.id || ("proj_" + Date.now() + "_" + Math.floor(Math.random() * 1000)));
     const name = String(rawProj.name || rawProj.title || "Saved Project").trim();
-    const mode = rawProj.mode === "real" || rawProj.mode === "integral" ? rawProj.mode : "map";
-    const folder = typeof rawProj.folder === "string" && rawProj.folder.trim() ? rawProj.folder.trim() : "my";
+    const rawMode = rawProj.mode === "real" || rawProj.mode === "integral" ? rawProj.mode : "map";
+    const mode = rawMode === "real" ? "real" : "map";
+    const rawFolder = typeof rawProj.folder === "string" && rawProj.folder.trim() ? rawProj.folder.trim() : "my";
+    const folder = rawFolder === "examples" ? defaultCategoryFolderForMode(mode) : rawFolder;
     const baseState = readableStateToSnapshot(rawProj);
     const presets = (rawProj.presets || []).map((p, idx) => ({
       id: p.id || `pr_${idx + 1}`,
@@ -1821,6 +2256,8 @@
       ...(readableBase.seedCells ? { seedCells: readableBase.seedCells } : {}),
       points: readableBase.points || [],
       lines: readableBase.lines || [],
+      ...(readableBase.texts && readableBase.texts.length > 0 ? { texts: readableBase.texts } : {}),
+      ...(readableBase.layout ? { layout: readableBase.layout } : {}),
       ...(readableBase.layerOrder ? { layerOrder: readableBase.layerOrder } : {}),
       viewport: readableBase.viewport || {},
       baseState,
@@ -1925,6 +2362,7 @@
         state.libraryMeta = {
           folders: Array.from(fMap.values()),
           exampleRenames: { ...(state.libraryMeta.exampleRenames || {}), ...srvMeta.exampleRenames },
+          exampleDescriptions: { ...(state.libraryMeta.exampleDescriptions || {}), ...(srvMeta.exampleDescriptions || {}) },
           deletedExamples: Array.from(new Set([...(state.libraryMeta.deletedExamples || []), ...srvMeta.deletedExamples])),
         };
         saveLibraryMeta(false);
@@ -1965,20 +2403,32 @@
   function saveCurrentProject(name, opts = {}) {
     const forceNew = Boolean(opts && opts.forceNew);
     const inSaved = isInSavedProject();
+    const exampleTargetId = (!forceNew && !inSaved && (state.sourceExampleId || state.activeProjectId))
+      ? (state.sourceExampleId || state.activeProjectId)
+      : null;
     const rawName = (name !== undefined && name !== null && String(name).trim())
       ? String(name).trim()
-      : (inSaved ? state.activeProjectName : "");
+      : (state.activeProjectName && state.activeProjectName !== "Unsaved Project" && state.activeProjectName !== "New Project"
+          ? state.activeProjectName
+          : (exampleTargetId && window.CFVExamples ? getExampleDisplayName(window.CFVExamples.byId(exampleTargetId)) : ""));
     const trimmed = (rawName || "").trim();
     if (!trimmed) return null;
+    if (opts && opts.description !== undefined) {
+      state.activeProjectDescription = String(opts.description || "").trim();
+    }
 
     const list = [...loadSavedProjects()];
     const fullObj = exportFullProjectObject(trimmed);
+    if (opts && opts.description !== undefined) {
+      fullObj.description = state.activeProjectDescription;
+    }
     const baseState = buildWorkspaceSnapshot();
     const presetsCopy = serializeProjectPresets(state.projectPresets, fullObj);
 
     let entry = null;
-    if (!forceNew && inSaved) {
-      const existing = list.find((p) => p.id === state.activeProjectId);
+    const existingId = !forceNew ? (inSaved ? state.activeProjectId : exampleTargetId) : null;
+    if (existingId) {
+      const existing = list.find((p) => p.id === existingId);
       if (existing) {
         const folderId = (opts && opts.folder) || existing.folder || state.activeProjectFolder || "my";
         Object.assign(existing, fullObj, {
@@ -1995,8 +2445,9 @@
       }
     }
     if (!entry) {
-      const newId = "proj_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-      const folderId = (opts && opts.folder) || state.activeProjectFolder || "my";
+      const newId = existingId || ("proj_" + Date.now() + "_" + Math.floor(Math.random() * 1000));
+      const exObj = exampleTargetId && window.CFVExamples ? window.CFVExamples.byId(exampleTargetId) : null;
+      const folderId = (opts && opts.folder) || (exObj ? resolveExampleFolderId(exObj) : null) || state.activeProjectFolder || "my";
       entry = normalizeStoredProject({
         ...fullObj,
         id: newId,
@@ -2004,13 +2455,18 @@
         folder: folderId,
         mode: state.mode,
         isCustom: true,
-        sourceExampleId: state.sourceExampleId || null,
+        sourceExampleId: state.sourceExampleId || (exObj ? exObj.id : null),
         baseState,
         presets: presetsCopy,
       });
       list.push(entry);
     }
 
+    if (forceNew && entry && entry.id) {
+      if (!state.libraryMeta.lockedProjects) state.libraryMeta.lockedProjects = {};
+      state.libraryMeta.lockedProjects[entry.id] = false;
+      saveLibraryMeta(true);
+    }
     writeSavedProjects(list);
     persistProjectToRepo(entry);
     state.activeProjectId = entry.id;
@@ -2027,13 +2483,21 @@
   }
 
   function saveCurrentProjectInPlace() {
-    if (!isInSavedProject()) return null;
-    /* If currently inside a custom preset, also update that preset's snapshot when saving in-place! */
+    if (!canSaveInPlace()) return null;
+    /* Update active preset's snapshot when saving in-place (works for custom projects AND edited built-in examples!) */
     if (state.activePresetId) {
-      const pr = state.projectPresets.find((p) => p.id === state.activePresetId && p.isCustom);
-      if (pr) pr.snapshot = buildWorkspaceSnapshot();
+      const pr = state.projectPresets.find((p) => p.id === state.activePresetId);
+      if (pr) {
+        pr.snapshot = buildWorkspaceSnapshot();
+        pr.builtinPreset = null;
+        pr.isCustom = true;
+      }
     }
-    const saved = saveCurrentProject(state.activeProjectName, { forceNew: false });
+    const targetName =
+      state.activeProjectName && state.activeProjectName !== "Unsaved Project" && state.activeProjectName !== "New Project"
+        ? state.activeProjectName
+        : (state.sourceExampleId && window.CFVExamples ? getExampleDisplayName(window.CFVExamples.byId(state.sourceExampleId)) : defaultProjectName());
+    const saved = saveCurrentProject(targetName, { forceNew: false });
     if (saved && btnSaveProject) {
       btnSaveProject.classList.add("saved-flash");
       btnSaveProject.textContent = "✓ Saved";
@@ -2045,17 +2509,19 @@
     return saved;
   }
 
-  function renameSavedProject(projId, newName) {
+  function renameSavedProject(projId, newName, newDescription = undefined) {
     const trimmed = (newName || "").trim();
     if (!projId || !trimmed) return null;
     const list = [...loadSavedProjects()];
     const proj = list.find((p) => p.id === projId);
     if (!proj) return null;
     proj.name = trimmed;
+    if (newDescription !== undefined) proj.description = String(newDescription || "").trim();
     writeSavedProjects(list);
     persistProjectToRepo(proj);
     if (state.activeProjectIsCustom && state.activeProjectId === projId) {
       state.activeProjectName = trimmed;
+      if (newDescription !== undefined) state.activeProjectDescription = proj.description;
       updateProjectHeaderUI();
     }
     renderExamplesMenu();
@@ -2225,7 +2691,8 @@
     try {
       closeItemSettings();
       closeExamplesDropdown();
-      const targetMode = snap.m === "real" || snap.m === "integral" ? snap.m : "map";
+      const rawTargetMode = snap.m === "real" || snap.m === "integral" ? snap.m : "map";
+      const targetMode = rawTargetMode === "real" ? "real" : "map";
 
       if (meta) {
         state.activeProjectId = meta.projectId ?? null;
@@ -2251,7 +2718,9 @@
       if (window.CFVReal && typeof window.CFVReal.stopAudio === "function") window.CFVReal.stopAudio();
 
       setModeUI(targetMode);
-      if (targetMode !== "real" && typeof snap.sp === "number") {
+      if (snap.ly) {
+        applyPresetLayout(snap.ly);
+      } else if (targetMode !== "real" && typeof snap.sp === "number") {
         applySplitPct(snap.sp, true);
       }
 
@@ -2324,7 +2793,8 @@
         else window.CFVReal.scheduleSample(true);
         resolveVariables(true, true);
       } else {
-        window.CFVComplex.setMode(targetMode);
+        const wantContour = snap.c && snap.c.cm !== undefined ? Boolean(snap.c.cm) : (rawTargetMode === "integral");
+        window.CFVComplex.setContourMode(wantContour, { silent: true });
         if (snap.c) await window.CFVComplex.restoreSnapshot(snap.c);
         else await window.CFVComplex.recomputeAll(1.0);
         resolveVariables(true, true);
@@ -2461,7 +2931,18 @@
     }
 
     if (complexDrawDock) complexDrawDock.classList.toggle("hidden", isReal);
+    if (realDrawDock) realDrawDock.classList.toggle("hidden", !isReal);
     if (!isReal && realPolyDockEl) realPolyDockEl.classList.add("hidden");
+    if (sidebarToolsTitle) {
+      sidebarToolsTitle.textContent = "Tools & Elements";
+    }
+    /* Keep the Drawing / Landmark Tools Dock at the bottom of whichever sidebar is visible! */
+    if (sidebarToolsDock) {
+      const targetHost = sidebarHidden ? miniSliderSidebar : sidebar;
+      if (targetHost && sidebarToolsDock.parentNode !== targetHost) {
+        targetHost.appendChild(sidebarToolsDock);
+      }
+    }
 
     const showSidebarPill = sidebarHidden;
     const showInPill = !isReal && Boolean(state.inputHidden);
@@ -2485,11 +2966,36 @@
     });
   }
 
+  function applyPresetLayout(ly) {
+    if (!ly || typeof ly !== "object") return;
+    const sb = ly.sidebarCollapsed !== undefined ? Boolean(ly.sidebarCollapsed) : (ly.sb !== undefined ? Boolean(ly.sb) : undefined);
+    const inH = ly.inputHidden !== undefined ? Boolean(ly.inputHidden) : (ly.inH !== undefined ? Boolean(ly.inH) : undefined);
+    const outH = ly.outputHidden !== undefined ? Boolean(ly.outputHidden) : (ly.outH !== undefined ? Boolean(ly.outH) : undefined);
+    const rH = ly.realHidden !== undefined ? Boolean(ly.realHidden) : (ly.rH !== undefined ? Boolean(ly.rH) : undefined);
+    const sbW = ly.sidebarWidth !== undefined ? Number(ly.sidebarWidth) : (ly.sbW !== undefined ? Number(ly.sbW) : undefined);
+    const sp = ly.splitPct !== undefined ? Number(ly.splitPct) : (ly.sp !== undefined ? Number(ly.sp) : undefined);
+    if (sb !== undefined) state.sidebarCollapsed = sb;
+    if (inH !== undefined) state.inputHidden = inH;
+    if (outH !== undefined) state.outputHidden = outH;
+    if (rH !== undefined) state.realHidden = rH;
+    if (Number.isFinite(sbW) && sbW >= 260) state.savedSidebarWidth = Math.round(sbW);
+    if (Number.isFinite(sp) && sp >= 20 && sp <= 80) state.splitPct = sp;
+    applyLayoutVisibility();
+    if (!isRealMode() && !state.inputHidden && !state.outputHidden) {
+      applySplitPct(state.splitPct, true);
+    }
+  }
+
   function setSidebarCollapsed(collapsed) {
     state.sidebarCollapsed = Boolean(collapsed);
     closeItemSettings();
     closeExamplesDropdown();
+    if (state.sidebarCollapsed) {
+      closeFnLibraryDropdown();
+      closeFnGuidePanel();
+    }
     applyLayoutVisibility();
+    notifyStateChanged(false, false);
   }
 
   function setPanelVisibility(panel, visible) {
@@ -2497,6 +3003,7 @@
     else if (panel === "output") state.outputHidden = !visible;
     else if (panel === "real") state.realHidden = !visible;
     applyLayoutVisibility();
+    notifyStateChanged(false, false);
   }
 
   try {
@@ -2516,6 +3023,7 @@
       if (!sbDragging) return;
       const rect = sidebar.getBoundingClientRect();
       applySidebarWidth(e.clientX - rect.left, false);
+      positionSidePanels();
     });
     const endSbDrag = () => {
       if (!sbDragging) return;
@@ -2523,10 +3031,11 @@
       sidebarSplitter.classList.remove("dragging");
       const curW = parseFloat(sidebar.style.width) || sidebar.clientWidth || 372;
       applySidebarWidth(curW, true);
+      positionSidePanels();
     };
     sidebarSplitter.addEventListener("pointerup", endSbDrag);
     sidebarSplitter.addEventListener("pointercancel", endSbDrag);
-    sidebarSplitter.addEventListener("dblclick", () => applySidebarWidth(372, true));
+    sidebarSplitter.addEventListener("dblclick", () => { applySidebarWidth(372, true); positionSidePanels(); });
   }
 
   /* -------------------------------------------------------------------------
@@ -2662,7 +3171,8 @@
       /* During slider animation use immediate single-flight fetch (no artificial debounce lag!) */
       window.CFVReal.scheduleSample(true);
     } else {
-      window.CFVComplex.recomputeAll(fastSlider ? 1.35 : 1.0, Boolean(fastSlider));
+      /* Preserve full polygon/curve fidelity (qScale = 1.0) during slider movement */
+      window.CFVComplex.recomputeAll(1.0, Boolean(fastSlider));
     }
   }
 
@@ -2697,12 +3207,15 @@
       const row = document.createElement("div");
       row.className =
         "expr-card" +
+        (c.kind === "fn" ? " fn-card" : c.kind === "var" ? " var-card" : " slider-card") +
         (isActiveComplex ? " active-primary" : "") +
         (isAuxComplex ? " aux-card" : "") +
-        (c.locked ? " locked-item" : "");
-      row.draggable = true;
+        (c.locked ? " locked-item" : "") +
+        (c.collapsed ? " collapsed" : "");
+      let allowRowDrag = false;
+      row.draggable = false;
       row.addEventListener("dragstart", (ev) => {
-        if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA" || ev.target.tagName === "SELECT")) {
+        if (!allowRowDrag) {
           ev.preventDefault();
           return;
         }
@@ -2740,6 +3253,8 @@
       });
       row.addEventListener("dragend", () => {
         dragFnFromIdx = -1;
+        allowRowDrag = false;
+        row.draggable = false;
         row.classList.remove("dragging-card", "drop-before", "drop-after");
       });
 
@@ -2749,6 +3264,16 @@
       grip.className = "drag-grip";
       grip.textContent = "⋮⋮";
       grip.title = "Drag to reorder card";
+      const resetRowDrag = () => {
+        allowRowDrag = false;
+        row.draggable = false;
+      };
+      grip.addEventListener("pointerdown", () => {
+        allowRowDrag = true;
+        row.draggable = true;
+        window.addEventListener("pointerup", resetRowDrag, { once: true });
+      });
+      grip.addEventListener("pointerup", resetRowDrag);
       gutter.appendChild(grip);
       const num = document.createElement("span");
       num.className = "expr-num";
@@ -2829,6 +3354,18 @@
           head.appendChild(actBtn);
         }
 
+        const minBtn = document.createElement("button");
+        minBtn.className = "expr-mini-btn";
+        minBtn.textContent = c.collapsed ? "▸" : "▾";
+        minBtn.title = c.collapsed ? "Expand card" : "Minimize card";
+        minBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          c.collapsed = !c.collapsed;
+          renderFnCards();
+          notifyStateChanged(true, true);
+        });
+        head.appendChild(minBtn);
+
         const lockBtn = document.createElement("button");
         lockBtn.className = "expr-mini-btn" + (c.locked ? " locked" : "");
         lockBtn.textContent = c.locked ? "🔒" : "🔓";
@@ -2873,7 +3410,7 @@
         body.appendChild(head);
 
         const codeArea = document.createElement("textarea");
-        codeArea.className = "expr-code";
+        codeArea.className = "expr-code fn-code";
         codeArea.spellcheck = false;
         codeArea.readOnly = readOnly || Boolean(c.locked);
         codeArea.value = c.code;
@@ -2973,6 +3510,18 @@
         c._valPillEl = valPill;
         vrow.appendChild(valPill);
 
+        const vMinBtn = document.createElement("button");
+        vMinBtn.className = "expr-mini-btn";
+        vMinBtn.textContent = c.collapsed ? "▸" : "▾";
+        vMinBtn.title = c.collapsed ? "Expand variable" : "Minimize variable";
+        vMinBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          c.collapsed = !c.collapsed;
+          renderFnCards();
+          notifyStateChanged(true, true);
+        });
+        vrow.appendChild(vMinBtn);
+
         const delBtn = document.createElement("button");
         delBtn.className = "expr-mini-btn";
         delBtn.textContent = "×";
@@ -2986,11 +3535,15 @@
         vrow.appendChild(delBtn);
         body.appendChild(vrow);
 
-        if (c.label) {
+        if (c.label && !c.collapsed) {
           const sub = document.createElement("div");
-          sub.className = "var-sub-label";
+          sub.className = "var-sub-label var-body";
           sub.textContent = c.label;
           body.appendChild(sub);
+        }
+        if (c.collapsed) {
+          exprIn.style.display = "none";
+          eq.style.display = "none";
         }
       } else {
         /* Independent Desmos Parameter Slider Card */
@@ -3026,6 +3579,18 @@
         lbl.textContent = c.label || "";
         top.appendChild(lbl);
 
+        const sMinBtn = document.createElement("button");
+        sMinBtn.className = "expr-mini-btn";
+        sMinBtn.textContent = c.collapsed ? "▸" : "▾";
+        sMinBtn.title = c.collapsed ? "Expand slider" : "Minimize slider";
+        sMinBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          c.collapsed = !c.collapsed;
+          renderFnCards();
+          notifyStateChanged(true, true);
+        });
+        top.appendChild(sMinBtn);
+
         const delBtn = document.createElement("button");
         delBtn.className = "expr-mini-btn";
         delBtn.textContent = "×";
@@ -3040,7 +3605,7 @@
         body.appendChild(top);
 
         const ctrl = document.createElement("div");
-        ctrl.className = "slider-controls-row";
+        ctrl.className = "slider-controls-row slider-range-row";
 
         const playBtn = document.createElement("button");
         playBtn.className = "slider-play-btn" + (c.playing ? " playing" : "");
@@ -3383,7 +3948,7 @@
   }
 
   function formatShapeBadge(s) {
-    if (state.mode === "integral") {
+    if (isContourMode()) {
       if (!s.integral) return { text: "…", neg: false };
       if (s.integral.singular) return { text: "pole!", neg: true };
       if (s.closed) {
@@ -3399,14 +3964,17 @@
     return null;
   }
 
-  function buildShapeCard(s, seqNum) {
-    const selected = window.CFVComplex.isShapeSelected
-      ? window.CFVComplex.isShapeSelected(s.id)
-      : s.id === window.CFVComplex.state.selectedShapeId;
+  function buildShapeCard(s, seqNum, isReal = false) {
+    const selected = isReal
+      ? (window.CFVReal && s.id === window.CFVReal.state.selectedShapeId)
+      : (window.CFVComplex.isShapeSelected
+          ? window.CFVComplex.isShapeSelected(s.id)
+          : s.id === window.CFVComplex.state.selectedShapeId);
     const row = document.createElement("div");
     row.className = "expr-card" + (selected ? " selected-item" : "") + (s.locked ? " locked-item" : "");
     row.addEventListener("click", (ev) => {
       if (ev.target.tagName === "INPUT" || ev.target.tagName === "BUTTON" || ev.target.tagName === "SELECT") return;
+      if (isReal) { window.CFVReal.selectShape(s.id); return; }
       if (ev.shiftKey) window.CFVComplex.selectShape(s.id, { range: true });
       else if (ev.ctrlKey || ev.metaKey) window.CFVComplex.selectShape(s.id, { toggle: true });
       else window.CFVComplex.selectShape(s.id);
@@ -3427,8 +3995,12 @@
       ev.stopPropagation();
       if (ev.shiftKey) { openItemSettings("shape", s.id, dot); return; }
       s.visible = !s.visible;
-      window.CFVComplex.updateIntegralPanel();
-      window.CFVComplex.requestRender();
+      if (isReal) {
+        window.CFVReal.requestRender();
+      } else {
+        window.CFVComplex.updateIntegralPanel();
+        window.CFVComplex.requestRender();
+      }
       renderDomainCards();
       notifyStateChanged(true, true);
     });
@@ -3445,7 +4017,12 @@
     tag.className = "expr-fn-tag";
     tag.style.color = "#34d399";
     tag.style.background = "rgba(52,211,153,0.12)";
-    tag.textContent = s.kind === "freehand" ? (s.closed ? "Loop" : "Path") : s.kind[0].toUpperCase() + s.kind.slice(1);
+    tag.textContent =
+      s.kind === "freehand" ? (s.closed ? "Loop" : "Path") :
+      s.kind === "infline" ? "Line" :
+      s.kind === "ray" ? "Ray" :
+      s.kind === "seg" || s.kind === "line" ? "Seg" :
+      s.kind[0].toUpperCase() + s.kind.slice(1);
     head.appendChild(tag);
 
     const titleIn = document.createElement("input");
@@ -3454,16 +4031,16 @@
     titleIn.disabled = Boolean(s.locked);
     titleIn.addEventListener("input", () => {
       s.label = titleIn.value;
-      window.CFVComplex.updateIntegralPanel();
+      if (!isReal) window.CFVComplex.updateIntegralPanel();
       notifyStateChanged(false, true);
     });
     head.appendChild(titleIn);
 
-    if (!s.locked) {
+    if (!isReal) {
       const fxBtn = document.createElement("button");
       fxBtn.className = "expr-mini-btn fx-btn" + (s.formula ? " active" : "");
       fxBtn.textContent = "fx";
-      fxBtn.title = s.formula ? "Detach variable formula (make static)" : "Bind to slider variables (R, r, eps, pi…)";
+      fxBtn.title = s.formula ? "Detach variable formula (make static)" : "Bind to slider variables (works even when locked!)";
       fxBtn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
         if (s.formula) {
@@ -3487,7 +4064,8 @@
       s.locked = !s.locked;
       renderDomainCards();
       refreshSettingsIfTarget("shape", s.id);
-      window.CFVComplex.requestRender();
+      if (isReal) window.CFVReal.requestRender();
+      else window.CFVComplex.requestRender();
       notifyStateChanged(true, true);
     });
     if (s.locked) {
@@ -3517,7 +4095,8 @@
       delBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         closeItemSettings();
-        window.CFVComplex.deleteShape(s.id);
+        if (isReal) window.CFVReal.deleteShape(s.id);
+        else window.CFVComplex.deleteShape(s.id);
       });
       head.appendChild(delBtn);
     }
@@ -3529,7 +4108,7 @@
     leftMeta.textContent = `${s.closed ? "Closed" : "Open"}${s.locked ? " · Locked" : ""}`;
     meta.appendChild(leftMeta);
 
-    const badge = formatShapeBadge(s);
+    const badge = isReal ? null : formatShapeBadge(s);
     if (badge) {
       const pill = document.createElement("span");
       pill.className = "shape-val-pill" + (badge.neg ? " neg" : "");
@@ -3550,7 +4129,6 @@
       kindLbl.textContent = "type";
       const kindSel = document.createElement("select");
       kindSel.className = "formula-in";
-      kindSel.disabled = Boolean(s.locked);
       for (const [val, lbl] of [
         ["arc", "Arc (cx, cy, r, a0, a1)"],
         ["line", "Line (x0, y0 → x1, y1)"],
@@ -3598,7 +4176,6 @@
         inp.type = "text";
         inp.spellcheck = false;
         inp.value = String(f[key] ?? "");
-        inp.disabled = Boolean(s.locked);
         inp.addEventListener("input", () => {
           s.formula[key] = inp.value;
           window.CFVComplex.rebuildShapeFromFormula(s);
@@ -3749,24 +4326,34 @@
     valRow.appendChild(axisBtn);
 
     const valIn = document.createElement("input");
-    valIn.type = "number";
-    valIn.step = "0.1";
+    valIn.type = "text";
+    valIn.spellcheck = false;
     valIn.className = "coord-in";
-    valIn.style.width = "96px";
+    valIn.style.width = "128px";
+    valIn.placeholder = "value or expr (e.g. a)";
+    valIn.title = "Number or variable formula (e.g. a, b, pi/2) — moves live even when locked!";
     valIn.dataset.lineId = String(ln.id);
-    valIn.value = Number(ln.value.toFixed(4)).toString();
-    valIn.disabled = Boolean(ln.locked);
+    valIn.value = ln.valExpr && String(ln.valExpr).trim() ? String(ln.valExpr) : Number(ln.value.toFixed(4)).toString();
     valIn.addEventListener("input", () => {
-      const v = parseFloat(valIn.value);
-      if (!Number.isFinite(v)) return;
-      ln.value = v;
+      const raw = valIn.value.trim();
+      const evFn = window.CFVComplex && window.CFVComplex.evalParamExpr;
+      if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(raw)) {
+        ln.valExpr = "";
+        ln.value = parseFloat(raw);
+      } else if (raw && evFn) {
+        ln.valExpr = raw;
+        const v = evFn(raw, getParamMap());
+        if (Number.isFinite(v)) ln.value = v;
+      } else {
+        return;
+      }
       if (isReal) window.CFVReal.requestRender();
       else window.CFVComplex.requestRender();
       notifyStateChanged(false, true);
     });
     valRow.appendChild(valIn);
 
-    if (state.mode === "integral") {
+    if (isContourMode()) {
       const note = document.createElement("span");
       note.style.cssText = "margin-left:auto;font-size:9.5px;color:#64748b;";
       note.textContent = "guide only";
@@ -3898,17 +4485,30 @@
     const lblX = document.createElement("span");
     lblX.textContent = isReal ? "x:" : "Re:";
     const xIn = document.createElement("input");
-    xIn.type = "number";
-    xIn.step = "0.1";
+    xIn.type = "text";
+    xIn.spellcheck = false;
     xIn.className = "coord-in";
     xIn.dataset.ptId = String(p.id);
     xIn.dataset.axis = "x";
-    xIn.value = Number(p.x.toFixed(4)).toString();
-    xIn.disabled = Boolean(p.locked);
+    xIn.placeholder = "0 or expr";
+    xIn.title = "Number or variable formula (e.g. a, cx0, cos(t)) — updates live even when locked";
+    xIn.value = (p.xExpr && String(p.xExpr).trim()) ? String(p.xExpr) : Number(p.x.toFixed(4)).toString();
     xIn.addEventListener("input", () => {
-      const v = parseFloat(xIn.value);
-      if (!Number.isFinite(v)) return;
-      p.x = v;
+      const raw = xIn.value.trim();
+      if (!raw) return;
+      const numOnly = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.test(raw);
+      if (numOnly) {
+        const v = parseFloat(raw);
+        if (!Number.isFinite(v)) return;
+        p.x = v;
+        p.xExpr = "";
+      } else {
+        p.xExpr = raw;
+        if (window.CFVComplex && window.CFVComplex.evalParamExpr) {
+          const ev = window.CFVComplex.evalParamExpr(raw, getParamEnv());
+          if (Number.isFinite(ev)) p.x = ev;
+        }
+      }
       if (isReal) window.CFVReal.requestRender();
       else window.CFVComplex.recomputePoints();
       notifyStateChanged(false, true);
@@ -3917,17 +4517,30 @@
     const lblY = document.createElement("span");
     lblY.textContent = isReal ? "y:" : "Im:";
     const yIn = document.createElement("input");
-    yIn.type = "number";
-    yIn.step = "0.1";
+    yIn.type = "text";
+    yIn.spellcheck = false;
     yIn.className = "coord-in";
     yIn.dataset.ptId = String(p.id);
     yIn.dataset.axis = "y";
-    yIn.value = Number(p.y.toFixed(4)).toString();
-    yIn.disabled = Boolean(p.locked);
+    yIn.placeholder = "0 or expr";
+    yIn.title = "Number or variable formula (e.g. sin(a), cy0) — updates live even when locked";
+    yIn.value = (p.yExpr && String(p.yExpr).trim()) ? String(p.yExpr) : Number(p.y.toFixed(4)).toString();
     yIn.addEventListener("input", () => {
-      const v = parseFloat(yIn.value);
-      if (!Number.isFinite(v)) return;
-      p.y = v;
+      const raw = yIn.value.trim();
+      if (!raw) return;
+      const numOnly = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.test(raw);
+      if (numOnly) {
+        const v = parseFloat(raw);
+        if (!Number.isFinite(v)) return;
+        p.y = v;
+        p.yExpr = "";
+      } else {
+        p.yExpr = raw;
+        if (window.CFVComplex && window.CFVComplex.evalParamExpr) {
+          const ev = window.CFVComplex.evalParamExpr(raw, getParamEnv());
+          if (Number.isFinite(ev)) p.y = ev;
+        }
+      }
       if (isReal) window.CFVReal.requestRender();
       else window.CFVComplex.recomputePoints();
       notifyStateChanged(false, true);
@@ -3938,6 +4551,285 @@
     coords.appendChild(lblY);
     coords.appendChild(yIn);
     body.appendChild(coords);
+    row.appendChild(body);
+    return row;
+  }
+
+  function buildTextCard(tb, seq, isReal) {
+    const row = document.createElement("div");
+    const selId = isReal ? window.CFVReal.state.selectedTextId : window.CFVComplex.state.selectedTextId;
+    const isSel = selId === tb.id;
+    row.className = "expr-card point-card text-card" + (isSel ? " selected" : "") + (tb.visible === false ? " hidden-card" : "") + (tb.locked ? " locked-card" : "");
+    row.dataset.textId = String(tb.id);
+    row.addEventListener("click", (ev) => {
+      if (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA" || ev.target.tagName === "SELECT" || ev.target.tagName === "BUTTON") return;
+      if (isReal) window.CFVReal.selectTextBox(tb.id);
+      else window.CFVComplex.selectTextBox(tb.id);
+    });
+    row.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      openItemSettingsAt("text", tb.id, ev.clientX, ev.clientY);
+    });
+
+    const gutter = document.createElement("div");
+    gutter.className = "expr-gutter";
+    const num = document.createElement("span");
+    num.className = "expr-num";
+    num.textContent = String(seq);
+    const dot = document.createElement("button");
+    dot.className = "expr-vis-dot" + (tb.visible === false ? " off" : "");
+    dot.dataset.settingsTrigger = "1";
+    dot.style.setProperty("--card-color", tb.color || "#38bdf8");
+    dot.style.display = "grid";
+    dot.style.placeItems = "center";
+    dot.style.fontSize = "10px";
+    dot.style.fontWeight = "700";
+    dot.style.color = tb.visible === false ? (tb.color || "#38bdf8") : "#061019";
+    dot.textContent = "T";
+    dot.title = "Show/hide text box · Shift+click for style settings";
+    dot.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (ev.shiftKey) { openItemSettings("text", tb.id, dot); return; }
+      tb.visible = tb.visible === false;
+      renderDomainCards();
+      if (isReal) window.CFVReal.requestRender();
+      else window.CFVComplex.requestRender();
+      notifyStateChanged(true, true);
+    });
+    gutter.appendChild(num);
+    gutter.appendChild(dot);
+    row.appendChild(gutter);
+
+    const body = document.createElement("div");
+    body.className = "expr-body";
+
+    const head = document.createElement("div");
+    head.className = "expr-head";
+    const kind = document.createElement("span");
+    kind.className = "expr-fn-tag";
+    kind.textContent = "Text";
+    kind.style.color = tb.color || "#38bdf8";
+    kind.style.background = "rgba(56,189,248,0.14)";
+    head.appendChild(kind);
+
+    const titleIn = document.createElement("input");
+    titleIn.className = "expr-title-input";
+    titleIn.type = "text";
+    titleIn.value = tb.title || "";
+    titleIn.placeholder = "Note title…";
+    titleIn.addEventListener("input", () => {
+      tb.title = titleIn.value;
+      if (isReal) window.CFVReal.requestRender();
+      else window.CFVComplex.requestRender();
+      notifyStateChanged(false, true);
+    });
+    head.appendChild(titleIn);
+
+    const lockBtn = document.createElement("button");
+    lockBtn.className = "expr-mini-btn" + (tb.locked ? " active" : "");
+    lockBtn.textContent = tb.locked ? "🔒" : "🔓";
+    lockBtn.title = tb.locked ? "Locked (click to unlock)" : "Lock text box";
+    lockBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      tb.locked = !tb.locked;
+      renderDomainCards();
+      notifyStateChanged(true, true);
+    });
+    if (tb.locked) {
+      const lkPill = document.createElement("span");
+      lkPill.className = "locked-pill-badge";
+      lkPill.textContent = "Locked";
+      head.appendChild(lkPill);
+    }
+    head.appendChild(lockBtn);
+
+    const gearBtn = document.createElement("button");
+    gearBtn.className = "expr-mini-btn";
+    gearBtn.dataset.settingsTrigger = "1";
+    gearBtn.textContent = "⚙";
+    gearBtn.title = "Text box color & opacity";
+    gearBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      openItemSettings("text", tb.id, gearBtn);
+    });
+    head.appendChild(gearBtn);
+
+    if (!tb.locked) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "expr-mini-btn";
+      delBtn.textContent = "×";
+      delBtn.title = "Delete text box";
+      delBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        closeItemSettings();
+        if (isReal) window.CFVReal.deleteTextBox(tb.id);
+        else window.CFVComplex.deleteTextBox(tb.id);
+      });
+      head.appendChild(delBtn);
+    }
+    body.appendChild(head);
+
+    /* Live Rendered Inline LaTeX Preview + Click-to-Edit Source in Sidebar Text Cards */
+    const previewEl = document.createElement("div");
+    previewEl.className = "text-math-preview";
+    previewEl.title = "Click to edit text or inline LaTeX ($...$)";
+    const updatePreview = () => {
+      const raw = tb.text || "";
+      if (!raw.trim()) {
+        previewEl.innerHTML = '<span style="color:var(--text-muted);font-style:italic">Click to add note (supports $LaTeX$ math)…</span>';
+      } else if (window.CFVMathTex && window.CFVMathTex.renderToHtml) {
+        previewEl.innerHTML = window.CFVMathTex.renderToHtml(raw);
+      } else {
+        previewEl.textContent = raw;
+      }
+    };
+    updatePreview();
+
+    const textArea = document.createElement("textarea");
+    textArea.className = "text-card-area hidden";
+    const estLines = String(tb.text || "").split("\n").reduce((acc, l) => acc + Math.max(1, Math.ceil((l.length || 1) / 30)), 0);
+    textArea.rows = Math.max(2, Math.min(18, estLines));
+    textArea.placeholder = "Explain the math — wrap inline LaTeX in $...$ (e.g. $\\frac{f(b)-f(a)}{b-a}$)";
+    textArea.value = tb.text || "";
+    const autoSizeTa = () => {
+      if (tb.collapsed || textArea.classList.contains("hidden") || Number(tb.cardHeight) > 0) return;
+      textArea.style.height = "auto";
+      const sh = textArea.scrollHeight;
+      if (sh > 0) textArea.style.height = `${Math.max(46, sh + 4)}px`;
+    };
+    textArea._autoSizeTa = autoSizeTa;
+    previewEl.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      previewEl.classList.add("hidden");
+      textArea.classList.remove("hidden");
+      autoSizeTa();
+      textArea.focus();
+    });
+    textArea.addEventListener("blur", () => {
+      updatePreview();
+      textArea.classList.add("hidden");
+      previewEl.classList.remove("hidden");
+    });
+    textArea.addEventListener("input", () => {
+      tb.text = textArea.value;
+      updatePreview();
+      autoSizeTa();
+      if (isReal) window.CFVReal.requestRender();
+      else window.CFVComplex.requestRender();
+      notifyStateChanged(false, true);
+    });
+    body.appendChild(previewEl);
+    body.appendChild(textArea);
+
+    const controls = document.createElement("div");
+    controls.className = "point-coords-row";
+    const anchorSel = document.createElement("select");
+    anchorSel.className = "text-anchor-sel";
+    anchorSel.title = "Position on graph (drag box directly on canvas to move freely!)";
+    [
+      ["bottom-left", "Bottom Left"],
+      ["top-left", "Top Left"],
+      ["top-right", "Top Right"],
+      ["bottom-right", "Bottom Right"],
+      ["free", "Free (Dragged)"],
+      ["world", "World (x, y)"],
+    ].forEach(([val, lbl]) => {
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = lbl;
+      if ((tb.anchor || "bottom-left") === val) opt.selected = true;
+      anchorSel.appendChild(opt);
+    });
+    anchorSel.addEventListener("change", () => {
+      tb.anchor = anchorSel.value;
+      if (tb.anchor === "free" && (!Number.isFinite(Number(tb.nx)) || !Number.isFinite(Number(tb.ny)))) {
+        tb.nx = 0.04;
+        tb.ny = 0.72;
+      }
+      renderDomainCards();
+      if (isReal) window.CFVReal.requestRender();
+      else window.CFVComplex.requestRender();
+      notifyStateChanged(true, true);
+    });
+    controls.appendChild(anchorSel);
+
+    if (!isReal) {
+      const planeSel = document.createElement("select");
+      planeSel.className = "text-anchor-sel";
+      planeSel.title = "Which complex plane displays this note";
+      [
+        ["in", "z-Plane (In)"],
+        ["out", "w-Plane (Out)"],
+      ].forEach(([val, lbl]) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = lbl;
+        if ((tb.plane || "in") === val) opt.selected = true;
+        planeSel.appendChild(opt);
+      });
+      planeSel.addEventListener("change", () => {
+        tb.plane = planeSel.value;
+        window.CFVComplex.requestRender();
+        notifyStateChanged(true, true);
+      });
+      controls.appendChild(planeSel);
+    }
+    body.appendChild(controls);
+
+    if ((tb.anchor || "bottom-left") === "world") {
+      const wRow = document.createElement("div");
+      wRow.className = "point-coords-row";
+      const lx = document.createElement("span");
+      lx.textContent = isReal ? "x:" : "Re:";
+      const xIn = document.createElement("input");
+      xIn.type = "text";
+      xIn.className = "coord-in";
+      xIn.value = (tb.xExpr && String(tb.xExpr).trim()) ? String(tb.xExpr) : Number((tb.x || 0).toFixed(3)).toString();
+      xIn.addEventListener("input", () => {
+        const raw = xIn.value.trim();
+        if (!raw) return;
+        const numOnly = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.test(raw);
+        if (numOnly) { tb.x = parseFloat(raw); tb.xExpr = ""; }
+        else {
+          tb.xExpr = raw;
+          if (window.CFVComplex && window.CFVComplex.evalParamExpr) {
+            const ev = window.CFVComplex.evalParamExpr(raw, getParamEnv());
+            if (Number.isFinite(ev)) tb.x = ev;
+          }
+        }
+        if (isReal) window.CFVReal.requestRender();
+        else window.CFVComplex.requestRender();
+        notifyStateChanged(false, true);
+      });
+      const ly = document.createElement("span");
+      ly.textContent = isReal ? "y:" : "Im:";
+      const yIn = document.createElement("input");
+      yIn.type = "text";
+      yIn.className = "coord-in";
+      yIn.value = (tb.yExpr && String(tb.yExpr).trim()) ? String(tb.yExpr) : Number((tb.y || 0).toFixed(3)).toString();
+      yIn.addEventListener("input", () => {
+        const raw = yIn.value.trim();
+        if (!raw) return;
+        const numOnly = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.test(raw);
+        if (numOnly) { tb.y = parseFloat(raw); tb.yExpr = ""; }
+        else {
+          tb.yExpr = raw;
+          if (window.CFVComplex && window.CFVComplex.evalParamExpr) {
+            const ev = window.CFVComplex.evalParamExpr(raw, getParamEnv());
+            if (Number.isFinite(ev)) tb.y = ev;
+          }
+        }
+        if (isReal) window.CFVReal.requestRender();
+        else window.CFVComplex.requestRender();
+        notifyStateChanged(false, true);
+      });
+      wRow.appendChild(lx);
+      wRow.appendChild(xIn);
+      wRow.appendChild(ly);
+      wRow.appendChild(yIn);
+      body.appendChild(wRow);
+    }
+
     row.appendChild(body);
     return row;
   }
@@ -3956,9 +4848,7 @@
     if (domainTotal === 0) {
       const empty = document.createElement("div");
       empty.style.cssText = "padding:12px;font-size:11.5px;color:#64748b;line-height:1.45;";
-      empty.textContent = isReal
-        ? "Click + Pt or + Line above to add points or guide lines. Drag cards to reorder layers."
-        : "Draw shapes on the input plane, or click + Circle / + Arc / + Rect / + Seg / + Pt / + Line. Drag cards to reorder layers.";
+      empty.textContent = "Select Line, Ray, Seg, Arc, Circle, Rect, Poly, Point, or Text below, then click or drag on the plane to place it.";
       domainCardsEl.appendChild(empty);
       return;
     }
@@ -3998,22 +4888,113 @@
     let dragElFrom = -1;
     ordered.forEach((el, idx) => {
       const card =
-        el.kind === "shape" ? buildShapeCard(el.item, seq++) :
+        el.kind === "shape" ? buildShapeCard(el.item, seq++, isReal) :
         el.kind === "guide_line" ? buildGuideLineCard(el.item, seq++, isReal) :
+        el.kind === "text" ? buildTextCard(el.item, seq++, isReal) :
         buildPointCard(el.item, seq++, isReal);
 
+      const item = el.item;
+      /* Universal Minimize/Restore (▾/▸) + Hide/Show Eye (👁) + Vertical Card Resizing for EVERY element card! */
+      const head = card.querySelector(".expr-head");
+      if (head) {
+        const minBtn = document.createElement("button");
+        minBtn.className = "expr-mini-btn card-min-btn" + (item.collapsed ? " active" : "");
+        minBtn.textContent = item.collapsed ? "▸" : "▾";
+        minBtn.title = item.collapsed ? "Expand card (restores height)" : "Minimize card to header";
+        minBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          item.collapsed = !item.collapsed;
+          renderDomainCards();
+          notifyStateChanged(true, true);
+        });
+        head.insertBefore(minBtn, head.firstChild);
+
+        const visBtn = document.createElement("button");
+        const isVis = item.visible !== false;
+        visBtn.className = "expr-mini-btn vis-eye-btn" + (isVis ? "" : " is-hidden");
+        visBtn.textContent = isVis ? "👁" : "◌";
+        visBtn.title = isVis ? "Hide element (saved in preset)" : "Show hidden element";
+        visBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          item.visible = item.visible === false;
+          if (el.kind === "point" && !isReal) window.CFVComplex.recomputePoints();
+          else if (el.kind === "shape" && !isReal) { window.CFVComplex.updateIntegralPanel(); window.CFVComplex.requestRender(); }
+          else if (isReal) window.CFVReal.requestRender();
+          else window.CFVComplex.requestRender();
+          renderDomainCards();
+          notifyStateChanged(true, true);
+        });
+        const gearEl = head.querySelector('[data-settings-trigger="1"]');
+        if (gearEl) head.insertBefore(visBtn, gearEl);
+        else head.appendChild(visBtn);
+      }
+
+      if (item.collapsed) {
+        card.classList.add("card-minimized");
+        card.style.height = "";
+      } else {
+        if (Number(item.cardHeight) > 0) {
+          card.style.height = `${Math.round(Number(item.cardHeight))}px`;
+          card.classList.add("card-custom-h");
+        }
+        const vHandle = document.createElement("div");
+        vHandle.className = "card-v-resize";
+        vHandle.title = "Drag to resize card height · Double-click to auto-fit";
+        vHandle.addEventListener("dblclick", (ev) => {
+          ev.stopPropagation();
+          item.cardHeight = 0;
+          card.style.height = "";
+          card.classList.remove("card-custom-h");
+          const ta = card.querySelector(".text-card-area");
+          if (ta) { ta.style.height = "auto"; ta.style.height = `${Math.max(42, ta.scrollHeight + 2)}px`; }
+          notifyStateChanged(true, true);
+        });
+        vHandle.addEventListener("pointerdown", (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          const startY = ev.clientY;
+          const startH = card.getBoundingClientRect().height || 76;
+          card.draggable = false;
+          const onMove = (me) => {
+            const nh = Math.round(Math.max(42, Math.min(540, startH + (me.clientY - startY))));
+            item.cardHeight = nh;
+            card.style.height = `${nh}px`;
+            card.classList.add("card-custom-h");
+          };
+          const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            notifyStateChanged(true, true);
+          };
+          window.addEventListener("pointermove", onMove);
+          window.addEventListener("pointerup", onUp);
+        });
+        card.appendChild(vHandle);
+      }
+
+      let allowCardDrag = false;
       const gutter = card.querySelector(".expr-gutter");
       if (gutter) {
         const grip = document.createElement("span");
         grip.className = "drag-grip";
         grip.textContent = "⋮⋮";
         grip.title = "Drag to reorder layer (top = back, bottom = front)";
+        const resetCardDrag = () => {
+          allowCardDrag = false;
+          card.draggable = false;
+        };
+        grip.addEventListener("pointerdown", () => {
+          allowCardDrag = true;
+          card.draggable = true;
+          window.addEventListener("pointerup", resetCardDrag, { once: true });
+        });
+        grip.addEventListener("pointerup", resetCardDrag);
         gutter.insertBefore(grip, gutter.firstChild);
       }
 
-      card.draggable = true;
+      card.draggable = false;
       card.addEventListener("dragstart", (ev) => {
-        if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA" || ev.target.tagName === "SELECT")) {
+        if (!allowCardDrag) {
           ev.preventDefault();
           return;
         }
@@ -4049,22 +5030,35 @@
       });
       card.addEventListener("dragend", () => {
         dragElFrom = -1;
+        allowCardDrag = false;
+        card.draggable = false;
         card.classList.remove("dragging-card", "drop-before", "drop-after");
       });
       domainCardsEl.appendChild(card);
     });
   }
 
+  function autoSizeAllTextAreas() {
+    if (!domainCardsEl) return;
+    domainCardsEl.querySelectorAll(".text-card-area").forEach((ta) => {
+      if (typeof ta._autoSizeTa === "function") ta._autoSizeTa();
+    });
+  }
+  if (typeof ResizeObserver !== "undefined" && domainCardsEl) {
+    const domRo = new ResizeObserver(() => autoSizeAllTextAreas());
+    domRo.observe(domainCardsEl);
+  }
+
   function syncPointCoords(pt) {
     const xin = sidebar.querySelector(`input.coord-in[data-pt-id="${pt.id}"][data-axis="x"]`);
     const yin = sidebar.querySelector(`input.coord-in[data-pt-id="${pt.id}"][data-axis="y"]`);
-    if (xin) xin.value = Number(pt.x.toFixed(4)).toString();
-    if (yin) yin.value = Number(pt.y.toFixed(4)).toString();
+    if (xin && !(pt.xExpr && String(pt.xExpr).trim())) xin.value = Number(pt.x.toFixed(4)).toString();
+    if (yin && !(pt.yExpr && String(pt.yExpr).trim())) yin.value = Number(pt.y.toFixed(4)).toString();
   }
 
   function syncGuideLine(ln) {
     const vin = sidebar.querySelector(`input.coord-in[data-line-id="${ln.id}"]`);
-    if (vin) vin.value = Number(ln.value.toFixed(4)).toString();
+    if (vin && !(ln.valExpr && String(ln.valExpr).trim())) vin.value = Number(ln.value.toFixed(4)).toString();
   }
 
   function syncShapeBadges() {
@@ -4085,7 +5079,10 @@
 
   function findSettingsItem(kind, id) {
     if (kind === "fn") return state.cards.find((c) => c.id === id);
-    if (kind === "shape") return window.CFVComplex.state.shapes.find((s) => s.id === id);
+    if (kind === "shape") {
+      const list = isRealMode() ? (window.CFVReal.state.shapes || []) : window.CFVComplex.state.shapes;
+      return list.find((s) => s.id === id);
+    }
     if (kind === "point") {
       const list = isRealMode() ? window.CFVReal.state.points : window.CFVComplex.state.points;
       return list.find((p) => p.id === id);
@@ -4093,6 +5090,10 @@
     if (kind === "guide_line") {
       const list = isRealMode() ? window.CFVReal.state.lines : window.CFVComplex.state.lines;
       return list.find((l) => l.id === id);
+    }
+    if (kind === "text") {
+      const list = isRealMode() ? (window.CFVReal.state.texts || []) : (window.CFVComplex.state.texts || []);
+      return list.find((t) => t.id === id);
     }
     return null;
   }
@@ -4153,7 +5154,8 @@
     itemSettingsTitle.textContent =
       kind === "fn" ? "Curve / Function Style" :
       kind === "shape" ? "Shape / Contour Properties" :
-      kind === "guide_line" ? "Guide Line Properties" : "Point Properties";
+      kind === "guide_line" ? "Guide Line Properties" :
+      kind === "text" ? "Text Box Properties" : "Point Properties";
     itemSettingsBody.innerHTML = "";
 
     const repaint = (recalc = false) => {
@@ -4164,8 +5166,12 @@
         else window.CFVComplex.requestRender();
       } else if (kind === "shape") {
         renderDomainCards();
-        window.CFVComplex.updateIntegralPanel();
-        window.CFVComplex.requestRender();
+        if (isRealMode()) {
+          window.CFVReal.requestRender();
+        } else {
+          window.CFVComplex.updateIntegralPanel();
+          window.CFVComplex.requestRender();
+        }
       } else {
         renderDomainCards();
         if (isRealMode()) window.CFVReal.requestRender();
@@ -4202,19 +5208,22 @@
     grid.appendChild(picker);
     colorSec.appendChild(grid);
 
-    /* Opacity Slider (applies to both Input Space & Output Space!) */
+    /* Opacity Slider (applies to both Input Space & Output Space! Closed shapes default 22%; 100% = solid opaque!) */
+    const isClosedShape = kind === "shape" && Boolean(item.closed);
+    const defaultOp = isClosedShape ? 0.22 : 1.0;
     const opRow = document.createElement("div");
     opRow.className = "slider-row";
     opRow.style.marginTop = "6px";
-    opRow.innerHTML = `<span>Opacity</span>`;
-    const curOp = normOpacityWs(item.opacity, 1.0);
+    opRow.innerHTML = `<span>${isClosedShape ? "Fill Opacity" : "Opacity"}</span>`;
+    const curOp = normOpacityWs(item.opacity, defaultOp);
     const opRange = document.createElement("input");
-    opRange.type = "range"; opRange.min = "0"; opRange.max = "1"; opRange.step = "0.05";
+    opRange.type = "range"; opRange.min = "0"; opRange.max = "1"; opRange.step = "0.02";
     opRange.value = String(curOp);
+    opRange.title = isClosedShape ? "0% = outline only, 22% = default translucent, 100% = completely solid opaque" : "Element opacity";
     const opVal = document.createElement("code");
     opVal.textContent = `${Math.round(curOp * 100)}%`;
     opRange.addEventListener("input", () => {
-      item.opacity = normOpacityWs(opRange.value, 1.0);
+      item.opacity = normOpacityWs(opRange.value, defaultOp);
       opVal.textContent = `${Math.round(item.opacity * 100)}%`;
       repaint(false);
     });
@@ -4353,24 +5362,27 @@
         const actRow = document.createElement("div");
         actRow.className = "btn-row";
         actRow.style.marginTop = "4px";
-        if (item.rawPts.length >= 3) {
+        if (item.rawPts && item.rawPts.length >= 3) {
           const clBtn = document.createElement("button");
           clBtn.className = "btn-subtle flex-1";
           clBtn.textContent = item.closed ? "Open Path" : "Close Loop";
           clBtn.addEventListener("click", async () => {
-            await window.CFVComplex.toggleCloseShape(item.id);
+            if (isRealMode()) window.CFVReal.toggleCloseShape(item.id);
+            else await window.CFVComplex.toggleCloseShape(item.id);
             renderItemSettings();
           });
           actRow.appendChild(clBtn);
         }
-        const revBtn = document.createElement("button");
-        revBtn.className = "btn-subtle flex-1";
-        revBtn.textContent = "Reverse ⇄";
-        revBtn.addEventListener("click", async () => {
-          await window.CFVComplex.reverseShape(item.id);
-          renderItemSettings();
-        });
-        actRow.appendChild(revBtn);
+        if (!isRealMode()) {
+          const revBtn = document.createElement("button");
+          revBtn.className = "btn-subtle flex-1";
+          revBtn.textContent = "Reverse ⇄";
+          revBtn.addEventListener("click", async () => {
+            await window.CFVComplex.reverseShape(item.id);
+            renderItemSettings();
+          });
+          actRow.appendChild(revBtn);
+        }
         lnSec.appendChild(actRow);
       }
       itemSettingsBody.appendChild(lnSec);
@@ -4430,7 +5442,7 @@
           state.cards = state.cards.filter((q) => q.id !== id);
           if (state.primaryCardId === id) { const rem = fnCards(); state.primaryCardId = rem[0] ? rem[0].id : null; }
           renderFnCards(); compileWorkspace(true, false); notifyStateChanged(true, true);
-        } else if (kind === "shape") window.CFVComplex.deleteShape(id);
+        } else if (kind === "shape") { if (isRealMode()) window.CFVReal.deleteShape(id); else window.CFVComplex.deleteShape(id); }
         else if (kind === "point") { if (isRealMode()) window.CFVReal.deletePoint(id); else window.CFVComplex.deletePoint(id); }
         else if (kind === "guide_line") { if (isRealMode()) window.CFVReal.deleteGuideLine(id); else window.CFVComplex.deleteGuideLine(id); }
       });
@@ -4471,6 +5483,8 @@
       closeFnLibraryDropdown();
       closeUnsavedModal();
       closeDeleteModal();
+      closeEditProjectModal();
+      closeFnLibraryDropdown();
       closeSaveProjectForm();
       closeSavePresetForm();
     }
@@ -4487,6 +5501,12 @@
       if (state.sliderRaf) cancelAnimationFrame(state.sliderRaf);
       state.sliderRaf = null;
       state.sliderLastTs = 0;
+      if (!isRealMode() && window.CFVComplex) {
+        if (window.CFVComplex.state && window.CFVComplex.state.showDomain && window.CFVComplex.scheduleDomain) {
+          window.CFVComplex.scheduleDomain(false);
+        }
+        window.CFVComplex.requestRender("both");
+      }
       return;
     }
     if (state.sliderRaf) return;
@@ -4499,7 +5519,10 @@
         const busy = needsServer && (
           isRealMode()
             ? (window.CFVReal && window.CFVReal.isFetchBusy && window.CFVReal.isFetchBusy())
-            : (window.CFVComplex && window.CFVComplex.isFetchBusy && window.CFVComplex.isFetchBusy())
+            : (window.CFVComplex && (
+                (window.CFVComplex.isFetchBusy && window.CFVComplex.isFetchBusy()) ||
+                (window.CFVComplex.state && window.CFVComplex.state.showDomain && window.CFVComplex.isDomainBusy && window.CFVComplex.isDomainBusy())
+              ))
         );
         let anyStepped = false;
         for (const s of playingSliders) {
@@ -4525,11 +5548,17 @@
           }
         }
         if (anyStepped) {
-          resolveVariables(true);
+          const vpRes = resolveVariables(true);
           if (needsServer) {
             refreshActiveStage(true);
           } else if (isRealMode()) {
             window.CFVReal.requestRender();
+          } else if (vpRes && vpRes.sphereOnly) {
+            /* Pure 3D sphere rotation/zoom: redraw whichever plane(s) display a Riemann Sphere! */
+            const stC = window.CFVComplex && window.CFVComplex.state;
+            const inSph = Boolean(stC && stC.inProjection === "sphere");
+            const outSph = Boolean(stC && stC.projection === "sphere");
+            window.CFVComplex.requestRender(inSph && outSph ? "both" : inSph ? "in" : "out");
           } else {
             window.CFVComplex.requestRender();
           }
@@ -4734,15 +5763,16 @@
         window.CFVReal.stopAudio();
       }
 
-      setModeUI(mode);
+      const normTarget = normMode(mode);
+      setModeUI(normTarget);
       state.cards = [];
       state.primaryCardId = null;
 
-      if (mode === "real") {
+      if (normTarget === "real") {
         window.CFVReal.clearToBlank();
       } else {
-        window.CFVComplex.setMode(mode);
         window.CFVComplex.clearToBlank();
+        if (mode === "integral") window.CFVComplex.setContourMode(true, { silent: true });
       }
 
       setStatus("ok", "Blank · Click + Fn or pick a Project");
@@ -4862,6 +5892,7 @@
       }
       resolveVariables(false);
 
+      if (preset.layout) applyPresetLayout(preset.layout);
       if (ex.mode === "real") {
         if (Array.isArray(preset.visibleFnIndices)) {
           const fns = fnCards();
@@ -4872,6 +5903,13 @@
         resolveVariables(true, true);
         if (preset.startSlider) ensureSliderLoop();
       } else {
+        const fns = fnCards();
+        const wantActIdx = typeof preset.activeFnIndex === "number"
+          ? preset.activeFnIndex
+          : Math.max(0, (ex.fnCards || []).findIndex((c) => c.active === true));
+        if (fns[wantActIdx] && state.primaryCardId !== fns[wantActIdx].id) {
+          state.primaryCardId = fns[wantActIdx].id;
+        }
         renderFnCards();
         await window.CFVComplex.loadExampleAndPreset(ex, preset);
         resolveVariables(true, true);
@@ -4908,9 +5946,9 @@
   }
 
   /* Standardized Project Row used uniformly for ALL projects (saved & built-in examples) */
-  function buildProjectRow({ title, badge, subtitle, description, isActive, onSelect, onRename, onExportJson, onDelete }) {
+  function buildProjectRow({ title, badge, subtitle, description, isActive, isLocked, onToggleLock, onSelect, onRename, onExportJson, onDelete }) {
     const wrap = document.createElement("div");
-    wrap.className = "ex-item-row";
+    wrap.className = "ex-item-row" + (isLocked ? " is-locked-proj" : "");
 
     const b = document.createElement("button");
     b.className = "ex-item" + (isActive ? " active" : "");
@@ -4943,12 +5981,28 @@
     b.addEventListener("click", onSelect);
     wrap.appendChild(b);
 
+    if (typeof onToggleLock === "function") {
+      const lockBtn = document.createElement("button");
+      lockBtn.className = "ex-proj-export proj-lock-btn" + (isLocked ? " locked" : " unlocked");
+      lockBtn.textContent = isLocked ? "🔒" : "🔓";
+      lockBtn.title = isLocked
+        ? "Locked — click to unlock for saving, renaming & deleting"
+        : "Unlocked — click to lock against overwrite, rename & deletion";
+      lockBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onToggleLock();
+      });
+      wrap.appendChild(lockBtn);
+    }
+
     const renBtn = document.createElement("button");
     renBtn.className = "ex-proj-export";
     renBtn.textContent = "✎";
-    renBtn.title = "Rename project";
+    renBtn.disabled = Boolean(isLocked);
+    renBtn.title = isLocked ? "Unlock project (🔒) to rename or edit description" : "Rename project";
     renBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
+      if (isLocked) return;
       onRename();
     });
     wrap.appendChild(renBtn);
@@ -4966,9 +6020,11 @@
     const delBtn = document.createElement("button");
     delBtn.className = "ex-proj-del";
     delBtn.textContent = "×";
-    delBtn.title = "Delete project";
+    delBtn.disabled = Boolean(isLocked);
+    delBtn.title = isLocked ? "Unlock project (🔒) to delete" : "Delete project";
     delBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
+      if (isLocked) return;
       onDelete();
     });
     wrap.appendChild(delBtn);
@@ -4978,6 +6034,7 @@
 
   function renderSavedProjectRow(proj) {
     const isCur = state.activeProjectIsCustom && state.activeProjectId === proj.id;
+    const isLocked = isProjectLocked(proj.id, true);
     const pCnt = (proj.presets || []).length;
     const cCnt = (proj.cards || []).length;
     const subTxt = proj.subtitle || `${cCnt} card${cCnt === 1 ? "" : "s"} · saved in projects/${proj.id}.json`;
@@ -4987,15 +6044,20 @@
       subtitle: subTxt,
       description: proj.description || "",
       isActive: isCur,
+      isLocked,
+      onToggleLock: () => toggleProjectLock(proj.id, true),
       onSelect: () => {
         closeExamplesDropdown();
         guardNavigation(() => loadSavedProject(proj.id, true));
       },
       onRename: () => {
-        const nextName = typeof window.prompt === "function"
-          ? window.prompt("Rename project:", proj.name)
-          : null;
-        if (nextName && nextName.trim()) renameSavedProject(proj.id, nextName.trim());
+        if (isProjectLocked(proj.id, true)) return;
+        openEditProjectModal({
+          kind: "saved",
+          id: proj.id,
+          name: proj.name,
+          description: proj.description || "",
+        });
       },
       onExportJson: () => {
         const cleanCopy = { ...proj };
@@ -5004,6 +6066,7 @@
         openProjectImportExport("export", JSON.stringify(cleanCopy, null, 2));
       },
       onDelete: () => {
+        if (isProjectLocked(proj.id, true)) return;
         requestDeleteProject({ kind: "saved", id: proj.id, name: proj.name });
       },
     });
@@ -5011,29 +6074,37 @@
 
   function renderBuiltInExampleRow(ex) {
     const dispName = getExampleDisplayName(ex);
+    const dispDesc = getExampleDisplayDescription(ex);
     const isCur = !state.activeProjectIsCustom && ex.id === state.activeProjectId;
+    const isLocked = isProjectLocked(ex.id, false);
     const pCnt = (ex.presets || []).length;
     return buildProjectRow({
       title: dispName,
       badge: `${pCnt} preset${pCnt === 1 ? "" : "s"}`,
       subtitle: ex.subtitle || "",
-      description: ex.description || "",
+      description: dispDesc,
       isActive: isCur,
+      isLocked,
+      onToggleLock: () => toggleProjectLock(ex.id, false),
       onSelect: () => {
         closeExamplesDropdown();
         guardNavigation(() => loadExample(ex.id, null, true));
       },
       onRename: () => {
-        const nextName = typeof window.prompt === "function"
-          ? window.prompt("Rename project:", dispName)
-          : null;
-        if (nextName && nextName.trim()) renameBuiltInExample(ex.id, nextName.trim());
+        if (isProjectLocked(ex.id, false)) return;
+        openEditProjectModal({
+          kind: "example",
+          id: ex.id,
+          name: dispName,
+          description: dispDesc,
+        });
       },
       onExportJson: () => {
         const obj = exampleToProjectObject(ex);
         openProjectImportExport("export", JSON.stringify(obj, null, 2));
       },
       onDelete: () => {
+        if (isProjectLocked(ex.id, false)) return;
         requestDeleteProject({ kind: "example", id: ex.id, name: dispName });
       },
     });
@@ -5047,34 +6118,43 @@
 
     const folders = getFoldersForMode(state.mode);
     const knownFolderIds = new Set(folders.map((f) => f.id));
-    const allSaved = loadSavedProjects().filter((p) => p.mode === state.mode);
-    const allBuiltIn = window.CFVExamples.forMode(state.mode).filter((ex) => !isExampleDeleted(ex.id));
+    const allSaved = loadSavedProjects().filter((p) => normMode(p.mode) === state.mode);
+    const overriddenExampleIds = new Set(allSaved.map((p) => p.id));
+    const allBuiltIn = window.CFVExamples.forMode(state.mode).filter(
+      (ex) => !isExampleDeleted(ex.id) && !overriddenExampleIds.has(ex.id)
+    );
 
     for (const folder of folders) {
       const folderSaved = allSaved.filter((p) => {
-        const pf = p.folder && knownFolderIds.has(p.folder) ? p.folder : "my";
+        const rawPf = p.folder === "examples" ? defaultCategoryFolderForMode(state.mode) : p.folder;
+        const pf = rawPf && knownFolderIds.has(rawPf) ? rawPf : "my";
         return pf === folder.id;
       });
       const matchedSaved = filterQ
         ? folderSaved.filter((p) =>
             (p.name || "").toLowerCase().includes(filterQ) ||
             (p.subtitle || "").toLowerCase().includes(filterQ) ||
+            (p.description || "").toLowerCase().includes(filterQ) ||
             folder.name.toLowerCase().includes(filterQ)
           )
         : folderSaved;
 
-      const folderBuiltIn = folder.id === "examples"
-        ? (filterQ
-            ? allBuiltIn.filter((ex) =>
-                getExampleDisplayName(ex).toLowerCase().includes(filterQ) ||
-                (ex.subtitle || "").toLowerCase().includes(filterQ) ||
-                folder.name.toLowerCase().includes(filterQ)
-              )
-            : allBuiltIn)
+      const folderBuiltIn = folder.isCategory
+        ? allBuiltIn.filter((ex) => {
+            if (resolveExampleFolderId(ex) !== folder.id) return false;
+            if (!filterQ) return true;
+            return (
+              getExampleDisplayName(ex).toLowerCase().includes(filterQ) ||
+              (ex.subtitle || "").toLowerCase().includes(filterQ) ||
+              getExampleDisplayDescription(ex).toLowerCase().includes(filterQ) ||
+              folder.name.toLowerCase().includes(filterQ)
+            );
+          })
         : [];
 
       const totalItems = matchedSaved.length + folderBuiltIn.length;
-      const collapsed = !filterQ && Boolean(state.folderCollapsed && state.folderCollapsed[folder.id]);
+      /* Default all folders to minimized when opening Project Library (auto-expand while filtering) */
+      const collapsed = !filterQ && (!state.folderCollapsed || state.folderCollapsed[folder.id] !== false);
 
       const folderEl = document.createElement("div");
       folderEl.className = "proj-folder" + (collapsed ? " collapsed" : "");
@@ -5117,7 +6197,8 @@
 
       hdrBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        state.folderCollapsed[folder.id] = !state.folderCollapsed[folder.id];
+        if (!state.folderCollapsed) state.folderCollapsed = {};
+        state.folderCollapsed[folder.id] = collapsed ? false : true;
         renderExamplesMenu();
       });
       hdrWrap.appendChild(hdrBtn);
@@ -5187,10 +6268,10 @@
       state.activeProjectId = ex.id;
       const customRename = state.libraryMeta && state.libraryMeta.exampleRenames && state.libraryMeta.exampleRenames[ex.id];
       state.activeProjectName = customRename ? customRename : ex.title.split("—")[0].trim();
-      state.activeProjectDescription = ex.description || ex.subtitle || "";
+      state.activeProjectDescription = getExampleDisplayDescription(ex);
       syncDescriptionUI();
       state.activeProjectIsCustom = false;
-      state.activeProjectFolder = "examples";
+      state.activeProjectFolder = resolveExampleFolderId(ex);
       state.sourceExampleId = ex.id;
       state.projectPresets = (ex.presets || []).map((p) => ({
         id: p.id,
@@ -5207,7 +6288,8 @@
         window.CFVReal.stopAudio();
       }
 
-      setModeUI(ex.mode);
+      const normExMode = normMode(ex.mode);
+      setModeUI(normExMode);
 
       const fns = (ex.fnCards || []).map((c) => ({
         ...c,
@@ -5243,8 +6325,10 @@
         if (sl) { sl.value = sl.min; sl.playing = true; }
       }
       resolveVariables(false);
-      const explicitAct = fns.find((c) => c.active === true);
-      state.primaryCardId = explicitAct ? explicitAct.id : (fns[0] ? fns[0].id : null);
+      const explicitActIdx = (preset && typeof preset.activeFnIndex === "number")
+        ? preset.activeFnIndex
+        : fns.findIndex((c) => c.active === true);
+      state.primaryCardId = (explicitActIdx >= 0 && fns[explicitActIdx]) ? fns[explicitActIdx].id : (fns[0] ? fns[0].id : null);
 
       updateProjectHeaderUI();
       renderFnCards();
@@ -5254,7 +6338,16 @@
 
       await compileWorkspace(true, true);
 
-      if (ex.mode === "real") {
+      if (preset && preset.layout) {
+        applyPresetLayout(preset.layout);
+      } else {
+        /* Default showcase layout when loading a fresh example without a custom preset layout */
+        state.inputHidden = false;
+        state.outputHidden = false;
+        state.realHidden = false;
+        applyLayoutVisibility();
+      }
+      if (normExMode === "real") {
         if (preset && Array.isArray(preset.visibleFnIndices)) {
           fnCards().forEach((c, idx) => { c.visible = preset.visibleFnIndices.includes(idx); });
           renderFnCards();
@@ -5263,7 +6356,6 @@
         resolveVariables(true, true);
         if (preset && preset.startSlider) ensureSliderLoop();
       } else {
-        window.CFVComplex.setMode(ex.mode);
         await window.CFVComplex.loadExampleAndPreset(ex, preset);
         resolveVariables(true, true);
         window.CFVComplex.requestRender();
@@ -5275,25 +6367,30 @@
   }
 
   function setModeUI(mode) {
-    state.mode = mode;
-    const isReal = mode === "real";
+    const normM = normMode(mode);
+    state.mode = normM;
+    const isReal = normM === "real";
 
     document.querySelectorAll(".ws-btn").forEach((b) => {
-      const a = b.dataset.wsMode === mode;
+      const a = b.dataset.wsMode === normM;
       b.classList.toggle("active", a);
       b.setAttribute("aria-selected", String(a));
     });
 
     if (fnTabLabel) {
       fnTabLabel.textContent =
-        mode === "real" ? "2D Real Curves & Relations" : mode === "integral" ? "Integrand f(z) & Aux" : "Function w = f(z) & Aux";
+        isReal ? "Real Curves & Relations" : isContourMode() ? "Integrand f(z) & Aux" : "Function w = f(z) & Aux";
     }
     if (domainSectionLabel) {
       domainSectionLabel.textContent = "Elements & Layers";
     }
-    closeFnLibraryDropdown();
     if (fnSyntaxGuide && !fnSyntaxGuide.classList.contains("hidden") && window.CFVFunctionLibrary) {
-      fnSyntaxGuide.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(mode);
+      const gb = document.getElementById("fn-guide-body");
+      if (gb) gb.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(mode);
+      else fnSyntaxGuide.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(mode);
+    }
+    if (fnLibraryDropdown && !fnLibraryDropdown.classList.contains("hidden")) {
+      renderFnLibraryMenu();
     }
     if (domainQuickAdds && domainQuickAdds.querySelectorAll) {
       domainQuickAdds.querySelectorAll(".complex-only-add").forEach((el) => {
@@ -5305,7 +6402,7 @@
     stageReal.classList.toggle("hidden", !isReal);
     toolsComplexBody.classList.toggle("hidden", isReal);
     toolsRealBody.classList.toggle("hidden", !isReal);
-    toolsTitle.textContent = isReal ? "2D Real Analysis Tools" : "Complex Analysis Tools";
+    toolsTitle.textContent = isReal ? "Real Analysis Tools" : "Complex Analysis Tools";
 
     readoutInLabel.textContent = isReal ? "x" : "z";
     readoutOutLabel.textContent = isReal ? "y" : "f(z)";
@@ -5481,67 +6578,152 @@
     });
   }
 
-  /* Collapsible Project Description Strip */
+  /* Edit Project Name & Description Modal (replaces inline sidebar desc strip & window.prompt) */
   function syncDescriptionUI() {
-    const desc = (state.activeProjectDescription || "").trim();
-    if (projectDescPreview) {
-      projectDescPreview.textContent = desc || "Add project description…";
-      projectDescPreview.title = desc || "Click to add a project description";
+    /* Description is edited via Save As (on first save) and Edit Project Details modal (✎) */
+  }
+  function closeEditProjectModal() {
+    state.pendingEditProject = null;
+    if (editProjectModal) editProjectModal.classList.add("hidden");
+  }
+  function openEditProjectModal(target) {
+    if (!target) return;
+    closeExamplesDropdown();
+    state.pendingEditProject = target;
+    if (editProjectSub) {
+      editProjectSub.textContent = target.kind === "example"
+        ? "Edit this example project's display name and description."
+        : target.kind === "saved"
+          ? "Edit this saved project's name and description."
+          : "Set the name and description for this workspace.";
     }
-    if (projectDescInput && document.activeElement !== projectDescInput) {
-      projectDescInput.value = state.activeProjectDescription || "";
+    if (editProjectName) editProjectName.value = target.name || "";
+    if (editProjectDesc) editProjectDesc.value = target.description || "";
+    if (editProjectModal) editProjectModal.classList.remove("hidden");
+    if (editProjectName && editProjectName.focus) {
+      editProjectName.focus();
+      if (editProjectName.select) editProjectName.select();
     }
   }
-  if (btnToggleDesc && projectDescBar && projectDescEditor) {
-    btnToggleDesc.addEventListener("click", () => {
-      const opening = projectDescEditor.classList.contains("hidden");
-      projectDescEditor.classList.toggle("hidden", !opening);
-      projectDescBar.classList.toggle("open", opening);
-      btnToggleDesc.setAttribute("aria-expanded", String(opening));
-      if (opening && projectDescInput) projectDescInput.focus();
+  function confirmEditProject() {
+    const target = state.pendingEditProject;
+    if (!target) { closeEditProjectModal(); return false; }
+    const nextName = editProjectName ? editProjectName.value.trim() : "";
+    const nextDesc = editProjectDesc ? editProjectDesc.value.trim() : "";
+    if (!nextName) { if (editProjectName) editProjectName.focus(); return false; }
+    if (target.kind === "saved" && target.id) {
+      renameSavedProject(target.id, nextName, nextDesc);
+    } else if (target.kind === "example" && target.id) {
+      renameBuiltInExample(target.id, nextName, nextDesc);
+    } else {
+      state.activeProjectName = nextName;
+      state.activeProjectDescription = nextDesc;
+      updateProjectHeaderUI();
+      notifyStateChanged(false, true);
+    }
+    closeEditProjectModal();
+    return true;
+  }
+  if (btnConfirmEditProject) btnConfirmEditProject.addEventListener("click", confirmEditProject);
+  if (btnCancelEditProject) btnCancelEditProject.addEventListener("click", closeEditProjectModal);
+  if (btnCloseEditProject) btnCloseEditProject.addEventListener("click", closeEditProjectModal);
+  if (editProjectModal) {
+    editProjectModal.addEventListener("click", (e) => {
+      if (e.target === editProjectModal) closeEditProjectModal();
     });
   }
-  if (projectDescInput) {
-    projectDescInput.addEventListener("input", () => {
-      state.activeProjectDescription = projectDescInput.value;
-      syncDescriptionUI();
-      notifyStateChanged(false, true);
+  if (editProjectName) {
+    editProjectName.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); confirmEditProject(); }
+      else if (e.key === "Escape") { e.preventDefault(); closeEditProjectModal(); }
     });
   }
 
-  /* Prewritten Function Library Dropdown (Strictly separated Complex vs 2D Real) */
-  let fnLibSelectedCat = "All";
+  /* Side-by-Side Floating Function Library & Syntax Guide (Docked right of sidebar, BOTH openable simultaneously!)
+   * Supports foldered categories + smart cursor-aware insertion into any active function/formula box! */
+  const fnGuideBody = document.getElementById("fn-guide-body");
+  const fnGuideTitle = document.getElementById("fn-guide-title");
+  const btnCloseFnLib = document.getElementById("btn-close-fn-lib");
+  const btnCloseFnGuide = document.getElementById("btn-close-fn-guide");
+  const fnLibExpandedCats = {};
+  let lastFocusedCodeEl = null;
+
+  if (sidebar) {
+    sidebar.addEventListener("focusin", (ev) => {
+      const t = ev.target;
+      if (!t) return;
+      if (
+        (t.tagName === "TEXTAREA" || t.tagName === "INPUT") &&
+        (t.classList.contains("expr-code") || t.classList.contains("var-expr-in") || t.classList.contains("formula-in") || t.classList.contains("coord-in"))
+      ) {
+        lastFocusedCodeEl = t;
+      }
+    });
+  }
+
+  function insertTextAtCursor(el, snippet) {
+    if (!el || !el.isConnected) return false;
+    const start = typeof el.selectionStart === "number" ? el.selectionStart : el.value.length;
+    const end = typeof el.selectionEnd === "number" ? el.selectionEnd : el.value.length;
+    el.value = el.value.slice(0, start) + snippet + el.value.slice(end);
+    const nextPos = start + snippet.length;
+    try {
+      el.focus();
+      el.setSelectionRange(nextPos, nextPos);
+    } catch (_) {}
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  function positionSidePanels() {
+    const sbOpen = sidebar && !sidebar.classList.contains("hidden") && !state.sidebarCollapsed;
+    const sbRight = sbOpen ? (sidebar.getBoundingClientRect().right || 330) : (miniSliderSidebar && !miniSliderSidebar.classList.contains("hidden") ? (miniSliderSidebar.getBoundingClientRect().right || 190) : 12);
+    const topPx = 54;
+    const maxH = Math.max(260, (window.innerHeight || 800) - 108);
+    const libOpen = fnLibraryDropdown && !fnLibraryDropdown.classList.contains("hidden");
+    const guideOpen = fnSyntaxGuide && !fnSyntaxGuide.classList.contains("hidden");
+    const vw = window.innerWidth || 1280;
+    let curLeft = Math.max(10, Math.round(sbRight + 10));
+
+    if (libOpen) {
+      const libW = Math.min(340, Math.max(250, Math.floor((vw - curLeft - 24) * (guideOpen ? 0.45 : 0.9))));
+      fnLibraryDropdown.style.left = `${curLeft}px`;
+      fnLibraryDropdown.style.top = `${topPx}px`;
+      fnLibraryDropdown.style.width = `${libW}px`;
+      fnLibraryDropdown.style.maxHeight = `${maxH}px`;
+      curLeft += libW + 10;
+    }
+    if (guideOpen) {
+      const guideW = Math.min(430, Math.max(260, vw - curLeft - 14));
+      fnSyntaxGuide.style.left = `${Math.min(curLeft, Math.max(10, vw - guideW - 10))}px`;
+      fnSyntaxGuide.style.top = `${topPx}px`;
+      fnSyntaxGuide.style.width = `${guideW}px`;
+      fnSyntaxGuide.style.maxHeight = `${maxH}px`;
+    }
+  }
+  window.addEventListener("resize", positionSidePanels);
+
   function closeFnLibraryDropdown() {
     if (fnLibraryDropdown) fnLibraryDropdown.classList.add("hidden");
+    if (btnFnLibrary) btnFnLibrary.classList.remove("active");
+    positionSidePanels();
   }
+  function closeFnGuidePanel() {
+    if (fnSyntaxGuide) fnSyntaxGuide.classList.add("hidden");
+    if (btnFnGuide) btnFnGuide.classList.remove("active");
+    positionSidePanels();
+  }
+
   function renderFnLibraryMenu() {
-    if (!fnLibList || !fnLibCats || !window.CFVFunctionLibrary) return;
+    if (!fnLibList || !window.CFVFunctionLibrary) return;
     const items = window.CFVFunctionLibrary.getForMode(state.mode);
     if (fnLibTitle) {
       fnLibTitle.textContent = isRealMode()
-        ? "2D Real Function & Curve Library"
-        : "Complex Analysis Function Library";
+        ? "Real Function & Curve Library"
+        : "Complex Function Library";
     }
-    const cats = ["All", ...Array.from(new Set(items.map((x) => x.cat)))];
-    if (!cats.includes(fnLibSelectedCat)) fnLibSelectedCat = "All";
-
-    fnLibCats.innerHTML = "";
-    for (const cat of cats) {
-      const pill = document.createElement("button");
-      pill.type = "button";
-      pill.className = "fn-lib-cat-pill" + (cat === fnLibSelectedCat ? " active" : "");
-      pill.textContent = cat;
-      pill.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        fnLibSelectedCat = cat;
-        renderFnLibraryMenu();
-      });
-      fnLibCats.appendChild(pill);
-    }
-
     const q = (fnLibSearch && fnLibSearch.value ? fnLibSearch.value : "").trim().toLowerCase();
     const filtered = items.filter((it) => {
-      if (fnLibSelectedCat !== "All" && it.cat !== fnLibSelectedCat) return false;
       if (!q) return true;
       return (
         it.name.toLowerCase().includes(q) ||
@@ -5559,69 +6741,147 @@
       fnLibList.appendChild(emp);
       return;
     }
-    for (const it of filtered) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "fn-lib-item";
-      btn.innerHTML = `
-        <div class="fn-lib-item-top">
-          <span class="fn-lib-item-name"></span>
-          <span class="fn-lib-item-cat"></span>
-        </div>
-        <div class="fn-lib-item-code"></div>
-        <div class="fn-lib-item-desc"></div>
-      `;
-      btn.querySelector(".fn-lib-item-name").textContent = it.name;
-      btn.querySelector(".fn-lib-item-cat").textContent = it.cat;
-      btn.querySelector(".fn-lib-item-code").textContent = it.expr.replace(/\s+/g, " ");
-      btn.querySelector(".fn-lib-item-desc").textContent = it.desc;
-      btn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        closeFnLibraryDropdown();
-        addFunctionCard(it.expr, it.name);
-        if (!isRealMode()) {
-          const fns = fnCards();
-          const added = fns[fns.length - 1];
-          if (added) {
-            state.primaryCardId = added.id;
-            renderFnCards();
-            compileWorkspace(false, false);
-          }
+
+    const cats = Array.from(new Set(filtered.map((x) => x.cat)));
+    const createNewCardFromItem = (it) => {
+      addFunctionCard(it.expr, it.name);
+      if (!isRealMode()) {
+        const fns = fnCards();
+        const added = fns[fns.length - 1];
+        if (added) {
+          state.primaryCardId = added.id;
+          renderFnCards();
+          compileWorkspace(false, false);
         }
+      }
+    };
+
+    for (const cat of cats) {
+      const catItems = filtered.filter((x) => x.cat === cat);
+      const isExpanded = Boolean(q) || fnLibExpandedCats[cat] === true;
+      const folder = document.createElement("div");
+      folder.className = "fn-lib-folder" + (isExpanded ? "" : " collapsed");
+
+      const hdr = document.createElement("button");
+      hdr.type = "button";
+      hdr.className = "fn-lib-folder-hdr";
+      hdr.innerHTML = `<span class="proj-folder-icon">${isExpanded ? "📂" : "📁"}</span><span class="proj-folder-title"></span><span class="proj-folder-count">${catItems.length}</span><span class="proj-folder-chev">▾</span>`;
+      hdr.querySelector(".proj-folder-title").textContent = cat;
+      hdr.addEventListener("mousedown", (ev) => ev.preventDefault());
+      hdr.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        fnLibExpandedCats[cat] = !isExpanded;
+        renderFnLibraryMenu();
       });
-      fnLibList.appendChild(btn);
+      folder.appendChild(hdr);
+
+      if (isExpanded) {
+        const body = document.createElement("div");
+        body.className = "fn-lib-folder-body";
+        for (const it of catItems) {
+          const row = document.createElement("div");
+          row.className = "fn-lib-item";
+          row.innerHTML = `
+            <div class="fn-lib-item-top">
+              <span class="fn-lib-item-name"></span>
+              <button type="button" class="fn-lib-newcard-btn" title="Always add as a new function card">+ Card</button>
+            </div>
+            <div class="fn-lib-item-code"></div>
+            <div class="fn-lib-item-desc"></div>
+          `;
+          row.querySelector(".fn-lib-item-name").textContent = it.name;
+          row.querySelector(".fn-lib-item-code").textContent = it.expr.replace(/\s+/g, " ");
+          row.querySelector(".fn-lib-item-desc").textContent = it.desc;
+
+          /* Prevent focus theft so we know if the user's cursor is inside a function/formula input! */
+          row.addEventListener("mousedown", (ev) => ev.preventDefault());
+          row.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            const active = document.activeElement;
+            const targetEl =
+              (active && sidebar && sidebar.contains(active) && (active.tagName === "TEXTAREA" || active.tagName === "INPUT") &&
+                (active.classList.contains("expr-code") || active.classList.contains("var-expr-in") || active.classList.contains("formula-in") || active.classList.contains("coord-in")))
+                ? active
+                : (lastFocusedCodeEl && lastFocusedCodeEl.isConnected && sidebar && sidebar.contains(lastFocusedCodeEl) && lastFocusedCodeEl.offsetParent !== null && !it.expr.includes("\n")
+                    ? lastFocusedCodeEl
+                    : null);
+            if (targetEl && !it.expr.includes("\n")) {
+              insertTextAtCursor(targetEl, it.expr);
+            } else {
+              createNewCardFromItem(it);
+            }
+          });
+
+          const newBtn = row.querySelector(".fn-lib-newcard-btn");
+          newBtn.addEventListener("mousedown", (ev) => ev.preventDefault());
+          newBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            createNewCardFromItem(it);
+          });
+          body.appendChild(row);
+        }
+        folder.appendChild(body);
+      }
+      fnLibList.appendChild(folder);
     }
   }
+
   if (btnFnLibrary && fnLibraryDropdown) {
+    btnFnLibrary.addEventListener("mousedown", (ev) => ev.preventDefault());
     btnFnLibrary.addEventListener("click", (ev) => {
       ev.stopPropagation();
       const opening = fnLibraryDropdown.classList.contains("hidden");
       if (!opening) { closeFnLibraryDropdown(); return; }
-      fnLibSelectedCat = "All";
       if (fnLibSearch) fnLibSearch.value = "";
       renderFnLibraryMenu();
       fnLibraryDropdown.classList.remove("hidden");
-      const r = btnFnLibrary.getBoundingClientRect();
-      const left = Math.min((window.innerWidth || 1200) - 352, Math.max(10, r.left));
-      const top = Math.min((window.innerHeight || 800) - 452, r.bottom + 6);
-      fnLibraryDropdown.style.left = `${left}px`;
-      fnLibraryDropdown.style.top = `${top}px`;
-      if (fnLibSearch) fnLibSearch.focus();
+      btnFnLibrary.classList.add("active");
+      positionSidePanels();
     });
   }
+  if (btnCloseFnLib) btnCloseFnLib.addEventListener("click", (ev) => { ev.stopPropagation(); closeFnLibraryDropdown(); });
+  if (btnCloseFnGuide) btnCloseFnGuide.addEventListener("click", (ev) => { ev.stopPropagation(); closeFnGuidePanel(); });
   if (fnLibSearch) {
     fnLibSearch.addEventListener("click", (ev) => ev.stopPropagation());
     fnLibSearch.addEventListener("input", renderFnLibraryMenu);
   }
   if (btnFnGuide && fnSyntaxGuide) {
+    btnFnGuide.addEventListener("mousedown", (ev) => ev.preventDefault());
     btnFnGuide.addEventListener("click", (ev) => {
       ev.stopPropagation();
       const opening = fnSyntaxGuide.classList.contains("hidden");
-      if (opening && window.CFVFunctionLibrary) {
-        fnSyntaxGuide.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(state.mode);
+      if (!opening) { closeFnGuidePanel(); return; }
+      if (fnGuideTitle) fnGuideTitle.textContent = isRealMode() ? "Real Mode — C11 & Tools Guide" : "Complex Mode — C11 & Color Field Guide";
+      if (window.CFVFunctionLibrary) {
+        const target = fnGuideBody || fnSyntaxGuide;
+        target.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(state.mode);
       }
-      fnSyntaxGuide.classList.toggle("hidden", !opening);
-      btnFnGuide.classList.toggle("active", opening);
+      fnSyntaxGuide.classList.remove("hidden");
+      btnFnGuide.classList.add("active");
+      positionSidePanels();
+    });
+    /* Clickable + Insert recipe buttons inside the Guide panel */
+    fnSyntaxGuide.addEventListener("mousedown", (ev) => {
+      if (ev.target && ev.target.closest && ev.target.closest("[data-guide-insert]")) ev.preventDefault();
+    });
+    fnSyntaxGuide.addEventListener("click", (ev) => {
+      const btn = ev.target && ev.target.closest && ev.target.closest("[data-guide-insert]");
+      if (!btn) return;
+      ev.stopPropagation();
+      const snippet = btn.getAttribute("data-guide-insert") || "";
+      if (!snippet) return;
+      if (lastFocusedCodeEl && document.body.contains(lastFocusedCodeEl) && !lastFocusedCodeEl.readOnly && !lastFocusedCodeEl.disabled) {
+        insertTextAtCursor(lastFocusedCodeEl, snippet);
+      } else {
+        const card = addFunctionCard({ title: "Guide Recipe", code: snippet, color: COLORS[state.cards.length % COLORS.length], visible: true }, true);
+        if (!isRealMode() && card) state.primaryCardId = card.id;
+        renderFnCards();
+        compileWorkspace(true, false);
+        notifyStateChanged(true, true);
+      }
+      const orig = btn.textContent;
+      btn.textContent = "✓ Added";
+      setTimeout(() => { btn.textContent = orig; }, 900);
     });
   }
 
@@ -5651,9 +6911,12 @@
     });
   }
 
-  document.addEventListener("pointerdown", (ev) => {
-    if (fnLibraryDropdown && !fnLibraryDropdown.classList.contains("hidden")) {
-      if (!fnLibraryDropdown.contains(ev.target) && ev.target !== btnFnLibrary) closeFnLibraryDropdown();
+  /* Keep Function Library & Guide open side-by-side while editing in the sidebar;
+   * users close them explicitly via their header toggle buttons or × buttons. */
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") {
+      if (fnLibraryDropdown && !fnLibraryDropdown.classList.contains("hidden")) closeFnLibraryDropdown();
+      else if (fnSyntaxGuide && !fnSyntaxGuide.classList.contains("hidden")) closeFnSyntaxGuide();
     }
   });
 
@@ -5667,43 +6930,55 @@
     if (btnSavePreset) btnSavePreset.classList.remove("hidden");
   }
 
-  /* Save button: only enabled inside a saved project; saves directly in-place to current project! */
+  /* Save button: enabled on any UNLOCKED project (saved OR unlocked example); saves directly in-place! */
   if (btnSaveProject) {
     btnSaveProject.addEventListener("click", () => {
-      if (!isInSavedProject()) return;
+      if (!canSaveInPlace()) return;
       closeSaveProjectForm();
       saveCurrentProjectInPlace();
     });
   }
-  /* Save As button: always available; prompts for name + folder (including Examples!) and creates a NEW saved project */
+  /* Save As button: always available; prompts for name + folder and creates a NEW unlocked project */
   if (btnSaveAsProject) {
-    btnSaveAsProject.addEventListener("click", openSaveProjectForm);
+    btnSaveAsProject.addEventListener("click", () => {
+      closeFnLibraryDropdown();
+      closeFnGuidePanel();
+      openSaveProjectForm();
+    });
   }
-  /* Topbar Rename, JSON, and Delete Project buttons */
+  /* Topbar Lock/Unlock, Rename/Edit Details, JSON, and Delete Project buttons */
+  if (btnTopLockProject) {
+    btnTopLockProject.addEventListener("click", () => {
+      if (!state.activeProjectId) return;
+      toggleProjectLock(state.activeProjectId, state.activeProjectIsCustom);
+    });
+  }
   if (btnTopRenameProject) {
     btnTopRenameProject.addEventListener("click", () => {
-      const curName = state.activeProjectName || defaultProjectName();
-      const nextName = typeof window.prompt === "function"
-        ? window.prompt("Rename project:", curName)
-        : null;
-      if (!nextName || !nextName.trim()) return;
-      const trimmed = nextName.trim();
-      if (isInSavedProject()) {
-        renameSavedProject(state.activeProjectId, trimmed);
-      } else if (state.activeProjectId) {
-        renameBuiltInExample(state.activeProjectId, trimmed);
-      } else {
-        state.activeProjectName = trimmed;
-        updateProjectHeaderUI();
-      }
+      if (isCurrentProjectLocked()) return;
+      closeFnLibraryDropdown();
+      closeFnGuidePanel();
+      const kind = isInSavedProject() ? "saved" : (state.activeProjectId ? "example" : "unsaved");
+      openEditProjectModal({
+        kind,
+        id: state.activeProjectId,
+        name: state.activeProjectName || defaultProjectName(),
+        description: state.activeProjectDescription || "",
+      });
     });
   }
   if (btnTopJsonProject) {
-    btnTopJsonProject.addEventListener("click", () => openProjectImportExport("export"));
+    btnTopJsonProject.addEventListener("click", () => {
+      closeFnLibraryDropdown();
+      closeFnGuidePanel();
+      openProjectImportExport("export");
+    });
   }
   if (btnTopDeleteProject) {
     btnTopDeleteProject.addEventListener("click", () => {
-      if (!state.activeProjectId) return;
+      if (!state.activeProjectId || isCurrentProjectLocked()) return;
+      closeFnLibraryDropdown();
+      closeFnGuidePanel();
       requestDeleteProject({
         kind: state.activeProjectIsCustom ? "saved" : "example",
         id: state.activeProjectId,
@@ -5780,11 +7055,13 @@
     });
   }
 
-  /* Global Ctrl+S (Save in-place if in saved project, else Save As) & Ctrl+Shift+S (Save As) */
+  /* Global Ctrl+S (Save in-place if current project is unlocked, else Save As) & Ctrl+Shift+S (Save As) */
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
       e.preventDefault();
-      if (e.shiftKey || !isInSavedProject()) {
+      if (e.shiftKey || !canSaveInPlace()) {
+        closeFnLibraryDropdown();
+        closeFnGuidePanel();
         openSaveProjectForm();
       } else {
         saveCurrentProjectInPlace();
@@ -5821,6 +7098,9 @@
   if (btnShowSidebar) {
     btnShowSidebar.addEventListener("click", () => setSidebarCollapsed(false));
   }
+  if (btnMiniShowSidebar) {
+    btnMiniShowSidebar.addEventListener("click", () => setSidebarCollapsed(false));
+  }
   if (btnHideInput) btnHideInput.addEventListener("click", () => setPanelVisibility("input", false));
   if (btnShowInput) btnShowInput.addEventListener("click", () => setPanelVisibility("input", true));
   if (btnHideOutput) btnHideOutput.addEventListener("click", () => setPanelVisibility("output", false));
@@ -5847,9 +7127,15 @@
 
   btnExamples.addEventListener("click", (ev) => {
     ev.stopPropagation();
-    if (projectFilterInput) projectFilterInput.value = "";
-    renderExamplesMenu();
     const opening = examplesDropdown.classList.contains("hidden");
+    if (opening) {
+      closeFnLibraryDropdown();
+      closeFnGuidePanel();
+      /* Every folder defaults cleanly to closed (including the current project's folder!) */
+      state.folderCollapsed = {};
+      if (projectFilterInput) projectFilterInput.value = "";
+      renderExamplesMenu();
+    }
     examplesDropdown.classList.toggle("hidden", !opening);
     btnExamples.setAttribute("aria-expanded", String(opening));
     if (opening && projectFilterInput && projectFilterInput.focus) {
@@ -5861,17 +7147,39 @@
     projectFilterInput.addEventListener("click", (ev) => ev.stopPropagation());
   }
 
+  function addDomainTextBox() {
+    if (isRealMode()) window.CFVReal.addTextBox({});
+    else window.CFVComplex.addTextBox({});
+  }
+
   document.getElementById("btn-add-fn").addEventListener("click", () => addFunctionCard());
   document.getElementById("btn-add-slider").addEventListener("click", addSliderCard);
   const btnAddVar = document.getElementById("btn-add-var");
   if (btnAddVar) btnAddVar.addEventListener("click", addVariableCard);
-  document.getElementById("btn-add-point").addEventListener("click", addDomainPoint);
-  document.getElementById("btn-add-guide").addEventListener("click", addDomainGuideLine);
-  document.getElementById("btn-quick-circle").addEventListener("click", () => window.CFVComplex.addQuickShape("circle"));
+  const btnAddPt = document.getElementById("btn-add-point");
+  if (btnAddPt) btnAddPt.addEventListener("click", addDomainPoint);
+  const btnAddGd = document.getElementById("btn-add-guide");
+  if (btnAddGd) btnAddGd.addEventListener("click", addDomainGuideLine);
+  const btnAddTx = document.getElementById("btn-add-text");
+  if (btnAddTx) btnAddTx.addEventListener("click", addDomainTextBox);
+  const btnQuickCircle = document.getElementById("btn-quick-circle");
+  if (btnQuickCircle) btnQuickCircle.addEventListener("click", () => window.CFVComplex.addQuickShape("circle"));
   const btnQuickArc = document.getElementById("btn-quick-arc");
   if (btnQuickArc) btnQuickArc.addEventListener("click", () => window.CFVComplex.addQuickShape("arc"));
-  document.getElementById("btn-quick-rect").addEventListener("click", () => window.CFVComplex.addQuickShape("rect"));
-  document.getElementById("btn-quick-line").addEventListener("click", () => window.CFVComplex.addQuickShape("line"));
+  const btnQuickRect = document.getElementById("btn-quick-rect");
+  if (btnQuickRect) btnQuickRect.addEventListener("click", () => window.CFVComplex.addQuickShape("rect"));
+  const btnQuickLine = document.getElementById("btn-quick-line");
+  if (btnQuickLine) btnQuickLine.addEventListener("click", () => window.CFVComplex.addQuickShape("line"));
+  const btnRealAddArc = document.getElementById("btn-real-add-arc");
+  if (btnRealAddArc) btnRealAddArc.addEventListener("click", () => window.CFVReal.addQuickShape("arc"));
+  const btnRealAddSeg = document.getElementById("btn-real-add-seg");
+  if (btnRealAddSeg) btnRealAddSeg.addEventListener("click", () => window.CFVReal.addQuickShape("line"));
+  const btnRealAddPt = document.getElementById("btn-real-add-point");
+  if (btnRealAddPt) btnRealAddPt.addEventListener("click", addDomainPoint);
+  const btnRealAddGd = document.getElementById("btn-real-add-guide");
+  if (btnRealAddGd) btnRealAddGd.addEventListener("click", addDomainGuideLine);
+  const btnRealAddTx = document.getElementById("btn-real-add-text");
+  if (btnRealAddTx) btnRealAddTx.addEventListener("click", addDomainTextBox);
   btnCompileAll.addEventListener("click", () => compileWorkspace(false, false));
 
   /* Browser Back/Forward URL Restoration */
@@ -5885,7 +7193,7 @@
     if (route.kind === "example") {
       loadExample(route.ex.id, route.preset ? route.preset.id : null, false);
     } else {
-      openBlankWorkspace(route.mode, false);
+      openBlankWorkspace(route.contourMode ? "integral" : route.mode, false);
     }
   });
 
@@ -6088,6 +7396,9 @@
     saveCurrentProjectInPlace,
     renameSavedProject,
     renameBuiltInExample,
+    openEditProjectModal,
+    confirmEditProject,
+    closeEditProjectModal,
     deleteBuiltInExample,
     exampleToProjectObject,
     getFoldersForMode,
@@ -6133,7 +7444,7 @@
       if (route.kind === "example") {
         await loadExample(route.ex.id, route.preset ? route.preset.id : null, false);
       } else {
-        openBlankWorkspace(route.mode, false);
+        openBlankWorkspace(route.contourMode ? "integral" : route.mode, false);
       }
     }
   }

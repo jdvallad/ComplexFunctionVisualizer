@@ -17,8 +17,9 @@
 
   const state = {
     active: true,
-    mode: "map", /* "map" | "integral" */
-    tool: "freehand",
+    mode: "map", /* "map" | "integral" (synced with contourMode toggle inside Complex mode) */
+    contourMode: false,
+    tool: "move",
     colorIdx: 0,
 
     inView: { cx: 0.0, cy: 0.0, scale: 65, scaleX: 65, scaleY: 65 },
@@ -33,29 +34,34 @@
 
     showMesh: true,
     showDomain: false,
+    showOutDomain: false,
+    outDomainMapping: "stereo",
     domainScheme: "classic",
     domainOpacity: 0.72,
     showLandmarks: true,
     showCriticalLine: true,
     showDirichletWall: false,
 
-    /* Output space projection: "planar" | "sphere" | "stereographic" | "poincare" | "custom" */
+    /* Input & Output space projections: "planar" | "polar" | "mercator" | "stereographic" | "poincare" | "sphere" | "cylinder" */
+    inProjection: "planar",
     projection: "planar",
-    projectionExpr: "(w - i) / (w + i)",
 
     /* Unified Element Layering Order (back -> front): [{ kind: "shape"|"guide_line"|"point", id }] */
     layerOrder: [],
 
-    /* Desmos Domain Objects: Shapes (contours), Points & Landmark Lines (points & lines ignored for integrals!) */
+    /* Desmos Domain Objects: Shapes (contours), Points, Landmark Lines & Text Boxes */
     shapes: [],
     points: [],
     lines: [],
+    texts: [],
     nextShapeId: 1,
     nextPointId: 1,
     nextLineId: 1,
+    nextTextId: 1,
     selectedShapeId: null,
     selectedPointId: null,
     selectedLineId: null,
+    selectedTextId: null,
     selectedShapeIds: new Set(),
     selectedPointIds: new Set(),
     hoveredShapeId: null,
@@ -103,10 +109,8 @@
   const outputTag = document.getElementById("output-tag");
   const outputSub = document.getElementById("output-sub");
   const btnToggleSphere = document.getElementById("btn-toggle-sphere");
+  const inProjSelect = document.getElementById("in-projection-select");
   const outProjSelect = document.getElementById("out-projection-select");
-  const customProjBar = document.getElementById("custom-proj-bar");
-  const customProjInput = document.getElementById("custom-proj-input");
-  const customProjErr = document.getElementById("custom-proj-err");
   const btnTracePlay = document.getElementById("btn-trace-play");
 
   function isLightTheme() {
@@ -130,6 +134,7 @@
     for (const s of state.shapes) valid.set(`shape:${s.id}`, { kind: "shape", id: s.id, item: s });
     for (const l of state.lines) valid.set(`guide_line:${l.id}`, { kind: "guide_line", id: l.id, item: l });
     for (const p of state.points) valid.set(`point:${p.id}`, { kind: "point", id: p.id, item: p });
+    for (const t of state.texts) valid.set(`text:${t.id}`, { kind: "text", id: t.id, item: t });
 
     const next = [];
     const seen = new Set();
@@ -155,9 +160,14 @@
     const sMap = new Map(state.shapes.map((s) => [s.id, s]));
     const lMap = new Map(state.lines.map((l) => [l.id, l]));
     const pMap = new Map(state.points.map((p) => [p.id, p]));
+    const tMap = new Map(state.texts.map((t) => [t.id, t]));
     const out = [];
     for (const e of state.layerOrder) {
-      const item = e.kind === "shape" ? sMap.get(e.id) : e.kind === "guide_line" ? lMap.get(e.id) : pMap.get(e.id);
+      const item =
+        e.kind === "shape" ? sMap.get(e.id) :
+        e.kind === "guide_line" ? lMap.get(e.id) :
+        e.kind === "text" ? tMap.get(e.id) :
+        pMap.get(e.id);
       if (item) out.push({ kind: e.kind, id: e.id, item });
     }
     return out;
@@ -192,61 +202,141 @@
     return ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
   }
 
+  function projectInPt(pt) {
+    if (!pt || !window.CFVProjections || state.inProjection === "planar" || state.inProjection === "polar" || state.inProjection === "sphere" || state.inProjection === "cylinder") return pt;
+    return window.CFVProjections.projectPoint(state.inProjection, pt);
+  }
+
+  function projectInPts(pts) {
+    if (!pts || !window.CFVProjections || state.inProjection === "planar" || state.inProjection === "polar" || state.inProjection === "sphere" || state.inProjection === "cylinder") return pts;
+    return window.CFVProjections.projectPoints(state.inProjection, pts);
+  }
+
+  function screenToInComplexExact(sx, sy) {
+    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn) {
+      return window.RiemannSphereIn.screenToComplex(sx, sy, canvasIn, state.inProjection);
+    }
+    const raw = screenToWorld(state.inView, canvasIn, sx, sy);
+    if (state.inProjection === "stereographic" || state.inProjection === "poincare") {
+      if (raw.x * raw.x + raw.y * raw.y >= 0.999) return null;
+      return window.CFVProjections ? window.CFVProjections.inverseProjectPoint(state.inProjection, raw) : raw;
+    }
+    if (state.inProjection === "mercator") {
+      if (Math.abs(raw.x) > Math.PI || Math.abs(raw.y) > 2.65) return null;
+      return window.CFVProjections ? window.CFVProjections.inverseProjectPoint("mercator", raw) : raw;
+    }
+    return raw;
+  }
+
+  function screenToInComplex(sx, sy) {
+    return screenToInComplexExact(sx, sy) || { x: 0, y: 0 };
+  }
+
   function projectOutPt(pt) {
-    if (!pt || !window.CFVProjections || state.projection === "planar" || state.projection === "sphere") return pt;
-    return window.CFVProjections.projectPoint(state.projection, pt, state.projectionExpr, activeParamsMap());
+    if (!pt || !window.CFVProjections || state.projection === "planar" || state.projection === "polar" || state.projection === "sphere" || state.projection === "cylinder") return pt;
+    return window.CFVProjections.projectPoint(state.projection, pt);
   }
 
   function projectOutPts(pts) {
-    if (!pts || !window.CFVProjections || state.projection === "planar" || state.projection === "sphere") return pts;
-    return window.CFVProjections.projectPoints(state.projection, pts, state.projectionExpr, activeParamsMap());
+    if (!pts || !window.CFVProjections || state.projection === "planar" || state.projection === "polar" || state.projection === "sphere" || state.projection === "cylinder") return pts;
+    return window.CFVProjections.projectPoints(state.projection, pts);
+  }
+
+  function screenToOutComplexExact(sx, sy) {
+    if ((state.projection === "sphere" || state.projection === "cylinder") && window.RiemannSphere) {
+      return window.RiemannSphere.screenToComplex(sx, sy, canvasOut, state.projection);
+    }
+    const raw = screenToWorld(state.outView, canvasOut, sx, sy);
+    if (state.projection === "stereographic" || state.projection === "poincare") {
+      if (raw.x * raw.x + raw.y * raw.y >= 0.999) return null;
+      return window.CFVProjections ? window.CFVProjections.inverseProjectPoint(state.projection, raw) : raw;
+    }
+    if (state.projection === "mercator") {
+      if (Math.abs(raw.x) > Math.PI || Math.abs(raw.y) > 2.65) return null;
+      return window.CFVProjections ? window.CFVProjections.inverseProjectPoint("mercator", raw) : raw;
+    }
+    return raw;
+  }
+
+  function setInProjection(mode, opts = {}) {
+    const valid = new Set(["planar", "polar", "mercator", "stereographic", "poincare", "sphere"]);
+    const next = valid.has(mode) ? mode : "planar";
+    const prev = state.inProjection;
+    state.inProjection = next;
+    const is3D = next === "sphere";
+    if (window.RiemannSphereIn) {
+      window.RiemannSphereIn.state.enabled = is3D;
+      if (is3D && !opts.keepSphereView && prev !== next) window.RiemannSphereIn.reset();
+    }
+    if (inProjSelect && inProjSelect.value !== next) inProjSelect.value = next;
+    if (inputTag) {
+      inputTag.textContent =
+        next === "sphere" ? "INPUT · RIEMANN SPHERE" :
+        next === "stereographic" ? "INPUT · STEREO DISK" :
+        next === "poincare" ? "INPUT · POINCARÉ DISK" :
+        next === "mercator" ? "INPUT · MERCATOR" :
+        next === "polar" ? "INPUT · POLAR ℂ" :
+        state.mode === "integral" ? "CONTOUR PLANE" : "INPUT PLANE";
+    }
+    if (inputSub && window.CFVProjections) {
+      inputSub.textContent =
+        next === "planar" ? (state.mode === "integral" ? "γ(t) ⊂ ℂ" : "z = x + iy") : window.CFVProjections.getSubtitle(next);
+    }
+    if (!opts.keepInView && prev !== next) {
+      if (next === "stereographic" || next === "poincare") {
+        setSquareAspect("in", true);
+        setView(state.inView, canvasIn, 0, 0, 1.32);
+      } else if (next === "mercator") {
+        setSquareAspect("in", true);
+        setView(state.inView, canvasIn, 0, 0, 3.35);
+      }
+    }
+    ensureCanvasSize(canvasIn);
+    requestRender("in");
+    if (!opts.silent) notifyState(true, true);
   }
 
   function setProjection(mode, opts = {}) {
-    const valid = new Set(["planar", "sphere", "stereographic", "poincare", "custom"]);
+    const valid = new Set(["planar", "polar", "mercator", "stereographic", "poincare", "sphere"]);
     const next = valid.has(mode) ? mode : "planar";
     const prev = state.projection;
     state.projection = next;
-    if (opts.expr !== undefined && typeof opts.expr === "string") {
-      state.projectionExpr = opts.expr;
-      if (customProjInput && customProjInput.value !== opts.expr) customProjInput.value = opts.expr;
-    }
-    const isSphere = next === "sphere";
+    const is3D = next === "sphere";
     if (window.RiemannSphere) {
-      window.RiemannSphere.state.enabled = isSphere;
-      if (isSphere && !opts.keepSphereView && prev !== "sphere") window.RiemannSphere.reset();
+      window.RiemannSphere.state.enabled = is3D;
+      if (is3D && !opts.keepSphereView && prev !== next) window.RiemannSphere.reset();
     }
     if (outProjSelect && outProjSelect.value !== next) outProjSelect.value = next;
     if (btnToggleSphere) {
-      btnToggleSphere.classList.toggle("active", isSphere);
-      btnToggleSphere.textContent = isSphere ? "2D Plane" : "3D Sphere";
-    }
-    if (customProjBar) customProjBar.classList.toggle("hidden", next !== "custom");
-    if (next === "custom" && window.CFVProjections && customProjErr) {
-      const { err } = window.CFVProjections.getCustomProjector(state.projectionExpr);
-      customProjErr.textContent = err || "";
-      customProjErr.classList.toggle("hidden", !err);
+      btnToggleSphere.classList.toggle("active", next === "sphere");
+      btnToggleSphere.textContent = next === "sphere" ? "2D Plane" : "Riemann Sphere";
     }
     if (outputTag) {
       outputTag.textContent =
         next === "sphere" ? "RIEMANN SPHERE" :
         next === "stereographic" ? "STEREOGRAPHIC DISK" :
         next === "poincare" ? "POINCARÉ DISK" :
-        next === "custom" ? "CUSTOM PROJECTION" :
+        next === "mercator" ? "MERCATOR MAP" :
+        next === "polar" ? "POLAR ℂ" :
         state.mode === "integral" ? "INTEGRAL PLANE" : "OUTPUT PLANE";
     }
     if (outputSub && window.CFVProjections) {
       outputSub.textContent =
         next === "planar"
           ? (state.mode === "integral" ? "I(t) = ∫ f(z) dz" : "w = f(z)")
-          : window.CFVProjections.getSubtitle(next, state.projectionExpr);
+          : window.CFVProjections.getSubtitle(next);
     }
-    if (!opts.keepOutView && (next === "stereographic" || next === "poincare") && prev !== next) {
-      setSquareAspect("out", true);
-      setView(state.outView, canvasOut, 0, 0, 1.32);
+    if (!opts.keepOutView && prev !== next) {
+      if (next === "stereographic" || next === "poincare") {
+        setSquareAspect("out", true);
+        setView(state.outView, canvasOut, 0, 0, 1.32);
+      } else if (next === "mercator") {
+        setSquareAspect("out", true);
+        setView(state.outView, canvasOut, 0, 0, 3.35);
+      }
     }
     ensureCanvasSize(canvasOut);
-    requestRender();
+    requestRender("out");
     if (!opts.silent) notifyState(true, true);
   }
 
@@ -254,7 +344,15 @@
   const integralPanelHdr = document.getElementById("integral-panel-hdr");
   const integralResizeHandle = document.getElementById("integral-resize-handle");
   const btnMinIntegral = document.getElementById("btn-min-integral");
+  const btnCloseIntegral = document.getElementById("btn-close-integral");
+  const btnIntegralAddCircle = document.getElementById("btn-integral-add-circle");
+  const btnToggleContour = document.getElementById("btn-toggle-contour");
+  const optContourMode = document.getElementById("opt-contour-mode");
   const integralMinSum = document.getElementById("integral-min-sum");
+  const integralSummaryBar = document.getElementById("integral-summary-bar");
+  const integralSumLabel = document.getElementById("integral-sum-label");
+  const integralSumRes = document.getElementById("integral-sum-res");
+  const integralResCell = document.getElementById("integral-res-cell");
   const integralRows = document.getElementById("integral-rows");
   const integralSumRow = document.getElementById("integral-sum-row");
   const integralSumVal = document.getElementById("integral-sum-val");
@@ -496,9 +594,11 @@
     sin: Math.sin, cos: Math.cos, tan: Math.tan,
     asin: Math.asin, acos: Math.acos, atan: Math.atan, atan2: Math.atan2,
     sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
-    exp: Math.exp, log: Math.log, sqrt: Math.sqrt,
+    exp: Math.exp, log: Math.log, log2: Math.log2, log10: Math.log10,
+    sqrt: Math.sqrt, cbrt: Math.cbrt, hypot: Math.hypot,
     abs: Math.abs, fabs: Math.abs, pow: Math.pow,
-    min: Math.min, max: Math.max, floor: Math.floor, ceil: Math.ceil,
+    min: Math.min, max: Math.max, fmin: Math.min, fmax: Math.max,
+    floor: Math.floor, ceil: Math.ceil, round: Math.round, trunc: Math.trunc, sign: Math.sign,
   };
   const exprFnCache = new Map();
 
@@ -590,12 +690,39 @@
 
   function rebuildFormulaShapes() {
     const paramMap = ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
+    /* Locked elements with variable formulas STILL move dynamically when sliders/vars change! */
     for (const s of state.shapes) {
       if (!s.formula) continue;
       const res = evalShapeFormula(s.formula, paramMap);
       if (res && res.rawPts.length >= 2) {
         s.rawPts = res.rawPts;
         if (s.formula.kind !== "parametric") s.closed = res.closed;
+      }
+    }
+    for (const p of state.points) {
+      if (p.xExpr && String(p.xExpr).trim()) {
+        const vx = evalParamExpr(p.xExpr, paramMap);
+        if (Number.isFinite(vx)) p.x = vx;
+      }
+      if (p.yExpr && String(p.yExpr).trim()) {
+        const vy = evalParamExpr(p.yExpr, paramMap);
+        if (Number.isFinite(vy)) p.y = vy;
+      }
+    }
+    for (const ln of state.lines) {
+      if (ln.valExpr && String(ln.valExpr).trim()) {
+        const vv = evalParamExpr(ln.valExpr, paramMap);
+        if (Number.isFinite(vv)) ln.value = vv;
+      }
+    }
+    for (const tb of state.texts) {
+      if (tb.xExpr && String(tb.xExpr).trim()) {
+        const vx = evalParamExpr(tb.xExpr, paramMap);
+        if (Number.isFinite(vx)) tb.x = vx;
+      }
+      if (tb.yExpr && String(tb.yExpr).trim()) {
+        const vy = evalParamExpr(tb.yExpr, paramMap);
+        if (Number.isFinite(vy)) tb.y = vy;
       }
     }
   }
@@ -698,18 +825,23 @@
 
   function unpackIntegral(raw) {
     const inPts = [], cumPts = [];
-    for (let i = 0; i < raw.in.length; i += 2) {
-      inPts.push({ x: raw.in[i], y: raw.in[i + 1] });
-      cumPts.push({ x: raw.cum[i], y: raw.cum[i + 1] });
+    const rIn = (raw && Array.isArray(raw.in)) ? raw.in : [];
+    const rCum = (raw && Array.isArray(raw.cum)) ? raw.cum : [];
+    const len = Math.min(rIn.length, rCum.length);
+    for (let i = 0; i + 1 < len; i += 2) {
+      inPts.push({ x: rIn[i], y: rIn[i + 1] });
+      cumPts.push({ x: rCum[i], y: rCum[i + 1] });
     }
+    const tot = (raw && Array.isArray(raw.total)) ? raw.total : [0, 0];
+    const d2p = (raw && Array.isArray(raw.div_2pii)) ? raw.div_2pii : [0, 0];
     return {
       inPts,
       cumPts,
-      total: { x: raw.total[0], y: raw.total[1] },
-      div2pii: { x: raw.div_2pii[0], y: raw.div_2pii[1] },
-      arcLength: raw.arc_length,
-      orientation: raw.orientation,
-      singular: Boolean(raw.singular),
+      total: { x: tot[0] || 0, y: tot[1] || 0 },
+      div2pii: { x: d2p[0] || 0, y: d2p[1] || 0 },
+      arcLength: Number(raw && raw.arc_length) || 0,
+      orientation: Number(raw && raw.orientation) || 1,
+      singular: Boolean(raw && raw.singular),
     };
   }
 
@@ -744,8 +876,8 @@
         closed,
         with_mesh: withMesh,
         points: flat,
-        max_in_step: Math.max(0.015, (inSpan / 110) * qScale),
-        max_out_step: Math.max(0.015, (outSpan / 95) * qScale),
+        max_in_step: Math.max(0.012, (inSpan / 130) * qScale),
+        max_out_step: Math.max(0.012, (outSpan / 115) * qScale),
         clip_radius: Math.max(80, outSpan * 12),
       }),
     });
@@ -771,18 +903,49 @@
     return res.ok ? res.json() : null;
   }
 
+  function expandLinearShapePts(shape) {
+    if (!shape || !shape.rawPts || shape.rawPts.length < 2) return shape ? shape.rawPts : [];
+    if (shape.kind !== "ray" && shape.kind !== "infline") return shape.rawPts;
+    const a = shape.rawPts[0];
+    const b = shape.rawPts[shape.rawPts.length - 1];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) { dx = 1; dy = 0; }
+    else { dx /= len; dy /= len; }
+    const span = Math.max(4.0, ((canvasIn.clientWidth || 600) / Math.max(1e-6, state.inView.scale)) * 1.2);
+    const maxExt = span * 18.0;
+    const pts = [];
+    if (shape.kind === "ray") {
+      const N = 96;
+      for (let i = 0; i <= N; i++) {
+        const u = i / N;
+        const dist = maxExt * (0.12 * u + 0.88 * u * u * u);
+        pts.push({ x: a.x + dx * dist, y: a.y + dy * dist });
+      }
+    } else {
+      const N = 128;
+      for (let i = 0; i <= N; i++) {
+        const u = -1.0 + (2.0 * i) / N;
+        const dist = maxExt * (0.12 * u + 0.88 * u * u * u);
+        pts.push({ x: a.x + dx * dist, y: a.y + dy * dist });
+      }
+    }
+    return pts;
+  }
+
   async function computeShape(shape, qScale = 1.0) {
+    const evalPts = expandLinearShapePts(shape);
     const targets = visibleComplexTargets();
     if (targets.length === 0) {
       shape.integral = null;
-      shape.boundary = { inPts: shape.rawPts, outPts: [] };
+      shape.boundary = { inPts: evalPts, outPts: [] };
       shape.mesh = [];
       shape.extraCurves = [];
       return;
     }
 
     if (state.mode === "integral") {
-      const data = await apiIntegrate(shape.rawPts, shape.closed, primaryFnPayload(), qScale);
+      const data = await apiIntegrate(evalPts, shape.closed, primaryFnPayload(), qScale);
       if (data && state.shapes.includes(shape)) {
         shape.integral = unpackIntegral(data);
         shape.boundary = { inPts: shape.integral.inPts, outPts: shape.integral.cumPts };
@@ -795,7 +958,7 @@
     /* Keep interior conformal mesh updated even while sliders scrub/play or shapes drag so
      * grid lines never freeze/detach and interior/exterior shading never tests stale points! */
     const wantMesh = Boolean(state.showMesh && shape.closed && state.shapes.length <= 16);
-    const pData = await apiTrace(shape.rawPts, shape.closed, wantMesh, primary.target, qScale);
+    const pData = await apiTrace(evalPts, shape.closed, wantMesh, primary.target, qScale);
     if (pData && state.shapes.includes(shape)) {
       shape.boundary = unpackCurve(pData.boundary);
       shape.mesh = wantMesh ? (pData.mesh || []).map(unpackCurve) : [];
@@ -806,7 +969,7 @@
     const extras = [];
     for (let i = 1; i < targets.length; i++) {
       const t = targets[i];
-      const d = await apiTrace(shape.rawPts, shape.closed, false, t.target, qScale * 1.1);
+      const d = await apiTrace(evalPts, shape.closed, false, t.target, qScale * 1.1);
       if (d && d.boundary) {
         extras.push({
           curve: unpackCurve(d.boundary),
@@ -842,20 +1005,31 @@
     requestRender();
   }
 
+  function isInputEditable() {
+    return state.inProjection === "planar" || state.inProjection === "polar";
+  }
+
   async function recomputeAllOnce(qScale = 1.0, lightweight = false) {
     if (!state.active) return;
     rebuildFormulaShapes();
-    await Promise.all([
-      ...state.shapes.map((s) => computeShape(s, qScale)),
-      recomputePoints(),
-    ]);
-    updateIntegralPanel();
+    const hasDom = Boolean(state.showDomain || state.showOutDomain);
+    /* Fire domain coloring IMMEDIATELY in parallel instead of waiting behind shape/point roundtrips! */
+    if (hasDom) scheduleDomain(Boolean(lightweight));
+    const outHidden = Boolean(ws() && ws().state && ws().state.outputHidden);
+    const skipShapesForInSphere = Boolean(outHidden && state.inProjection === "sphere");
+    const fastDomainOnly = Boolean((lightweight && hasDom && state.shapes.length === 0) || skipShapesForInSphere);
+    if (!fastDomainOnly) {
+      await Promise.all([
+        ...state.shapes.map((s) => computeShape(s, qScale)),
+        recomputePoints(),
+      ]);
+      updateIntegralPanel();
+    }
     if (lightweight && ws() && typeof ws().syncShapeBadges === "function") {
       ws().syncShapeBadges();
-    } else {
+    } else if (!fastDomainOnly) {
       notifyDomain();
     }
-    if (state.showDomain) scheduleDomain();
     if (state.taylor.enabled && !lightweight) fetchTaylor();
     requestRender();
   }
@@ -887,28 +1061,30 @@
    * View, Resize & Domain Coloring
    * ------------------------------------------------------------------------- */
 
-  function setView(view, canvas, cx, cy, r) {
+  function setView(view, canvas, cx, cy, r, skipSideEffects = false) {
     const dim = Math.min(canvas.clientWidth || 500, canvas.clientHeight || 500);
     view.cx = cx;
     view.cy = cy;
-    const s = (dim * 0.45) / Math.max(r, 1e-4);
+    const s = (dim * 0.45) / Math.max(r, 1e-13);
     view.scale = s;
     view.scaleX = s;
     view.scaleY = s;
-    if (view === state.inView && state.showDomain) scheduleDomain();
-    requestRender();
+    if (!skipSideEffects) {
+      if (view === state.inView && (state.showDomain || state.showOutDomain)) scheduleDomain();
+      requestRender(view === state.inView ? "in" : "out");
+    }
   }
 
   function zoomAt(view, canvas, sx, sy, factorX, factorY = factorX) {
     const b = screenToWorld(view, canvas, sx, sy);
-    view.scaleX = Math.min(1e6, Math.max(0.5, (view.scaleX || view.scale) * factorX));
-    view.scaleY = Math.min(1e6, Math.max(0.5, (view.scaleY || view.scale) * factorY));
+    view.scaleX = Math.min(1e13, Math.max(0.5, (view.scaleX || view.scale) * factorX));
+    view.scaleY = Math.min(1e13, Math.max(0.5, (view.scaleY || view.scale) * factorY));
     view.scale = Math.sqrt(view.scaleX * view.scaleY);
     const a = screenToWorld(view, canvas, sx, sy);
     view.cx += b.x - a.x;
     view.cy += b.y - a.y;
-    if (view === state.inView && state.showDomain) scheduleDomain();
-    requestRender();
+    if (view === state.inView && (state.showDomain || state.showOutDomain)) scheduleDomain(true);
+    requestRender(view === state.inView ? "in" : "out");
   }
 
   function autoFitOutput() {
@@ -999,7 +1175,7 @@
         view.scaleY = s * Math.sqrt(ratio);
       }
     }
-    if (isIn && state.showDomain) scheduleDomain();
+    if (isIn && (state.showDomain || state.showOutDomain)) scheduleDomain();
     requestRender();
   }
 
@@ -1015,7 +1191,7 @@
     if (had0Out && okOut) {
       setView(state.outView, canvasOut, state.defaultOutView.cx, state.defaultOutView.cy, state.defaultOutView.r);
     }
-    if (state.showDomain && okIn) scheduleDomain();
+    if ((state.showDomain || state.showOutDomain) && (okIn || okOut)) scheduleDomain();
     requestRender();
   }
 
@@ -1027,14 +1203,39 @@
     ro.observe(outCard);
   }
 
-  function scheduleDomain() {
-    if (!state.showDomain || !state.active) return;
+  function scheduleDomain(isAnimating = false) {
+    if ((!state.showDomain && !state.showOutDomain) || !state.active) return;
+    if (isAnimating) {
+      /* Smooth pipelined preview: fire immediately if idle, else queue latest viewport (ZERO debounce starvation!) */
+      if (!state.domainInFlight) {
+        fetchDomain(true);
+      } else {
+        state.domainPendingMode = state.domainPendingMode === "full" ? "full" : "fast";
+      }
+      /* Schedule crisp native-res settle pass shortly after zooming/animation pauses */
+      if (state.domainSettleTimer) clearTimeout(state.domainSettleTimer);
+      state.domainSettleTimer = setTimeout(() => {
+        state.domainSettleTimer = null;
+        if ((!state.showDomain && !state.showOutDomain) || !state.active) return;
+        const playing = ws() && typeof ws().isAnySliderPlaying === "function" && ws().isAnySliderPlaying();
+        if (!playing) {
+          if (!state.domainInFlight) fetchDomain(false);
+          else state.domainPendingMode = "full";
+        }
+      }, 110);
+      return;
+    }
     if (state.domainTimer) clearTimeout(state.domainTimer);
-    state.domainTimer = setTimeout(fetchDomain, 90);
+    if (state.domainSettleTimer) { clearTimeout(state.domainSettleTimer); state.domainSettleTimer = null; }
+    state.domainTimer = setTimeout(() => {
+      state.domainTimer = null;
+      if (!state.domainInFlight) fetchDomain(false);
+      else state.domainPendingMode = "full";
+    }, 35);
   }
 
-  async function fetchDomain() {
-    if (!state.showDomain || !state.active) return;
+  async function fetchDomain(fastPreview = false) {
+    if ((!state.showDomain && !state.showOutDomain) || !state.active) return;
     const tgt = primaryFnPayload();
     if (!tgt) {
       state.domainImg = null;
@@ -1042,40 +1243,93 @@
       return;
     }
     const reqId = ++state.domainReqId;
-    const w = canvasIn.clientWidth, h = canvasIn.clientHeight;
-    if (w < 20 || h < 20) return;
+    const inW = canvasIn.clientWidth, inH = canvasIn.clientHeight;
+    const useMercGlobal = (
+      state.showOutDomain ||
+      (state.showDomain && state.inProjection === "sphere")
+    ) && state.outDomainMapping === "mercator" && (
+      !state.showDomain || state.inProjection === "sphere" || inW < 20 || inH < 20
+    );
+    const w = inW >= 20 ? inW : (canvasOut.clientWidth >= 20 ? canvasOut.clientWidth : 640);
+    const h = inH >= 20 ? inH : (canvasOut.clientHeight >= 20 ? canvasOut.clientHeight : 480);
+    const dpr = Math.min(2.0, window.devicePixelRatio || 1);
+    const physW = useMercGlobal ? 720 : Math.max(64, Math.round(w * dpr));
+    const physH = useMercGlobal ? 540 : Math.max(64, Math.round(h * dpr));
     const isFractal = state.domainScheme === "smooth_escape" || state.domainScheme === "inferno" || state.domainScheme === "ocean";
-    const scaleRes = isFractal ? 0.72 : 0.48;
-    const maxDim = isFractal ? 720 : 420;
-    const tw = Math.min(maxDim, Math.max(128, Math.round(w * scaleRes)));
-    const th = Math.min(maxDim, Math.max(128, Math.round(h * scaleRes)));
+    /* High-clarity adaptive FPS preview + 100% native device-pixel settle! */
+    if (!Number.isFinite(state.domainFastBudget)) {
+      state.domainFastBudget = isFractal ? 380000 : 260000;
+    }
+    const maxPixels = fastPreview
+      ? Math.max(120000, Math.min(720000, Math.round(state.domainFastBudget)))
+      : (isFractal ? 2800000 : 1500000);
+    const maxEdge = fastPreview ? (isFractal ? 1400 : 1080) : (isFractal ? 2200 : 1600);
+    const pixelScale = Math.sqrt(maxPixels / Math.max(1, physW * physH));
+    const edgeScale = maxEdge / Math.max(physW, physH);
+    const scale = Math.min(1.0, pixelScale, edgeScale);
+    const tw = Math.min(2400, Math.max(64, Math.round(physW * scale)));
+    const th = Math.min(2400, Math.max(64, Math.round(physH * scale)));
     const scX = state.inView.scaleX || state.inView.scale;
     const scY = state.inView.scaleY || state.inView.scale;
-    const halfW = (w * 0.5) / scX;
-    const halfH = (h * 0.5) / scY;
-    const cx = state.inView.cx, cy = state.inView.cy;
-    const res = await fetch("/api/domain", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...tgt,
-        cx,
-        cy,
-        half_w: halfW,
-        half_h: halfH,
-        width: tw,
-        height: th,
-        scheme: state.domainScheme || "classic",
-      }),
-    });
-    if (!res.ok || reqId !== state.domainReqId) return;
-    const buf = await res.arrayBuffer();
-    if (reqId !== state.domainReqId) return;
-    const off = document.createElement("canvas");
-    off.width = tw; off.height = th;
-    off.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(buf), tw, th), 0, 0);
-    state.domainImg = { canvas: off, cx, cy, halfW, halfH };
-    requestRender();
+    const halfW = useMercGlobal ? Math.PI : (w * 0.5) / scX;
+    const halfH = useMercGlobal ? 2.65 : (h * 0.5) / scY;
+    const cx = useMercGlobal ? 0.0 : state.inView.cx;
+    const cy = useMercGlobal ? 0.0 : state.inView.cy;
+    const paramKey = JSON.stringify(tgt) + "|" + (state.domainScheme || "classic") + (useMercGlobal ? "|merc" : "");
+    state.domainInFlight = true;
+    state.domainPendingMode = null;
+    const tFetchStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+    try {
+      const res = await fetch("/api/domain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...tgt,
+          cx,
+          cy,
+          half_w: halfW,
+          half_h: halfH,
+          width: tw,
+          height: th,
+          scheme: state.domainScheme || "classic",
+        }),
+      });
+      if (!res.ok) return;
+      if (reqId < (state.domainLastAppliedId || 0)) return;
+      if (!fastPreview && reqId !== state.domainReqId) return;
+      const buf = await res.arrayBuffer();
+      if (fastPreview) {
+        const dtMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - tFetchStart;
+        if (dtMs > 34) state.domainFastBudget = Math.max(120000, state.domainFastBudget * 0.78);
+        else if (dtMs < 18) state.domainFastBudget = Math.min(720000, state.domainFastBudget * 1.24);
+      }
+      if (reqId < (state.domainLastAppliedId || 0)) return;
+      if (!fastPreview && reqId !== state.domainReqId) return;
+      /* Never let a lower-res fastPreview overwrite an already-settled full-res tile for the EXACT same viewport AND parameters! */
+      const cur = state.domainImg;
+      if (fastPreview && cur && !cur.fast &&
+          cur.paramKey === paramKey &&
+          Math.abs(cur.cx - cx) < halfW * 1e-6 &&
+          Math.abs(cur.cy - cy) < halfH * 1e-6 &&
+          Math.abs(cur.halfW - halfW) < halfW * 1e-6 &&
+          Math.abs(cur.halfH - halfH) < halfH * 1e-6) {
+        return;
+      }
+      state.domainLastAppliedId = reqId;
+      const pixels = new Uint8ClampedArray(buf);
+      const off = state._domainOffCanvas || (state._domainOffCanvas = document.createElement("canvas"));
+      if (off.width !== tw || off.height !== th) { off.width = tw; off.height = th; }
+      off.getContext("2d").putImageData(new ImageData(pixels, tw, th), 0, 0);
+      state.domainImg = { canvas: off, pixels, cx, cy, halfW, halfH, paramKey, fast: Boolean(fastPreview), tw, th };
+      requestRender(state.showOutDomain ? "both" : "in");
+    } finally {
+      state.domainInFlight = false;
+      const nextMode = state.domainPendingMode;
+      state.domainPendingMode = null;
+      if (nextMode && (state.showDomain || state.showOutDomain) && state.active) {
+        fetchDomain(nextMode !== "full");
+      }
+    }
   }
 
   /* -------------------------------------------------------------------------
@@ -1165,6 +1419,22 @@
    * Resize Handles & Hit-Testing (Respects `locked`!)
    * ------------------------------------------------------------------------- */
 
+  function rectLocalFrame(pts) {
+    if (!pts || pts.length !== 4) return null;
+    const p0 = pts[0], p1 = pts[1], p2 = pts[2], p3 = pts[3];
+    const cx = 0.25 * (p0.x + p1.x + p2.x + p3.x);
+    const cy = 0.25 * (p0.y + p1.y + p2.y + p3.y);
+    const e01x = p1.x - p0.x, e01y = p1.y - p0.y;
+    const e03x = p3.x - p0.x, e03y = p3.y - p0.y;
+    const w = Math.hypot(e01x, e01y);
+    const h = Math.hypot(e03x, e03y);
+    if (w < 1e-9 || h < 1e-9) {
+      const bb = bboxOf(pts);
+      return { cx: bb.cx, cy: bb.cy, ux: 1, uy: 0, vx: 0, vy: 1, w: Math.max(0.02, bb.xmax - bb.xmin), h: Math.max(0.02, bb.ymax - bb.ymin) };
+    }
+    return { cx, cy, ux: e01x / w, uy: e01y / w, vx: e03x / h, vy: e03y / h, w, h };
+  }
+
   function getResizeHandles(shape) {
     if (!shape || !shape.visible || shape.locked || !shape.rawPts || shape.rawPts.length < 2) return [];
     const bb = bboxOf(shape.rawPts);
@@ -1175,6 +1445,19 @@
         { id: "w", x: bb.cx - r, y: bb.cy, cursor: "ew-resize", shapeKind: "circle" },
         { id: "n", x: bb.cx, y: bb.cy + r, cursor: "ns-resize", shapeKind: "circle" },
         { id: "s", x: bb.cx, y: bb.cy - r, cursor: "ns-resize", shapeKind: "circle" },
+      ];
+    }
+    if (shape.kind === "rect" && shape.rawPts.length === 4) {
+      const [p0, p1, p2, p3] = shape.rawPts;
+      return [
+        { id: "nw", x: p3.x, y: p3.y, cursor: "nwse-resize", shapeKind: "rect" },
+        { id: "ne", x: p2.x, y: p2.y, cursor: "nesw-resize", shapeKind: "rect" },
+        { id: "se", x: p1.x, y: p1.y, cursor: "nwse-resize", shapeKind: "rect" },
+        { id: "sw", x: p0.x, y: p0.y, cursor: "nesw-resize", shapeKind: "rect" },
+        { id: "n", x: 0.5 * (p2.x + p3.x), y: 0.5 * (p2.y + p3.y), cursor: "ns-resize", shapeKind: "rect" },
+        { id: "s", x: 0.5 * (p0.x + p1.x), y: 0.5 * (p0.y + p1.y), cursor: "ns-resize", shapeKind: "rect" },
+        { id: "e", x: 0.5 * (p1.x + p2.x), y: 0.5 * (p1.y + p2.y), cursor: "ew-resize", shapeKind: "rect" },
+        { id: "w", x: 0.5 * (p3.x + p0.x), y: 0.5 * (p3.y + p0.y), cursor: "ew-resize", shapeKind: "rect" },
       ];
     }
     if (shape.kind === "rect") {
@@ -1189,7 +1472,7 @@
         { id: "w", x: bb.xmin, y: bb.cy, cursor: "ew-resize", shapeKind: "rect" },
       ];
     }
-    if (shape.kind === "line") {
+    if (shape.kind === "line" || shape.kind === "seg" || shape.kind === "ray" || shape.kind === "infline") {
       return [
         { id: "start", x: shape.rawPts[0].x, y: shape.rawPts[0].y, cursor: "move", shapeKind: "line" },
         { id: "end", x: shape.rawPts[shape.rawPts.length - 1].x, y: shape.rawPts[shape.rawPts.length - 1].y, cursor: "move", shapeKind: "line" },
@@ -1498,12 +1781,21 @@
   }
 
   function hitPoint(sx, sy) {
+    const inIs3D = state.inProjection === "sphere" && window.RiemannSphereIn;
     for (let i = state.points.length - 1; i >= 0; i--) {
       const p = state.points[i];
       if (!p.visible) continue;
-      const sp = worldToScreen(state.inView, canvasIn, p.x, p.y);
       const rad = Math.max(10, (p.size || 5) + 6);
-      if (Math.hypot(sx - sp.x, sy - sp.y) <= rad) return p;
+      if (inIs3D) {
+        const c = window.RiemannSphereIn.projectToCanvas(p.x, p.y, canvasIn);
+        if (!c || c.depth < -0.04) continue;
+        if (Math.hypot(sx - c.sx, sy - c.sy) <= rad) return p;
+      } else {
+        const pp = projectInPt(p);
+        if (!pp || !Number.isFinite(pp.x) || !Number.isFinite(pp.y)) continue;
+        const sp = worldToScreen(state.inView, canvasIn, pp.x, pp.y);
+        if (Math.hypot(sx - sp.x, sy - sp.y) <= rad) return p;
+      }
     }
     return null;
   }
@@ -1560,18 +1852,42 @@
   }
 
   function hitShape(sx, sy) {
-    const wpt = screenToWorld(state.inView, canvasIn, sx, sy);
+    const inIs3D = state.inProjection === "sphere" && window.RiemannSphereIn;
+    const isCurved = inIs3D || state.inProjection === "stereographic" || state.inProjection === "poincare" || state.inProjection === "mercator";
+    const zExact = isCurved ? screenToInComplexExact(sx, sy) : screenToWorld(state.inView, canvasIn, sx, sy);
+    if (isCurved && !zExact) return null;
     for (let i = state.shapes.length - 1; i >= 0; i--) {
       const s = state.shapes[i];
       if (!s.visible) continue;
-      const pts = s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts;
-      const segs = s.closed ? pts.length : pts.length - 1;
-      for (let k = 0; k < segs; k++) {
-        const a = worldToScreen(state.inView, canvasIn, pts[k].x, pts[k].y);
-        const b = worldToScreen(state.inView, canvasIn, pts[(k + 1) % pts.length].x, pts[(k + 1) % pts.length].y);
-        if (distSegSq(sx, sy, a.x, a.y, b.x, b.y) <= 144) return s;
+      if (isCurved && (s.isOcean || /^global ocean\b/i.test(s.label || ""))) continue;
+      const rawInPts = (s.kind === "ray" || s.kind === "infline")
+        ? expandLinearShapePts(s)
+        : (s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts);
+      if (!rawInPts || rawInPts.length < 2) continue;
+      if (inIs3D) {
+        const segs = s.closed ? rawInPts.length : rawInPts.length - 1;
+        for (let k = 0; k < segs; k++) {
+          const pa = rawInPts[k], pb = rawInPts[(k + 1) % rawInPts.length];
+          if (!pa || !pb) continue;
+          const ca = window.RiemannSphereIn.projectToCanvas(pa.x, pa.y, canvasIn);
+          const cb = window.RiemannSphereIn.projectToCanvas(pb.x, pb.y, canvasIn);
+          if (!ca || !cb || ca.depth < -0.04 || cb.depth < -0.04) continue;
+          if (distSegSq(sx, sy, ca.sx, ca.sy, cb.sx, cb.sy) <= 100) return s;
+        }
+        if (s.closed && s.rawPts.length >= 3 && zExact && ptInPoly(zExact.x, zExact.y, s.rawPts)) return s;
+      } else {
+        const pts = projectInPts(rawInPts);
+        if (!pts || pts.length < 2) continue;
+        const segs = s.closed ? pts.length : pts.length - 1;
+        for (let k = 0; k < segs; k++) {
+          const pa = pts[k], pb = pts[(k + 1) % pts.length];
+          if (!pa || !pb) continue;
+          const a = worldToScreen(state.inView, canvasIn, pa.x, pa.y);
+          const b = worldToScreen(state.inView, canvasIn, pb.x, pb.y);
+          if (distSegSq(sx, sy, a.x, a.y, b.x, b.y) <= 144) return s;
+        }
+        if (s.closed && s.rawPts.length >= 3 && zExact && ptInPoly(zExact.x, zExact.y, s.rawPts)) return s;
       }
-      if (s.closed && s.rawPts.length >= 3 && ptInPoly(wpt.x, wpt.y, s.rawPts)) return s;
     }
     return null;
   }
@@ -1625,12 +1941,25 @@
    * ------------------------------------------------------------------------- */
 
   let renderQueued = false;
-  function requestRender() {
+  let dirtyIn = true;
+  let dirtyOut = true;
+  function requestRender(which = "both") {
     if (!state.active) return;
+    if (which === "in") dirtyIn = true;
+    else if (which === "out") dirtyOut = true;
+    else { dirtyIn = true; dirtyOut = true; }
     if (!renderQueued) {
       renderQueued = true;
       requestAnimationFrame(renderFrame);
     }
+  }
+
+  function themeCol(col, opts) {
+    return (window.CFVTheme && window.CFVTheme.adaptColor) ? window.CFVTheme.adaptColor(col, opts) : (col || "#38bdf8");
+  }
+
+  function themeRgba(col, a, opts) {
+    return (window.CFVTheme && window.CFVTheme.adaptRgba) ? window.CFVTheme.adaptRgba(col, a, opts) : hexToRgba(col, a);
   }
 
   function tracePts(ctx, canvas, view, pts, closed) {
@@ -1676,7 +2005,25 @@
     const xmin = view.cx - hw, xmax = view.cx + hw, ymin = view.cy - hh, ymax = view.cy + hh;
     const light = isLightTheme();
 
-    ctx.fillStyle = light ? "#f8fafc" : "#0a0e17";
+    /* Specialized coordinate backdrops (Polar, Mercator, Stereographic & Poincaré Disks) on Input OR Output! */
+    const activeProj = isInput ? state.inProjection : state.projection;
+    if (window.CFVProjections && (activeProj === "polar" || activeProj === "mercator" || activeProj === "stereographic" || activeProj === "poincare")) {
+      window.CFVProjections.drawProjectionOverlay(ctx, canvas, view, worldToScreen, activeProj, light);
+      if (activeProj === "stereographic" || activeProj === "poincare") {
+        const origin = worldToScreen(view, canvas, 0, 0);
+        if (origin.x >= -20 && origin.x <= w + 20 && origin.y >= -20 && origin.y <= h + 20) {
+          ctx.save();
+          ctx.strokeStyle = light ? "rgba(5, 150, 105, 0.52)" : "rgba(52, 211, 153, 0.45)";
+          ctx.beginPath(); ctx.arc(origin.x, origin.y, 7, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = light ? "#059669" : "#34d399";
+          ctx.beginPath(); ctx.arc(origin.x, origin.y, 2.2, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+      }
+      return;
+    }
+
+    ctx.fillStyle = light ? "#f5f7fb" : "#0a0e17";
     ctx.fillRect(0, 0, w, h);
 
     if (isInput && state.showDomain && state.domainImg) {
@@ -1685,6 +2032,8 @@
       const br = worldToScreen(view, canvas, d.cx + d.halfW, d.cy - d.halfH);
       ctx.save();
       ctx.globalAlpha = normOpacity(state.domainOpacity, 0.72);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(d.canvas, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
       ctx.restore();
     }
@@ -1711,10 +2060,6 @@
     if (origin.y >= 0 && origin.y <= h) { ctx.moveTo(0, origin.y); ctx.lineTo(w, origin.y); }
     if (origin.x >= 0 && origin.x <= w) { ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, h); }
     ctx.stroke();
-
-    if (!isInput && window.CFVProjections && (state.projection === "stereographic" || state.projection === "poincare")) {
-      window.CFVProjections.drawProjectionOverlay(ctx, canvas, view, worldToScreen, state.projection, light);
-    }
 
     if (!isInput && origin.x >= -20 && origin.x <= w + 20 && origin.y >= -20 && origin.y <= h + 20) {
       ctx.save();
@@ -1748,13 +2093,13 @@
     const w = canvasIn.clientWidth, h = canvasIn.clientHeight;
     const hi = ln.id === state.selectedLineId || ln.id === state.hoveredLineId;
     const lw = normLineWidth(ln.lineWidth, 1.5);
-    const col = ln.color || "#fbbf24";
+    const col = themeCol(ln.color || "#fbbf24");
     const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
 
     ctx.save();
     ctx.globalAlpha = op;
     ctx.font = '600 10.5px "JetBrains Mono", monospace';
-    ctx.strokeStyle = hi ? hiCol : hexToRgba(col, 0.78);
+    ctx.strokeStyle = hi ? hiCol : themeRgba(col, 0.78);
     ctx.lineWidth = lw + (hi ? 0.8 : 0);
     applyLineStyle(ctx, ln.lineStyle || "dashed");
 
@@ -1791,15 +2136,18 @@
     const op = normOpacity(p.opacity, 1.0);
     if (op <= 0.001) return;
     const w = canvasIn.clientWidth, h = canvasIn.clientHeight;
-    const sp = worldToScreen(state.inView, canvasIn, p.x, p.y);
+    const pp = projectInPt({ x: p.x, y: p.y });
+    if (!pp) return;
+    const sp = worldToScreen(state.inView, canvasIn, pp.x, pp.y);
     if (sp.x < -36 || sp.x > w + 36 || sp.y < -36 || sp.y > h + 36) return;
     ctx.save();
     ctx.globalAlpha = op;
     ctx.font = '10.5px "JetBrains Mono", monospace';
     const sel = isPointSelected(p.id) || p.id === state.hoveredPointId;
-    drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
+    const col = themeCol(p.color || "#34d399");
+    drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", col, p.size || 5, sel);
     if (p.showLabel !== false && p.label) {
-      ctx.fillStyle = p.color || (isLightTheme() ? "#0f172a" : "#e2e8f0");
+      ctx.fillStyle = col;
       ctx.fillText(p.label, sp.x + (p.size || 5) + 6, sp.y + 3);
     }
     ctx.restore();
@@ -1818,9 +2166,10 @@
     ctx.globalAlpha = op;
     ctx.font = '10.5px "JetBrains Mono", monospace';
     const sel = isPointSelected(p.id) || p.id === state.hoveredPointId;
-    drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", p.color || "#34d399", p.size || 5, sel);
+    const col = themeCol(p.color || "#34d399");
+    drawPointIcon(ctx, sp.x, sp.y, p.icon || "dot", col, p.size || 5, sel);
     if (p.showLabel !== false && p.label) {
-      ctx.fillStyle = hexToRgba(p.color || (isLightTheme() ? "#0f172a" : "#e2e8f0"), 0.95);
+      ctx.fillStyle = themeRgba(col, 0.95);
       ctx.fillText(p.label, sp.x + (p.size || 5) + 6, sp.y + 3);
     }
     ctx.restore();
@@ -1866,43 +2215,65 @@
 
   function drawShapeIn(ctx, s) {
     if (!s.visible) return;
-    const op = normOpacity(s.opacity, 1.0);
+    const defaultOp = s.closed ? 0.22 : 1.0;
+    const op = normOpacity(s.opacity, defaultOp);
     if (op <= 0.001) return;
-    const pts = s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts;
+    const strokeAlpha = s.closed ? (op < 0.22 ? op / 0.22 : 1.0) : op;
+    const rawInPts = (s.kind === "ray" || s.kind === "infline")
+      ? expandLinearShapePts(s)
+      : (s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts);
+    const pts = projectInPts(rawInPts);
     const hi = isShapeSelected(s.id) || s.id === state.hoveredShapeId;
     const lw = normLineWidth(s.lineWidth, 2.2);
     const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
+    const fillCol = themeCol(s.color, { solidFill: s.closed && op >= 0.85 });
+    const strokeCol = themeCol(s.color, { solidFill: false });
 
     ctx.save();
-    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
 
     if (s.closed) {
       ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, true);
-      ctx.fillStyle = hexToRgba(s.color, state.mode === "integral" ? 0.14 : 0.22);
+      ctx.fillStyle = op >= 0.995 ? fillCol : themeRgba(s.color, op);
       ctx.fill("nonzero");
     }
-    if (state.mode === "map" && s.closed && state.showMesh && s.mesh) {
-      ctx.strokeStyle = hexToRgba(s.color, 0.24); ctx.lineWidth = 1;
+    if (state.mode === "map" && s.closed && state.showMesh && s.mesh && op < 0.96) {
+      ctx.strokeStyle = themeRgba(s.color, 0.24 * strokeAlpha); ctx.lineWidth = 1;
       ctx.beginPath();
       for (const m of s.mesh) tracePts(ctx, canvasIn, state.inView, m.inPts, false);
       ctx.stroke();
     }
 
     if (lw > 0 || hi) {
+      ctx.save();
+      ctx.globalAlpha = strokeAlpha;
       applyLineStyle(ctx, s.lineStyle || "solid");
-      if (lw > 0) {
+      if (lw > 0 && op < 0.85) {
         ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, s.closed);
-        ctx.strokeStyle = hexToRgba(s.color, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
+        ctx.strokeStyle = themeRgba(s.color, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
       }
       ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, s.closed);
-      ctx.strokeStyle = hi ? hiCol : s.color; ctx.lineWidth = lw > 0 ? (hi ? lw + 0.6 : lw) : 1.4; ctx.stroke();
+      ctx.strokeStyle = hi ? hiCol : strokeCol; ctx.lineWidth = lw > 0 ? (hi ? lw + 0.6 : lw) : 1.4; ctx.stroke();
       ctx.setLineDash([]);
+      ctx.restore();
     }
 
-    if (lw > 0) {
-      drawDirArrow(ctx, canvasIn, state.inView, pts, s.color, 0.28);
-      if (state.mode === "integral" || s.closed) drawDirArrow(ctx, canvasIn, state.inView, pts, s.color, 0.72);
+    if (lw > 0 && op < 0.85) {
+      ctx.save();
+      ctx.globalAlpha = strokeAlpha;
+      if (s.kind === "ray" && s.rawPts && s.rawPts.length >= 2) {
+        const aSp = worldToScreen(state.inView, canvasIn, s.rawPts[0].x, s.rawPts[0].y);
+        ctx.fillStyle = hi ? hiCol : strokeCol;
+        ctx.beginPath(); ctx.arc(aSp.x, aSp.y, 4.2, 0, Math.PI * 2); ctx.fill();
+        drawDirArrow(ctx, canvasIn, state.inView, s.rawPts, strokeCol, 0.9);
+      } else if (s.kind === "infline" && s.rawPts && s.rawPts.length >= 2) {
+        drawDirArrow(ctx, canvasIn, state.inView, s.rawPts, strokeCol, 0.85);
+        drawDirArrow(ctx, canvasIn, state.inView, [...s.rawPts].reverse(), strokeCol, 0.85);
+      } else {
+        drawDirArrow(ctx, canvasIn, state.inView, pts, strokeCol, 0.28);
+        if (state.mode === "integral" || s.closed) drawDirArrow(ctx, canvasIn, state.inView, pts, strokeCol, 0.72);
+      }
+      ctx.restore();
     }
 
     if (state.playing && pts.length > 1) {
@@ -1916,8 +2287,8 @@
     }
     ctx.restore();
 
-    /* Draw individual resize handles ONLY for a single selected unlocked shape (multi-select draws group handles) */
-    if (s.id === state.selectedShapeId && !s.locked && getSelectedMovableItems().total < 2) {
+    /* Draw individual resize handles ONLY in editable modes (Planar ℂ / Polar ℂ) for a single selected unlocked shape */
+    if (isInputEditable() && s.id === state.selectedShapeId && !s.locked && getSelectedMovableItems().total < 2) {
       ctx.save();
       for (const h of getResizeHandles(s)) {
         const sp = worldToScreen(state.inView, canvasIn, h.x, h.y);
@@ -2006,43 +2377,50 @@
 
   function drawShapeMapOut(ctx, s) {
     if (!s.visible || !s.boundary) return;
-    const op = normOpacity(s.opacity, 1.0);
+    const defaultOp = s.closed ? 0.22 : 1.0;
+    const op = normOpacity(s.opacity, defaultOp);
     if (op <= 0.001) return;
+    const strokeAlpha = s.closed ? (op < 0.22 ? op / 0.22 : 1.0) : op;
     const rawOut = s.boundary.outPts;
     if (!rawOut || rawOut.length < 2) return;
     const pts = projectOutPts(rawOut);
-    const col = s.primaryColor || s.color;
+    const rawCol = s.primaryColor || s.color;
+    const fillCol = themeCol(rawCol, { solidFill: s.closed && op >= 0.85 });
+    const col = themeCol(rawCol, { solidFill: false });
     const hi = isShapeSelected(s.id) || s.id === state.hoveredShapeId;
     const lw = normLineWidth(s.lineWidth, 2.2);
     const hiCol = isLightTheme() ? "#0f172a" : "#ffffff";
 
     ctx.save();
-    ctx.globalAlpha = op;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     if (s.closed && pts.every((p) => p !== null)) {
       if (state.projection === "planar" && shouldShadeExterior(s, pts)) {
-        drawExteriorShade(ctx, pts, col, 0.16);
+        drawExteriorShade(ctx, pts, col, op);
       } else {
         ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, true);
-        ctx.fillStyle = hexToRgba(col, 0.24); ctx.fill("nonzero");
+        ctx.fillStyle = op >= 0.995 ? fillCol : themeRgba(rawCol, op);
+        ctx.fill("nonzero");
       }
     }
-    if (s.closed && state.showMesh && s.mesh) {
-      ctx.strokeStyle = hexToRgba(col, 0.28); ctx.lineWidth = 1;
+    if (s.closed && state.showMesh && s.mesh && op < 0.96) {
+      ctx.strokeStyle = themeRgba(rawCol, 0.28 * strokeAlpha); ctx.lineWidth = 1;
       ctx.beginPath();
       for (const m of s.mesh) tracePts(ctx, canvasOut, state.outView, projectOutPts(m.outPts), false);
       ctx.stroke();
     }
 
     if (lw > 0 || hi) {
+      ctx.save();
+      ctx.globalAlpha = strokeAlpha;
       applyLineStyle(ctx, s.lineStyle || "solid");
-      if (lw > 0) {
+      if (lw > 0 && op < 0.85) {
         ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, s.closed);
-        ctx.strokeStyle = hexToRgba(col, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
+        ctx.strokeStyle = themeRgba(rawCol, hi ? 0.48 : 0.26); ctx.lineWidth = lw + (hi ? 6 : 4); ctx.stroke();
       }
       ctx.beginPath(); tracePts(ctx, canvasOut, state.outView, pts, s.closed);
       ctx.strokeStyle = hi ? hiCol : col; ctx.lineWidth = lw > 0 ? (hi ? lw + 0.6 : lw) : 1.4; ctx.stroke();
       ctx.setLineDash([]);
+      ctx.restore();
     }
 
     for (const ex of s.extraCurves || []) {
@@ -2138,8 +2516,12 @@
   function renderFrame(ts) {
     renderQueued = false;
     if (!state.active) return;
-    const okIn = ensureCanvasSize(canvasIn);
-    const okOut = ensureCanvasSize(canvasOut);
+    const drawInNow = dirtyIn || state.playing;
+    const drawOutNow = dirtyOut || state.playing;
+    dirtyIn = false;
+    dirtyOut = false;
+    const okIn = drawInNow && ensureCanvasSize(canvasIn);
+    const okOut = drawOutNow && ensureCanvasSize(canvasOut);
     if (!okIn && !okOut) return;
     const dpr = window.devicePixelRatio || 1;
     if (state.playing) {
@@ -2150,15 +2532,60 @@
     if (okIn) {
     ctxIn.save();
     ctxIn.scale(dpr, dpr);
-    drawGrid(ctxIn, canvasIn, state.inView, true);
-    drawInputOverlays(ctxIn);
-    /* Unified Element Layering Order (back -> front) */
-    for (const el of getOrderedElements()) {
-      if (el.kind === "shape") drawShapeIn(ctxIn, el.item);
-      else if (el.kind === "guide_line") drawSingleGuideLineIn(ctxIn, el.item);
-      else if (el.kind === "point") drawSinglePointIn(ctxIn, el.item);
+    const inIs3D = state.inProjection === "sphere" && window.RiemannSphereIn;
+    if (inIs3D) {
+      const orderedEls = getOrderedElements();
+      const orderedShapes = orderedEls.filter((e) => e.kind === "shape").map((e) => e.item);
+      const orderedPoints = orderedEls.filter((e) => e.kind === "point").map((e) => ({ ...e.item, outPt: { x: e.item.x, y: e.item.y } }));
+      const cfIn = state.showDomain && state.domainImg && state.domainImg.pixels
+        ? {
+            pixels: state.domainImg.pixels, tw: state.domainImg.tw, th: state.domainImg.th,
+            cx: state.domainImg.cx, cy: state.domainImg.cy, halfW: state.domainImg.halfW, halfH: state.domainImg.halfH,
+            opacity: normOpacity(state.domainOpacity, 0.9), mapping: state.outDomainMapping || "stereo",
+          }
+        : null;
+      const isAnimNow = Boolean(ws() && typeof ws().isAnySliderPlaying === "function" && ws().isAnySliderPlaying());
+      window.RiemannSphereIn.render(ctxIn, canvasIn, orderedShapes, {
+        surface: "sphere",
+        mode: state.mode,
+        showMesh: state.showMesh,
+        getPts: (s) => s.rawPts,
+        selectedShapeId: state.selectedShapeId,
+        hoveredShapeId: state.hoveredShapeId,
+        playPhase: state.playPhase,
+        playing: state.playing,
+        isAnimating: isAnimNow,
+        probe: state.probe && state.probe.active && state.probe.z ? { active: true, w: state.probe.z, color: "#38bdf8" } : null,
+        points: orderedPoints,
+        colorField: cfIn,
+      });
+    } else {
+      drawGrid(ctxIn, canvasIn, state.inView, true);
+      if (state.inProjection === "mercator") {
+        for (const s of state.shapes) {
+          if (s && s.visible && s.closed && (s.isOcean || /^global ocean\b/i.test(s.label || ""))) {
+            const tl = worldToScreen(state.inView, canvasIn, -Math.PI, 2.65);
+            const br = worldToScreen(state.inView, canvasIn, Math.PI, -2.65);
+            ctxIn.fillStyle = s.color || "#0b4f8c";
+            ctxIn.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+            break;
+          }
+        }
+      }
+      drawInputOverlays(ctxIn);
+      /* Unified Element Layering Order (back -> front) */
+      for (const el of getOrderedElements()) {
+        if (el.kind === "shape") {
+          if (state.inProjection !== "planar" && state.inProjection !== "polar" && (el.item.isOcean || /^global ocean\b/i.test(el.item.label || ""))) continue;
+          drawShapeIn(ctxIn, el.item);
+        } else if (el.kind === "guide_line") drawSingleGuideLineIn(ctxIn, el.item);
+        else if (el.kind === "point") drawSinglePointIn(ctxIn, el.item);
+      }
     }
 
+    /* Selection, Resize, Rotate & Drawing Overlays ONLY in Editable Coordinate Modes (Planar ℂ / Polar ℂ) */
+    const canEditIn = isInputEditable();
+    if (canEditIn) {
     /* Multi-Selection Group Bounding Box & Resize Handles */
     const gBox = getGroupBox();
     if (gBox) {
@@ -2272,10 +2699,43 @@
       ctxIn.stroke();
       ctxIn.restore();
     }
-    if (state.probe.active && state.probe.z) {
-      const sp = worldToScreen(state.inView, canvasIn, state.probe.z.x, state.probe.z.y);
-      ctxIn.fillStyle = "#fff"; ctxIn.strokeStyle = "#38bdf8"; ctxIn.lineWidth = 2;
-      ctxIn.beginPath(); ctxIn.arc(sp.x, sp.y, 4, 0, Math.PI * 2); ctxIn.fill(); ctxIn.stroke();
+    } /* end canEditIn */
+    if (!canEditIn) {
+      const wIn = canvasIn.clientWidth || 500;
+      const hIn = canvasIn.clientHeight || 400;
+      const pill = "Viewing Mode · Switch Input to Planar ℂ or Polar ℂ to edit elements";
+      ctxIn.save();
+      ctxIn.font = '500 10.5px Inter, system-ui, sans-serif';
+      const tw = ctxIn.measureText(pill).width;
+      const pw = tw + 18, ph = 22;
+      const px = Math.max(10, Math.round((wIn - pw) * 0.5));
+      const py = Math.max(46, hIn - ph - 10);
+      ctxIn.fillStyle = isLightTheme() ? "rgba(255,255,255,0.88)" : "rgba(10,14,23,0.82)";
+      ctxIn.strokeStyle = isLightTheme() ? "rgba(2,132,199,0.35)" : "rgba(56,189,248,0.35)";
+      ctxIn.lineWidth = 1;
+      ctxIn.beginPath(); ctxIn.roundRect(px, py, pw, ph, 11); ctxIn.fill(); ctxIn.stroke();
+      ctxIn.fillStyle = isLightTheme() ? "#0369a1" : "#94a3b8";
+      ctxIn.fillText(pill, px + 9, py + 14.5);
+      ctxIn.restore();
+    }
+    if (!inIs3D && state.probe.active && state.probe.z) {
+      const pz = projectInPt(state.probe.z);
+      if (pz && Number.isFinite(pz.x) && Number.isFinite(pz.y)) {
+        const sp = worldToScreen(state.inView, canvasIn, pz.x, pz.y);
+        ctxIn.fillStyle = "#fff"; ctxIn.strokeStyle = "#38bdf8"; ctxIn.lineWidth = 2;
+        ctxIn.beginPath(); ctxIn.arc(sp.x, sp.y, 4, 0, Math.PI * 2); ctxIn.fill(); ctxIn.stroke();
+      }
+    }
+    if (window.CFVAnnotations && state.texts.length > 0) {
+      window.CFVAnnotations.drawTextBoxes(ctxIn, canvasIn, state.texts, {
+        plane: "in",
+        isLight: isLightTheme(),
+        selectedTextId: state.selectedTextId,
+        hoveredTextId: state.hoveredTextId,
+        worldToScreen: (wx, wy) => worldToScreen(state.inView, canvasIn, wx, wy),
+      });
+    } else {
+      canvasIn._textLayouts = [];
     }
     ctxIn.restore();
     }
@@ -2283,11 +2743,26 @@
     if (okOut) {
     ctxOut.save();
     ctxOut.scale(dpr, dpr);
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) {
       const orderedEls = getOrderedElements();
       const orderedShapes = orderedEls.filter((e) => e.kind === "shape").map((e) => e.item);
       const orderedPoints = orderedEls.filter((e) => e.kind === "point").map((e) => e.item);
+      const cf = state.showOutDomain && state.domainImg && state.domainImg.pixels
+        ? {
+            pixels: state.domainImg.pixels,
+            tw: state.domainImg.tw,
+            th: state.domainImg.th,
+            cx: state.domainImg.cx,
+            cy: state.domainImg.cy,
+            halfW: state.domainImg.halfW,
+            halfH: state.domainImg.halfH,
+            opacity: normOpacity(state.domainOpacity, 0.9),
+            mapping: state.outDomainMapping || "stereo",
+          }
+        : null;
+      const isAnimOut = Boolean(ws() && typeof ws().isAnySliderPlaying === "function" && ws().isAnySliderPlaying());
       window.RiemannSphere.render(ctxOut, canvasOut, orderedShapes, {
+        surface: state.projection,
         mode: state.mode,
         showMesh: state.showMesh,
         getPts: (s) => (state.mode === "integral" ? (s.integral ? s.integral.cumPts : null) : s.boundary ? s.boundary.outPts : null),
@@ -2295,11 +2770,111 @@
         hoveredShapeId: state.hoveredShapeId,
         playPhase: state.playPhase,
         playing: state.playing,
-        probe: state.mode === "map" ? state.probe : null,
+        isAnimating: isAnimOut,
+        probe: state.probe && state.probe.active && state.probe.w ? { active: true, w: state.probe.w, color: "#a78bfa" } : null,
         points: orderedPoints,
+        colorField: cf,
       });
     } else {
       drawGrid(ctxOut, canvasOut, state.outView, false);
+      const isDiskProj = state.projection === "stereographic" || state.projection === "poincare";
+      const isMercProj = state.projection === "mercator";
+      let diskOcean = null;
+      if (isMercProj) {
+        const tl = worldToScreen(state.outView, canvasOut, -Math.PI, 2.65);
+        const br = worldToScreen(state.outView, canvasOut, Math.PI, -2.65);
+        ctxOut.save();
+        ctxOut.beginPath();
+        ctxOut.rect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        ctxOut.clip();
+        for (const s of state.shapes) {
+          if (s && s.visible && s.closed && (s.isOcean || (s.label && /^global ocean\b/i.test(s.label)))) {
+            diskOcean = s;
+            const g = ctxOut.createLinearGradient(tl.x, tl.y, tl.x, br.y);
+            g.addColorStop(0.0, "#073462");
+            g.addColorStop(0.5, "#1169ad");
+            g.addColorStop(1.0, "#073462");
+            ctxOut.fillStyle = g;
+            ctxOut.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+            break;
+          }
+        }
+      }
+      if (isDiskProj) {
+        const o = worldToScreen(state.outView, canvasOut, 0, 0);
+        const rx = (state.outView.scaleX || state.outView.scale) + 1.5;
+        const ry = (state.outView.scaleY || state.outView.scale) + 1.5;
+        ctxOut.save();
+        ctxOut.beginPath();
+        ctxOut.ellipse(o.x, o.y, rx, ry, 0, 0, Math.PI * 2);
+        ctxOut.clip();
+        /* Seamless full-disk Ocean fill (eliminates any rim gap on Stereographic & Poincaré Earth!) */
+        for (const s of state.shapes) {
+          if (s && s.visible && s.closed && (s.isOcean || (s.label && /^global ocean\b/i.test(s.label)))) {
+            diskOcean = s;
+            const op = normOpacity(s.opacity, 1.0);
+            if (op > 0.001) {
+              ctxOut.fillStyle = op >= 0.995 ? s.color : themeRgba(s.color, op);
+              ctxOut.beginPath();
+              ctxOut.ellipse(o.x, o.y, rx, ry, 0, 0, Math.PI * 2);
+              ctxOut.fill();
+            }
+            break;
+          }
+        }
+        /* Optional C11 Output Color Field mapped seamlessly onto the bounded Stereographic / Poincaré Disk! */
+        if (state.showOutDomain && state.domainImg && state.domainImg.pixels) {
+          const dom = state.domainImg;
+          const sz = Math.max(120, Math.min(260, Math.round(Math.max(rx, ry) * 1.15)));
+          const off = state._diskOutCanvas || (state._diskOutCanvas = document.createElement("canvas"));
+          if (off.width !== sz || off.height !== sz) {
+            off.width = sz; off.height = sz;
+            state._diskOutImgData = off.getContext("2d").createImageData(sz, sz);
+          }
+          const outD = state._diskOutImgData.data;
+          const src = dom.pixels, tw = dom.tw, th = dom.th;
+          const invHW = 0.5 / Math.max(1e-12, dom.halfW), invHH = 0.5 / Math.max(1e-12, dom.halfH);
+          const isMerc = state.outDomainMapping === "mercator";
+          const isPoin = state.projection === "poincare";
+          const aByte = Math.round(normOpacity(state.domainOpacity, 0.85) * 255);
+          const invR = 2.0 / sz;
+          let p = 0;
+          for (let py = 0; py < sz; py++) {
+            const dy = 1.0 - (py + 0.5) * invR;
+            for (let px = 0; px < sz; px++) {
+              const dx = (px + 0.5) * invR - 1.0;
+              const r = Math.hypot(dx, dy);
+              if (r >= 0.998) { outD[p + 3] = 0; p += 4; continue; }
+              const wMag = isPoin ? (2.0 * r / Math.max(1e-4, 1.0 - r * r)) : Math.tan(r * Math.PI * 0.5);
+              const invD = r > 1e-6 ? wMag / r : 0.0;
+              const wx = dx * invD, wy = dy * invD;
+              let u, v;
+              if (isMerc) {
+                u = Math.atan2(wx, wy);
+                v = Math.log(Math.max(1e-4, Math.min(1e4, wMag)));
+              } else {
+                u = wx; v = wy;
+              }
+              const ix = Math.max(0, Math.min(tw - 1, Math.floor(((u - dom.cx) * invHW + 0.5) * tw)));
+              const iy = Math.max(0, Math.min(th - 1, Math.floor((0.5 - (v - dom.cy) * invHH) * th)));
+              const si = (iy * tw + ix) * 4;
+              outD[p] = src[si]; outD[p + 1] = src[si + 1]; outD[p + 2] = src[si + 2];
+              outD[p + 3] = Math.round((src[si + 3] * aByte) / 255);
+              p += 4;
+            }
+          }
+          off.getContext("2d").putImageData(state._diskOutImgData, 0, 0);
+          ctxOut.drawImage(off, o.x - rx, o.y - ry, rx * 2, ry * 2);
+        }
+      } else if (state.showOutDomain && state.domainImg && state.domainImg.canvas) {
+        const d = state.domainImg;
+        const tl = worldToScreen(state.outView, canvasOut, d.cx - d.halfW, d.cy + d.halfH);
+        const br = worldToScreen(state.outView, canvasOut, d.cx + d.halfW, d.cy - d.halfH);
+        ctxOut.save();
+        ctxOut.globalAlpha = normOpacity(state.domainOpacity, 0.72);
+        ctxOut.drawImage(d.canvas, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        ctxOut.restore();
+      }
       const orderedEls = getOrderedElements();
       if (state.mode === "integral") {
         for (const el of orderedEls) {
@@ -2307,8 +2882,12 @@
         }
       } else {
         for (const el of orderedEls) {
-          if (el.kind === "shape") drawShapeMapOut(ctxOut, el.item);
-          else if (el.kind === "point") drawSinglePointOut(ctxOut, el.item);
+          if (el.kind === "shape") {
+            if (diskOcean && el.item === diskOcean) continue;
+            drawShapeMapOut(ctxOut, el.item);
+          } else if (el.kind === "point") {
+            drawSinglePointOut(ctxOut, el.item);
+          }
         }
         if (state.drawing && state.drawing.liveOut && state.drawing.liveOut.length >= 2) {
           ctxOut.save(); ctxOut.strokeStyle = state.drawing.color; ctxOut.lineWidth = 2.1;
@@ -2316,14 +2895,27 @@
           ctxOut.stroke(); ctxOut.restore();
         }
       }
-      if (state.mode === "map" && state.probe.active && state.probe.w) {
+      if (isDiskProj || isMercProj) ctxOut.restore();
+      if (state.probe.active && state.probe.w) {
         const pw = projectOutPt(state.probe.w);
-        if (pw) {
+        if (pw && Number.isFinite(pw.x) && Number.isFinite(pw.y)) {
           const sp = worldToScreen(state.outView, canvasOut, pw.x, pw.y);
           ctxOut.fillStyle = "#fff"; ctxOut.strokeStyle = "#a78bfa"; ctxOut.lineWidth = 2;
           ctxOut.beginPath(); ctxOut.arc(sp.x, sp.y, 4, 0, Math.PI * 2); ctxOut.fill(); ctxOut.stroke();
         }
       }
+    }
+    if (window.CFVAnnotations && state.texts.length > 0) {
+      window.CFVAnnotations.drawTextBoxes(ctxOut, canvasOut, state.texts, {
+        plane: "out",
+        isLight: isLightTheme(),
+        selectedTextId: state.selectedTextId,
+        hoveredTextId: state.hoveredTextId,
+        bottomLeftOffset: state.contourMode ? 18 : 14,
+        worldToScreen: (wx, wy) => worldToScreen(state.outView, canvasOut, wx, wy),
+      });
+    } else {
+      canvasOut._textLayouts = [];
     }
     ctxOut.restore();
     }
@@ -2335,6 +2927,32 @@
    * Multi-Contour Integral Results Panel (One Row Per Contour, Points Ignored!)
    * ------------------------------------------------------------------------- */
 
+  function fmtExactHint(re, im) {
+    if (!Number.isFinite(re) || !Number.isFinite(im)) return "";
+    if (Math.hypot(re, im) < 1e-4) return "≈ 0";
+    const pi = Math.PI;
+    if (Math.abs(re) < 1e-3) {
+      const k2pi = im / (2 * pi);
+      if (Math.abs(k2pi - Math.round(k2pi)) < 1e-3 && Math.round(k2pi) !== 0) {
+        const n = Math.round(k2pi);
+        return n === 1 ? "≈ 2πi" : n === -1 ? "≈ −2πi" : `≈ ${2 * n}πi`;
+      }
+      const kpi = im / pi;
+      if (Math.abs(kpi - Math.round(kpi)) < 1e-3 && Math.round(kpi) !== 0) {
+        const n = Math.round(kpi);
+        return n === 1 ? "≈ πi" : n === -1 ? "≈ −πi" : `≈ ${n}πi`;
+      }
+    }
+    if (Math.abs(im) < 1e-3) {
+      const kpi = re / pi;
+      if (Math.abs(kpi - Math.round(kpi)) < 1e-3 && Math.round(kpi) !== 0) {
+        const n = Math.round(kpi);
+        return n === 1 ? "≈ π" : n === -1 ? "≈ −π" : `≈ ${n}π`;
+      }
+    }
+    return "";
+  }
+
   function updateIntegralPanel() {
     if (!integralPanel) return;
     if (state.mode !== "integral") {
@@ -2344,18 +2962,21 @@
     integralPanel.classList.remove("hidden");
     integralRows.innerHTML = "";
 
-    /* Strictly filter shapes/contours only — points are NEVER included! */
+    /* Strictly filter shapes/contours only — points & guide lines are NEVER included! */
     const vis = state.shapes.filter((s) => s.visible && s.integral);
     if (vis.length === 0) {
       const empty = document.createElement("div");
-      empty.style.cssText = "font-size:11.5px;color:#64748b;padding:4px 2px;";
-      empty.textContent = "Draw or add a contour (open or closed) on the left plane.";
+      empty.className = "integral-empty-box";
+      empty.textContent = "Draw or place a path on the left plane using Tools & Elements to integrate f(z) dz.";
       integralRows.appendChild(empty);
-      integralSumRow.classList.add("hidden");
+      if (integralSummaryBar) integralSummaryBar.classList.add("hidden");
+      if (integralSumRow) integralSumRow.classList.add("hidden");
+      if (integralMinSum) integralMinSum.classList.add("hidden");
       return;
     }
 
     let sumRe = 0, sumIm = 0, validCount = 0;
+    let closedSumRe = 0, closedSumIm = 0, closedCount = 0;
     for (const s of vis) {
       const ig = s.integral;
       const row = document.createElement("div");
@@ -2374,32 +2995,69 @@
       top.appendChild(title);
 
       const orient = document.createElement("span");
-      orient.className = "integral-row-orient";
-      orient.textContent = s.closed ? (ig.orientation > 0 ? "CCW ↺" : "CW ↻") : "Open path";
+      orient.className = "integral-row-badge" + (s.closed ? (ig.orientation > 0 ? " ccw" : " cw") : "");
+      orient.textContent = s.closed ? (ig.orientation > 0 ? "Closed ↺ CCW" : "Closed ↻ CW") : "Open γ";
       top.appendChild(orient);
+
+      const revBtn = document.createElement("button");
+      revBtn.className = "integral-row-rev";
+      revBtn.textContent = "⇄";
+      revBtn.title = "Reverse contour orientation (flips sign of integral)";
+      revBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        reverseShape(s.id);
+      });
+      top.appendChild(revBtn);
       row.appendChild(top);
 
-      const vals = document.createElement("div");
-      vals.className = "integral-row-vals";
+      const metrics = document.createElement("div");
+      metrics.className = "integral-row-metrics";
+
+      const mLeft = document.createElement("div");
+      mLeft.className = "integral-row-metric";
       const sym = s.closed ? "∮" : "∫";
+      const lblL = document.createElement("span");
+      lblL.className = "integral-metric-lbl";
+      lblL.textContent = `${sym} f(z) dz`;
       const main = document.createElement("span");
       main.className = "integral-row-main";
-      main.textContent = ig.singular ? `${sym} = Pole on contour` : `${sym} = ${fmtComplex(ig.total.x, ig.total.y, 5)}`;
-      vals.appendChild(main);
+      main.textContent = ig.singular ? "Pole on contour" : fmtComplex(ig.total.x, ig.total.y, 4);
+      mLeft.appendChild(lblL);
+      mLeft.appendChild(main);
+      if (!ig.singular) {
+        const hint = fmtExactHint(ig.total.x, ig.total.y);
+        if (hint) {
+          const hEl = document.createElement("span");
+          hEl.className = "integral-row-exact";
+          hEl.textContent = hint;
+          mLeft.appendChild(hEl);
+        }
+      }
+      metrics.appendChild(mLeft);
 
+      const mRight = document.createElement("div");
+      mRight.className = "integral-row-metric";
+      const lblR = document.createElement("span");
+      lblR.className = "integral-metric-lbl";
       const right = document.createElement("span");
       right.className = "integral-row-res";
       if (ig.singular) {
+        lblR.textContent = "Status";
         right.style.color = "#fb7185";
-        right.textContent = "singular";
+        right.textContent = "Singular";
       } else if (s.closed) {
-        right.textContent = `÷2πi = ${fmtCompact(ig.div2pii.x, ig.div2pii.y)}`;
+        lblR.textContent = "Residue (÷ 2πi)";
+        right.textContent = fmtCompact(ig.div2pii.x, ig.div2pii.y);
       } else {
-        right.style.color = "#94a3b8";
+        lblR.textContent = "Magnitude · Length";
+        right.style.color = "var(--text-secondary)";
         right.textContent = `|I|=${Math.hypot(ig.total.x, ig.total.y).toFixed(3)} · L=${ig.arcLength.toFixed(2)}`;
       }
-      vals.appendChild(right);
-      row.appendChild(vals);
+      mRight.appendChild(lblR);
+      mRight.appendChild(right);
+      metrics.appendChild(mRight);
+
+      row.appendChild(metrics);
 
       row.addEventListener("click", () => {
         state.selectedShapeId = state.selectedShapeId === s.id ? null : s.id;
@@ -2414,15 +3072,35 @@
         sumRe += ig.total.x;
         sumIm += ig.total.y;
         validCount++;
+        if (s.closed) {
+          closedSumRe += ig.div2pii.x;
+          closedSumIm += ig.div2pii.y;
+          closedCount++;
+        }
       }
     }
 
-    if (vis.length > 1 && validCount > 0) {
-      integralSumRow.classList.remove("hidden");
-      integralSumVal.textContent = fmtComplex(sumRe, sumIm, 5);
-    } else {
-      integralSumRow.classList.add("hidden");
+    if (integralSummaryBar) {
+      if (validCount > 0) {
+        integralSummaryBar.classList.remove("hidden");
+        if (integralSumLabel) integralSumLabel.textContent = vis.length > 1 ? `Total Σ (${vis.length} contours)` : (vis[0].closed ? "∮ f(z) dz" : "∫ f(z) dz");
+        const hint = fmtExactHint(sumRe, sumIm);
+        if (integralSumVal) integralSumVal.textContent = fmtComplex(sumRe, sumIm, 4) + (hint ? ` (${hint})` : "");
+        if (integralResCell && integralSumRes) {
+          if (closedCount > 0) {
+            integralResCell.classList.remove("hidden");
+            integralSumRes.textContent = fmtCompact(closedSumRe, closedSumIm);
+          } else {
+            const divRe = sumIm / (2 * Math.PI), divIm = -sumRe / (2 * Math.PI);
+            integralResCell.classList.remove("hidden");
+            integralSumRes.textContent = fmtCompact(divRe, divIm);
+          }
+        }
+      } else {
+        integralSummaryBar.classList.add("hidden");
+      }
     }
+    if (integralSumRow) integralSumRow.classList.add("hidden");
     if (integralMinSum) {
       if (validCount > 0) {
         integralMinSum.textContent = vis.length > 1 ? `Σ = ${fmtCompact(sumRe, sumIm)}` : `∫ = ${fmtCompact(sumRe, sumIm)}`;
@@ -2494,7 +3172,7 @@
   if (integralPanelHdr && integralPanel) {
     let ipDrag = null;
     integralPanelHdr.addEventListener("pointerdown", (e) => {
-      if (e.target && e.target.closest && e.target.closest("#btn-min-integral")) return;
+      if (e.target && e.target.closest && e.target.closest("button")) return;
       e.preventDefault();
       e.stopPropagation();
       const cardRect = outCard.getBoundingClientRect();
@@ -2595,16 +3273,27 @@
 
   /* Layer-aware hit-testing for right-click context menu (topmost visible element first) */
   function hitElementIn(sx, sy) {
+    const inIs3D = state.inProjection === "sphere" && window.RiemannSphereIn;
+    const isCurved = inIs3D || state.inProjection === "stereographic" || state.inProjection === "poincare" || state.inProjection === "mercator";
+    const zExact = isCurved ? screenToInComplexExact(sx, sy) : screenToWorld(state.inView, canvasIn, sx, sy);
+    if (isCurved && !zExact) return null;
     const els = getOrderedElements();
-    const wpt = screenToWorld(state.inView, canvasIn, sx, sy);
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i];
       if (!el.item || !el.item.visible) continue;
       if (el.kind === "point") {
-        const sp = worldToScreen(state.inView, canvasIn, el.item.x, el.item.y);
-        if (Math.hypot(sx - sp.x, sy - sp.y) <= Math.max(10, (el.item.size || 5) + 6)) return el;
+        const rad = Math.max(10, (el.item.size || 5) + 6);
+        if (inIs3D) {
+          const c = window.RiemannSphereIn.projectToCanvas(el.item.x, el.item.y, canvasIn);
+          if (c && c.depth >= -0.04 && Math.hypot(sx - c.sx, sy - c.sy) <= rad) return el;
+        } else {
+          const pp = projectInPt(el.item);
+          if (!pp) continue;
+          const sp = worldToScreen(state.inView, canvasIn, pp.x, pp.y);
+          if (Math.hypot(sx - sp.x, sy - sp.y) <= rad) return el;
+        }
       } else if (el.kind === "guide_line") {
-        if (!state.showLandmarks) continue;
+        if (!state.showLandmarks || isCurved) continue;
         if (el.item.orientation === "horizontal") {
           if (Math.abs(sy - worldToScreen(state.inView, canvasIn, 0, el.item.value).y) <= 8) return el;
         } else {
@@ -2612,18 +3301,36 @@
         }
       } else if (el.kind === "shape") {
         const s = el.item;
-        const pts = s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts;
-        if (!pts || pts.length < 2) continue;
-        const segs = s.closed ? pts.length : pts.length - 1;
+        if (isCurved && (s.isOcean || /^global ocean\b/i.test(s.label || ""))) continue;
+        const rawInPts = (s.kind === "ray" || s.kind === "infline")
+          ? expandLinearShapePts(s)
+          : (s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts);
+        if (!rawInPts || rawInPts.length < 2) continue;
         let hit = false;
-        for (let k = 0; k < segs; k++) {
-          const a = pts[k], b = pts[(k + 1) % pts.length];
-          if (!a || !b) continue;
-          const sa = worldToScreen(state.inView, canvasIn, a.x, a.y);
-          const sb = worldToScreen(state.inView, canvasIn, b.x, b.y);
-          if (distSegSq(sx, sy, sa.x, sa.y, sb.x, sb.y) <= 100) { hit = true; break; }
+        if (inIs3D) {
+          const segs = s.closed ? rawInPts.length : rawInPts.length - 1;
+          for (let k = 0; k < segs; k++) {
+            const pa = rawInPts[k], pb = rawInPts[(k + 1) % rawInPts.length];
+            if (!pa || !pb) continue;
+            const ca = window.RiemannSphereIn.projectToCanvas(pa.x, pa.y, canvasIn);
+            const cb = window.RiemannSphereIn.projectToCanvas(pb.x, pb.y, canvasIn);
+            if (!ca || !cb || ca.depth < -0.04 || cb.depth < -0.04) continue;
+            if (distSegSq(sx, sy, ca.sx, ca.sy, cb.sx, cb.sy) <= 100) { hit = true; break; }
+          }
+          if (!hit && s.closed && s.rawPts.length >= 3 && zExact && ptInPoly(zExact.x, zExact.y, s.rawPts)) hit = true;
+        } else {
+          const pts = projectInPts(rawInPts);
+          if (!pts || pts.length < 2) continue;
+          const segs = s.closed ? pts.length : pts.length - 1;
+          for (let k = 0; k < segs; k++) {
+            const a = pts[k], b = pts[(k + 1) % pts.length];
+            if (!a || !b) continue;
+            const sa = worldToScreen(state.inView, canvasIn, a.x, a.y);
+            const sb = worldToScreen(state.inView, canvasIn, b.x, b.y);
+            if (distSegSq(sx, sy, sa.x, sa.y, sb.x, sb.y) <= 100) { hit = true; break; }
+          }
+          if (!hit && s.closed && s.rawPts.length >= 3 && zExact && ptInPoly(zExact.x, zExact.y, s.rawPts)) hit = true;
         }
-        if (!hit && s.closed && pts.length >= 3 && ptInPoly(wpt.x, wpt.y, pts)) hit = true;
         if (hit) return el;
       }
     }
@@ -2631,34 +3338,57 @@
   }
 
   function hitElementOut(sx, sy) {
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) return null;
+    const outIs3D = state.projection === "sphere" && window.RiemannSphere;
+    const isCurved = outIs3D || state.projection === "stereographic" || state.projection === "poincare" || state.projection === "mercator";
+    const wExact = isCurved ? screenToOutComplexExact(sx, sy) : screenToWorld(state.outView, canvasOut, sx, sy);
+    if (isCurved && !wExact) return null;
     const els = getOrderedElements();
-    const wpt = screenToWorld(state.outView, canvasOut, sx, sy);
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i];
       if (!el.item || !el.item.visible) continue;
       if (el.kind === "point") {
         if (state.mode !== "map" || el.item.locked || !el.item.outPt) continue;
-        const pp = projectOutPt(el.item.outPt);
-        if (!pp) continue;
-        const sp = worldToScreen(state.outView, canvasOut, pp.x, pp.y);
-        if (Math.hypot(sx - sp.x, sy - sp.y) <= Math.max(10, (el.item.size || 5) + 6)) return el;
+        const rad = Math.max(10, (el.item.size || 5) + 6);
+        if (outIs3D) {
+          const c = window.RiemannSphere.projectToCanvas(el.item.outPt.x, el.item.outPt.y, canvasOut);
+          if (c && c.depth >= -0.04 && Math.hypot(sx - c.sx, sy - c.sy) <= rad) return el;
+        } else {
+          const pp = projectOutPt(el.item.outPt);
+          if (!pp || !Number.isFinite(pp.x) || !Number.isFinite(pp.y)) continue;
+          const sp = worldToScreen(state.outView, canvasOut, pp.x, pp.y);
+          if (Math.hypot(sx - sp.x, sy - sp.y) <= rad) return el;
+        }
       } else if (el.kind === "shape") {
         const s = el.item;
+        if (isCurved && (s.isOcean || /^global ocean\b/i.test(s.label || ""))) continue;
         const rawPts = state.mode === "integral" ? (s.integral ? s.integral.cumPts : null) : (s.boundary ? s.boundary.outPts : null);
         if (!rawPts || rawPts.length < 2) continue;
-        const pts = projectOutPts(rawPts);
         const closed = state.mode === "map" && Boolean(s.closed);
-        const segs = closed ? pts.length : pts.length - 1;
         let hit = false;
-        for (let k = 0; k < segs; k++) {
-          const a = pts[k], b = pts[(k + 1) % pts.length];
-          if (!a || !b) continue;
-          const sa = worldToScreen(state.outView, canvasOut, a.x, a.y);
-          const sb = worldToScreen(state.outView, canvasOut, b.x, b.y);
-          if (distSegSq(sx, sy, sa.x, sa.y, sb.x, sb.y) <= 100) { hit = true; break; }
+        if (outIs3D) {
+          const segs = closed ? rawPts.length : rawPts.length - 1;
+          for (let k = 0; k < segs; k++) {
+            const pa = rawPts[k], pb = rawPts[(k + 1) % rawPts.length];
+            if (!pa || !pb) continue;
+            const ca = window.RiemannSphere.projectToCanvas(pa.x, pa.y, canvasOut);
+            const cb = window.RiemannSphere.projectToCanvas(pb.x, pb.y, canvasOut);
+            if (!ca || !cb || ca.depth < -0.04 || cb.depth < -0.04) continue;
+            if (distSegSq(sx, sy, ca.sx, ca.sy, cb.sx, cb.sy) <= 100) { hit = true; break; }
+          }
+          if (!hit && closed && rawPts.length >= 3 && wExact && rawPts.every((p) => p !== null) && polyWindingNumber(wExact.x, wExact.y, rawPts) !== 0) hit = true;
+        } else {
+          const pts = projectOutPts(rawPts);
+          if (!pts || pts.length < 2) continue;
+          const segs = closed ? pts.length : pts.length - 1;
+          for (let k = 0; k < segs; k++) {
+            const a = pts[k], b = pts[(k + 1) % pts.length];
+            if (!a || !b) continue;
+            const sa = worldToScreen(state.outView, canvasOut, a.x, a.y);
+            const sb = worldToScreen(state.outView, canvasOut, b.x, b.y);
+            if (distSegSq(sx, sy, sa.x, sa.y, sb.x, sb.y) <= 100) { hit = true; break; }
+          }
+          if (!hit && closed && rawPts.length >= 3 && wExact && rawPts.every((p) => p !== null) && polyWindingNumber(wExact.x, wExact.y, rawPts) !== 0) hit = true;
         }
-        if (!hit && closed && pts.length >= 3 && pts.every((p) => p !== null) && polyWindingNumber(wpt.x, wpt.y, pts) !== 0) hit = true;
         if (hit) return el;
       }
     }
@@ -2668,7 +3398,40 @@
   canvasIn.addEventListener("pointerdown", (e) => {
     canvasIn.setPointerCapture(e.pointerId);
     const pos = localPos(canvasIn, e);
-    if (e.button === 1 || e.button === 2 || state.spaceHeld || state.tool === "pan") {
+    /* Hit-test text boxes on the Input plane so users can drag or resize any text box directly! */
+    if (e.button === 0 && !state.spaceHeld && window.CFVAnnotations && state.texts.length > 0) {
+      const tbHit = window.CFVAnnotations.hitTestTextBoxes(ctxIn, canvasIn, state.texts, pos.x, pos.y, { plane: "in" });
+      if (tbHit) {
+        selectTextBox(tbHit.tb.id);
+        if (!tbHit.tb.locked) {
+          pushUndoSnapshot();
+          state.dragText = {
+            plane: "in",
+            tb: tbHit.tb,
+            mode: tbHit.hit,
+            startX: pos.x,
+            startY: pos.y,
+            origBx: tbHit.bx,
+            origBy: tbHit.by,
+            origW: tbHit.boxW,
+            origH: tbHit.boxH,
+            origWorldX: Number(tbHit.tb.x) || 0,
+            origWorldY: Number(tbHit.tb.y) || 0,
+            moved: false,
+          };
+          canvasIn.style.cursor = tbHit.hit === "resize" ? "nwse-resize" : "grabbing";
+        }
+        requestRender("in");
+        return;
+      }
+    }
+    if (state.inProjection === "sphere" && window.RiemannSphereIn) {
+      window.RiemannSphereIn.onPointerDown(pos.x, pos.y);
+      inCard.classList.add("panning");
+      return;
+    }
+    /* In Viewing-Only projections (Mercator, Stereographic, Poincaré), left-drag pans smoothly! */
+    if (e.button === 1 || e.button === 2 || state.spaceHeld || state.tool === "pan" || !isInputEditable()) {
       state.pan = {
         which: "in",
         startX: pos.x,
@@ -2864,7 +3627,29 @@
     }
 
     const col = PALETTE[state.colorIdx % PALETTE.length];
-    const snapStart = (state.tool === "line" || state.tool === "freehand" || state.tool === "polygon")
+
+    /* Unified click-to-place tools: Point & Text drop directly where you click! */
+    if (state.tool === "point") {
+      addPoint({ x: Number(z.x.toFixed(4)), y: Number(z.y.toFixed(4)), label: `z${state.points.length + 1}`, color: col });
+      return;
+    }
+    if (state.tool === "text") {
+      const cw = canvasIn.clientWidth || 600, ch = canvasIn.clientHeight || 400;
+      addTextBox({
+        title: "Note",
+        text: "Click to edit in sidebar, or drag & resize directly on the graph.",
+        anchor: "free",
+        plane: "in",
+        nx: Number(Math.max(0.02, Math.min(0.82, pos.x / cw)).toFixed(4)),
+        ny: Number(Math.max(0.06, Math.min(0.84, pos.y / ch)).toFixed(4)),
+        x: Number(z.x.toFixed(3)),
+        y: Number(z.y.toFixed(3)),
+        color: col,
+      });
+      return;
+    }
+
+    const snapStart = (state.tool === "line" || state.tool === "seg" || state.tool === "ray" || state.tool === "infline" || state.tool === "freehand" || state.tool === "polygon")
       ? findSnapTarget(pos.x, pos.y)
       : null;
     const zStart = snapStart ? { x: snapStart.x, y: snapStart.y } : z;
@@ -2888,7 +3673,7 @@
       kind: state.tool,
       rawPts: state.tool === "circle" ? makeCircle(z.x, z.y, 1e-4) : state.tool === "rect" ? makeRect(z.x, z.y, z.x, z.y) : [zStart, zStart],
       liveOut: [], closed: state.tool === "circle" || state.tool === "rect",
-      color: col, snapActive: false, anchor: zStart,
+      color: col, snapActive: false, anchor: zStart, startPx: { x: pos.x, y: pos.y },
     };
     if (state.tool === "freehand") state.drawing.rawPts = [zStart];
     requestRender();
@@ -2896,6 +3681,47 @@
 
   canvasIn.addEventListener("pointermove", (e) => {
     const pos = localPos(canvasIn, e);
+    if (state.dragText && state.dragText.plane === "in") {
+      const dt = state.dragText;
+      const dx = pos.x - dt.startX;
+      const dy = pos.y - dt.startY;
+      if (Math.hypot(dx, dy) >= 2) dt.moved = true;
+      const cw = canvasIn.clientWidth || 600, ch = canvasIn.clientHeight || 400;
+      if (dt.mode === "resize") {
+        dt.tb.width = Math.round(Math.max(150, Math.min(cw - 24, dt.origW + dx)));
+        dt.tb.height = Math.round(Math.max(44, Math.min(ch - 24, dt.origH + dy)));
+      } else if (dt.tb.anchor === "world") {
+        const scX = state.inView.scaleX || state.inView.scale;
+        const scY = state.inView.scaleY || state.inView.scale;
+        dt.tb.x = Number((dt.origWorldX + dx / scX).toFixed(4));
+        dt.tb.y = Number((dt.origWorldY - dy / scY).toFixed(4));
+        dt.tb.xExpr = "";
+        dt.tb.yExpr = "";
+      } else {
+        dt.tb.anchor = "free";
+        dt.tb.nx = Number(Math.max(0.01, Math.min(0.95, (dt.origBx + dx) / cw)).toFixed(4));
+        dt.tb.ny = Number(Math.max(0.01, Math.min(0.95, (dt.origBy + dy) / ch)).toFixed(4));
+      }
+      requestRender("in");
+      return;
+    }
+    if (!state.pan && !state.drawing && !state.dragShape && !state.dragPoint && !state.dragLine && !state.dragGroup && !state.dragRotate && window.CFVAnnotations && state.texts.length > 0) {
+      const th = window.CFVAnnotations.hitTestTextBoxes(ctxIn, canvasIn, state.texts, pos.x, pos.y, { plane: "in" });
+      const nextHov = th ? th.tb.id : null;
+      if (nextHov !== state.hoveredTextId) {
+        state.hoveredTextId = nextHov;
+        requestRender("in");
+      }
+      if (th && !th.tb.locked) {
+        canvasIn.style.cursor = th.hit === "resize" ? "nwse-resize" : "grab";
+      } else if (canvasIn.style.cursor === "nwse-resize" || canvasIn.style.cursor === "grab") {
+        canvasIn.style.cursor = "";
+      }
+    }
+    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn && window.RiemannSphereIn.state.orbiting) {
+      if (window.RiemannSphereIn.onPointerMove(pos.x, pos.y)) requestRender("in");
+      return;
+    }
     if (state.pan && state.pan.which === "in") {
       state.inView.cx = state.pan.origCx - (pos.x - state.pan.startX) / (state.inView.scaleX || state.inView.scale);
       state.inView.cy = state.pan.origCy + (pos.y - state.pan.startY) / (state.inView.scaleY || state.inView.scale);
@@ -2903,8 +3729,18 @@
       requestRender();
       return;
     }
+    const zProbe = screenToInComplexExact(pos.x, pos.y);
+    if (zProbe) {
+      updateProbe(zProbe);
+    } else if (state.probe.active) {
+      state.probe.active = false;
+      state.probe.z = null;
+      state.probe.w = null;
+      if (readoutIn) readoutIn.textContent = "—";
+      if (readoutOut) readoutOut.textContent = "—";
+      requestRender();
+    }
     const z = screenToWorld(state.inView, canvasIn, pos.x, pos.y);
-    updateProbe(z);
 
     if (state.taylor.draggingZ0) {
       state.taylor.x0 = z.x; state.taylor.y0 = z.y;
@@ -3065,14 +3901,36 @@
       } else {
         const h = drag.handle;
         if (h.shapeKind === "circle") {
-          s.rawPts = makeCircle(drag.origBox.cx, drag.origBox.cy, Math.max(0.02, Math.hypot(z.x - drag.origBox.cx, z.y - drag.origBox.cy)), drag.origRawPts.length, drag.origCcw);
+          const ob = drag.origBox;
+          const origR = Math.max(1e-6, 0.25 * ((ob.xmax - ob.xmin) + (ob.ymax - ob.ymin)));
+          const newR = Math.max(0.02, Math.hypot(z.x - ob.cx, z.y - ob.cy));
+          const ratio = newR / origR;
+          s.rawPts = drag.origRawPts.map((p) => ({
+            x: ob.cx + (p.x - ob.cx) * ratio,
+            y: ob.cy + (p.y - ob.cy) * ratio,
+          }));
         } else if (h.shapeKind === "rect") {
-          let { xmin, xmax, ymin, ymax } = drag.origBox;
-          if (h.id.includes("w")) xmin = z.x;
-          if (h.id.includes("e")) xmax = z.x;
-          if (h.id.includes("s")) ymin = z.y;
-          if (h.id.includes("n")) ymax = z.y;
-          s.rawPts = makeRect(xmin, ymin, xmax, ymax, drag.origCcw);
+          const rf = rectLocalFrame(drag.origRawPts);
+          if (rf) {
+            let uMin = -0.5 * rf.w, uMax = 0.5 * rf.w;
+            let vMin = -0.5 * rf.h, vMax = 0.5 * rf.h;
+            const dx = z.x - rf.cx, dy = z.y - rf.cy;
+            const pu = dx * rf.ux + dy * rf.uy;
+            const pv = dx * rf.vx + dy * rf.vy;
+            if (h.id.includes("w")) uMin = Math.min(uMax - 0.02, pu);
+            if (h.id.includes("e")) uMax = Math.max(uMin + 0.02, pu);
+            if (h.id.includes("s")) vMin = Math.min(vMax - 0.02, pv);
+            if (h.id.includes("n")) vMax = Math.max(vMin + 0.02, pv);
+            const mk = (u, v) => ({ x: rf.cx + u * rf.ux + v * rf.vx, y: rf.cy + u * rf.uy + v * rf.vy });
+            s.rawPts = [mk(uMin, vMin), mk(uMax, vMin), mk(uMax, vMax), mk(uMin, vMax)];
+          } else {
+            let { xmin, xmax, ymin, ymax } = drag.origBox;
+            if (h.id.includes("w")) xmin = z.x;
+            if (h.id.includes("e")) xmax = z.x;
+            if (h.id.includes("s")) ymin = z.y;
+            if (h.id.includes("n")) ymax = z.y;
+            s.rawPts = makeRect(xmin, ymin, xmax, ymax, drag.origCcw);
+          }
         } else if (h.shapeKind === "line") {
           const sn = findSnapTarget(pos.x, pos.y, s.id);
           state.snapHint = sn;
@@ -3085,8 +3943,17 @@
         } else if (h.shapeKind === "scale") {
           const b = drag.origBox;
           const ax = h.id.includes("w") ? b.xmax : b.xmin, ay = h.id.includes("s") ? b.ymax : b.ymin;
-          const sx = (z.x - ax) / ((h.id.includes("w") ? b.xmin - ax : b.xmax - ax) || 1);
-          const sy = (z.y - ay) / ((h.id.includes("s") ? b.ymin - ay : b.ymax - ay) || 1);
+          const denX = h.id.includes("w") ? (b.xmin - ax) : (b.xmax - ax);
+          const denY = h.id.includes("s") ? (b.ymin - ay) : (b.ymax - ay);
+          let sx = Math.abs(denX) > 1e-6 ? (z.x - ax) / denX : 1;
+          let sy = Math.abs(denY) > 1e-6 ? (z.y - ay) / denY : 1;
+          if (Math.abs(sx) < 0.04) sx = sx < 0 ? -0.04 : 0.04;
+          if (Math.abs(sy) < 0.04) sy = sy < 0 ? -0.04 : 0.04;
+          if (e.shiftKey) {
+            const u = Math.max(Math.abs(sx), Math.abs(sy));
+            sx = Math.sign(sx || 1) * u;
+            sy = Math.sign(sy || 1) * u;
+          }
           s.rawPts = drag.origRawPts.map((p) => ({ x: ax + (p.x - ax) * sx, y: ay + (p.y - ay) * sy }));
         }
         if (s.boundary) s.boundary.inPts = s.rawPts.map((p) => ({ ...p }));
@@ -3096,12 +3963,15 @@
       return;
     }
 
-    if (state.tool === "move" || e.altKey) {
-      if (hitRotateHandle(pos.x, pos.y)) { canvasIn.style.cursor = "grab"; return; }
-      const ghHit = hitGroupHandle(pos.x, pos.y);
-      if (ghHit) { canvasIn.style.cursor = ghHit.handle.cursor; return; }
-      const hHit = hitResizeHandle(pos.x, pos.y);
-      if (hHit) { canvasIn.style.cursor = hHit.handle.cursor; return; }
+    if (state.tool === "move" || e.altKey || !isInputEditable()) {
+      const canEdit = isInputEditable();
+      if (canEdit) {
+        if (hitRotateHandle(pos.x, pos.y)) { canvasIn.style.cursor = "grab"; return; }
+        const ghHit = hitGroupHandle(pos.x, pos.y);
+        if (ghHit) { canvasIn.style.cursor = ghHit.handle.cursor; return; }
+        const hHit = hitResizeHandle(pos.x, pos.y);
+        if (hHit) { canvasIn.style.cursor = hHit.handle.cursor; return; }
+      }
       canvasIn.style.cursor = "";
       const pHit = hitPoint(pos.x, pos.y);
       const sHit = pHit ? null : hitShape(pos.x, pos.y);
@@ -3110,7 +3980,7 @@
       if (state.hoveredPointId !== npid || state.hoveredShapeId !== nsid) {
         state.hoveredPointId = npid;
         state.hoveredShapeId = nsid;
-        const canDrag = (pHit && !pHit.locked) || (sHit && !sHit.locked) || hitGroupBox(pos.x, pos.y);
+        const canDrag = canEdit && ((pHit && !pHit.locked) || (sHit && !sHit.locked) || hitGroupBox(pos.x, pos.y));
         inCard.classList.toggle("move-hover", Boolean(canDrag));
         requestRender();
       }
@@ -3148,11 +4018,19 @@
         const fsp = worldToScreen(state.inView, canvasIn, d.rawPts[0].x, d.rawPts[0].y);
         d.snapActive = Math.hypot(pos.x - fsp.x, pos.y - fsp.y) <= SNAP_PX;
       }
-    } else if (d.kind === "line") {
+    } else if (d.kind === "line" || d.kind === "seg" || d.kind === "ray" || d.kind === "infline") {
       const sn = findSnapTarget(pos.x, pos.y);
       state.snapHint = sn;
       const tz = sn ? { x: sn.x, y: sn.y } : z;
       d.rawPts = makeLine(d.anchor.x, d.anchor.y, tz.x, tz.y, 48);
+    } else if (d.kind === "arc") {
+      const r = Math.max(1e-4, Math.hypot(z.x - d.anchor.x, z.y - d.anchor.y));
+      const a0 = Math.atan2(z.y - d.anchor.y, z.x - d.anchor.x);
+      d.rawPts = [];
+      for (let i = 0; i <= 48; i++) {
+        const ang = a0 + (i / 48) * Math.PI;
+        d.rawPts.push({ x: d.anchor.x + r * Math.cos(ang), y: d.anchor.y + r * Math.sin(ang) });
+      }
     }
     else if (d.kind === "circle") d.rawPts = makeCircle(d.anchor.x, d.anchor.y, Math.max(1e-4, Math.hypot(z.x - d.anchor.x, z.y - d.anchor.y)));
     else if (d.kind === "rect") d.rawPts = makeRect(d.anchor.x, d.anchor.y, z.x, z.y);
@@ -3162,13 +4040,41 @@
 
   canvasIn.addEventListener("pointerup", async (e) => {
     state.snapHint = null;
+    if (state.dragText && state.dragText.plane === "in") {
+      const moved = state.dragText.moved;
+      state.dragText = null;
+      canvasIn.style.cursor = "";
+      if (moved) {
+        notifyDomain();
+        notifyState(true, true);
+      }
+      requestRender("in");
+      return;
+    }
+    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn && window.RiemannSphereIn.state.orbiting) {
+      window.RiemannSphereIn.onPointerUp();
+      inCard.classList.remove("panning");
+      return;
+    }
     if (state.taylor.draggingZ0) { state.taylor.draggingZ0 = false; fetchTaylor(); return; }
+    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn && window.RiemannSphereIn.state.orbiting) {
+      if (window.RiemannSphereIn.onPointerMove(pos.x, pos.y)) requestRender("in");
+      return;
+    }
     if (state.pan && state.pan.which === "in") {
       const p = state.pan;
       state.pan = null;
       inCard.classList.remove("panning");
       const pos = localPos(canvasIn, e);
       if (p.rightClick && Math.hypot(pos.x - p.startX, pos.y - p.startY) < 5) {
+        const tbHit = window.CFVAnnotations && state.texts.length > 0
+          ? window.CFVAnnotations.hitTestTextBoxes(ctxIn, canvasIn, state.texts, pos.x, pos.y, { plane: "in" })
+          : null;
+        if (tbHit && ws() && typeof ws().openItemSettingsAt === "function") {
+          selectTextBox(tbHit.tb.id);
+          ws().openItemSettingsAt("text", tbHit.tb.id, e.clientX, e.clientY);
+          return;
+        }
         const hit = hitElementIn(pos.x, pos.y);
         if (hit && ws() && typeof ws().openItemSettingsAt === "function") {
           if (hit.kind === "shape") selectShape(hit.id);
@@ -3262,14 +4168,46 @@
     const d = state.drawing;
     if (!d) return;
     state.drawing = null;
+    /* Click-to-place support: if user simply clicked without dragging on any shape tool, drop a cleanly sized element at click! */
+    const endPos = localPos(canvasIn, e);
+    const dragDistPx = d.startPx ? Math.hypot(endPos.x - d.startPx.x, endPos.y - d.startPx.y) : 99;
+    if (dragDistPx < 5 && d.kind !== "freehand") {
+      const rDef = Math.max(0.15, ((canvasIn.clientWidth || 600) * 0.14) / Math.max(1e-6, state.inView.scale));
+      const ax = d.anchor.x, ay = d.anchor.y;
+      if (d.kind === "circle") { d.rawPts = makeCircle(ax, ay, rDef); d.closed = true; }
+      else if (d.kind === "rect") { d.rawPts = makeRect(ax - rDef, ay - rDef * 0.72, ax + rDef, ay + rDef * 0.72); d.closed = true; }
+      else if (d.kind === "arc") {
+        d.rawPts = [];
+        for (let i = 0; i <= 48; i++) {
+          const ang = (i / 48) * Math.PI;
+          d.rawPts.push({ x: ax + rDef * Math.cos(ang), y: ay + rDef * Math.sin(ang) });
+        }
+        d.closed = false;
+      } else if (d.kind === "seg" || d.kind === "line") {
+        d.rawPts = makeLine(ax - rDef, ay, ax + rDef, ay, 48);
+        d.closed = false;
+      } else if (d.kind === "ray") {
+        d.rawPts = makeLine(ax, ay, ax + rDef, ay, 24);
+        d.closed = false;
+      } else if (d.kind === "infline") {
+        d.rawPts = makeLine(ax - rDef, ay, ax + rDef, ay, 24);
+        d.closed = false;
+      }
+    }
     if (d.rawPts.length >= 2) {
       pushUndoSnapshot();
-      const closed = d.closed || d.snapActive;
+      const closed = (d.kind === "ray" || d.kind === "infline") ? false : (d.closed || d.snapActive);
       state.colorIdx = (state.colorIdx + 1) % PALETTE.length;
+      const defaultLbl =
+        d.kind === "infline" ? "Line" :
+        d.kind === "ray" ? "Ray" :
+        d.kind === "seg" || d.kind === "line" ? "Segment" :
+        d.kind === "arc" ? "Arc" :
+        closed ? (d.kind === "freehand" ? "Closed Loop" : d.kind[0].toUpperCase() + d.kind.slice(1)) : "Open Path";
       const shape = {
         id: state.nextShapeId++,
         kind: d.kind,
-        label: closed ? (d.kind === "freehand" ? "Closed Loop" : d.kind[0].toUpperCase() + d.kind.slice(1)) : "Open Path",
+        label: defaultLbl,
         color: d.color,
         lineWidth: 2.2,
         lineStyle: "solid",
@@ -3326,9 +4264,22 @@
   }
 
   canvasIn.addEventListener("dblclick", () => { if (state.polyDraft) finishPoly(); });
-  canvasIn.addEventListener("pointerleave", () => { state.probe.active = false; state.snapHint = null; requestRender(); });
+  canvasIn.addEventListener("pointerleave", () => {
+    state.probe.active = false;
+    state.probe.z = null;
+    state.probe.w = null;
+    state.snapHint = null;
+    state.hoveredShapeId = null;
+    state.hoveredPointId = null;
+    requestRender();
+  });
   canvasIn.addEventListener("wheel", (e) => {
     e.preventDefault();
+    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn) {
+      window.RiemannSphereIn.onWheel(e.deltaY);
+      requestRender("in");
+      return;
+    }
     const pos = localPos(canvasIn, e);
     const f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     const scaleXOnly = e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
@@ -3345,11 +4296,37 @@
     notifyState(false, false);
   }, { passive: false });
 
-  /* Output canvas pan / zoom / 3D sphere orbit / right-click context menu */
+  /* Output canvas pan / zoom / 3D sphere orbit / text box drag-resize / right-click context menu */
   canvasOut.addEventListener("pointerdown", (e) => {
     canvasOut.setPointerCapture(e.pointerId);
     const pos = localPos(canvasOut, e);
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
+    if (e.button === 0 && window.CFVAnnotations && state.texts.length > 0) {
+      const tbHit = window.CFVAnnotations.hitTestTextBoxes(ctxOut, canvasOut, state.texts, pos.x, pos.y, { plane: "out" });
+      if (tbHit) {
+        selectTextBox(tbHit.tb.id);
+        if (!tbHit.tb.locked) {
+          pushUndoSnapshot();
+          state.dragText = {
+            plane: "out",
+            tb: tbHit.tb,
+            mode: tbHit.hit,
+            startX: pos.x,
+            startY: pos.y,
+            origBx: tbHit.bx,
+            origBy: tbHit.by,
+            origW: tbHit.boxW,
+            origH: tbHit.boxH,
+            origWorldX: Number(tbHit.tb.x) || 0,
+            origWorldY: Number(tbHit.tb.y) || 0,
+            moved: false,
+          };
+          canvasOut.style.cursor = tbHit.hit === "resize" ? "nwse-resize" : "grabbing";
+        }
+        requestRender("out");
+        return;
+      }
+    }
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) {
       window.RiemannSphere.onPointerDown(pos.x, pos.y);
       outCard.classList.add("panning"); return;
     }
@@ -3367,22 +4344,111 @@
   });
   canvasOut.addEventListener("pointermove", (e) => {
     const pos = localPos(canvasOut, e);
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
-      if (window.RiemannSphere.onPointerMove(pos.x, pos.y)) requestRender();
+    if (state.dragText && state.dragText.plane === "out") {
+      const dt = state.dragText;
+      const dx = pos.x - dt.startX;
+      const dy = pos.y - dt.startY;
+      if (Math.hypot(dx, dy) >= 2) dt.moved = true;
+      const cw = canvasOut.clientWidth || 600, ch = canvasOut.clientHeight || 400;
+      if (dt.mode === "resize") {
+        dt.tb.width = Math.round(Math.max(150, Math.min(cw - 24, dt.origW + dx)));
+        dt.tb.height = Math.round(Math.max(44, Math.min(ch - 24, dt.origH + dy)));
+      } else if (dt.tb.anchor === "world") {
+        const scX = state.outView.scaleX || state.outView.scale;
+        const scY = state.outView.scaleY || state.outView.scale;
+        dt.tb.x = Number((dt.origWorldX + dx / scX).toFixed(4));
+        dt.tb.y = Number((dt.origWorldY - dy / scY).toFixed(4));
+        dt.tb.xExpr = "";
+        dt.tb.yExpr = "";
+      } else {
+        dt.tb.anchor = "free";
+        dt.tb.nx = Number(Math.max(0.01, Math.min(0.95, (dt.origBx + dx) / cw)).toFixed(4));
+        dt.tb.ny = Number(Math.max(0.01, Math.min(0.95, (dt.origBy + dy) / ch)).toFixed(4));
+      }
+      requestRender("out");
       return;
     }
-    if (!state.pan || state.pan.which !== "out") return;
-    state.outView.cx = state.pan.origCx - (pos.x - state.pan.startX) / (state.outView.scaleX || state.outView.scale);
-    state.outView.cy = state.pan.origCy + (pos.y - state.pan.startY) / (state.outView.scaleY || state.outView.scale);
-    requestRender();
+    if (!state.pan && window.CFVAnnotations && state.texts.length > 0) {
+      const th = window.CFVAnnotations.hitTestTextBoxes(ctxOut, canvasOut, state.texts, pos.x, pos.y, { plane: "out" });
+      const nextHov = th ? th.tb.id : null;
+      if (nextHov !== state.hoveredTextId) {
+        state.hoveredTextId = nextHov;
+        requestRender("out");
+      }
+      if (th && !th.tb.locked) {
+        canvasOut.style.cursor = th.hit === "resize" ? "nwse-resize" : "grab";
+      } else if (canvasOut.style.cursor === "nwse-resize" || canvasOut.style.cursor === "grab") {
+        canvasOut.style.cursor = "";
+      }
+    }
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder") && window.RiemannSphere.state.orbiting) {
+      if (window.RiemannSphere.onPointerMove(pos.x, pos.y)) requestRender("out");
+      return;
+    }
+    if (state.pan && state.pan.which === "out") {
+      state.outView.cx = state.pan.origCx - (pos.x - state.pan.startX) / (state.outView.scaleX || state.outView.scale);
+      state.outView.cy = state.pan.origCy + (pos.y - state.pan.startY) / (state.outView.scaleY || state.outView.scale);
+      requestRender("out");
+      return;
+    }
+    /* Output pane live probe dot & exact element hover highlighting across ALL projections (Planar, Disks, Mercator, Riemann Sphere)! */
+    const wProbe = screenToOutComplexExact(pos.x, pos.y);
+    if (wProbe) {
+      state.probe.active = true;
+      state.probe.z = null;
+      state.probe.w = wProbe;
+      if (readoutIn) readoutIn.textContent = "—";
+      if (readoutOut) readoutOut.textContent = fmtComplex(wProbe.x, wProbe.y, 4);
+    } else if (state.probe.active) {
+      state.probe.active = false;
+      state.probe.z = null;
+      state.probe.w = null;
+      if (readoutIn) readoutIn.textContent = "—";
+      if (readoutOut) readoutOut.textContent = "—";
+    }
+    const outHit = hitElementOut(pos.x, pos.y);
+    const npid = outHit && outHit.kind === "point" ? outHit.id : null;
+    const nsid = outHit && outHit.kind === "shape" ? outHit.id : null;
+    const hovChanged = state.hoveredPointId !== npid || state.hoveredShapeId !== nsid;
+    state.hoveredPointId = npid;
+    state.hoveredShapeId = nsid;
+    requestRender(hovChanged ? "both" : "out");
+  });
+  canvasOut.addEventListener("pointerleave", () => {
+    const hadAny = state.probe.active || state.hoveredShapeId !== null || state.hoveredPointId !== null;
+    state.probe.active = false;
+    state.probe.z = null;
+    state.probe.w = null;
+    state.hoveredShapeId = null;
+    state.hoveredPointId = null;
+    if (hadAny) requestRender("both");
   });
   canvasOut.addEventListener("pointerup", (e) => {
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) { window.RiemannSphere.onPointerUp(); outCard.classList.remove("panning"); return; }
+    if (state.dragText && state.dragText.plane === "out") {
+      const moved = state.dragText.moved;
+      state.dragText = null;
+      canvasOut.style.cursor = "";
+      if (moved) {
+        notifyDomain();
+        notifyState(true, true);
+      }
+      requestRender("out");
+      return;
+    }
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) { window.RiemannSphere.onPointerUp(); outCard.classList.remove("panning"); return; }
     const p = state.pan;
     state.pan = null; outCard.classList.remove("panning");
     if (p && p.which === "out" && p.rightClick) {
       const pos = localPos(canvasOut, e);
       if (Math.hypot(pos.x - p.startX, pos.y - p.startY) < 5) {
+        const tbHit = window.CFVAnnotations && state.texts.length > 0
+          ? window.CFVAnnotations.hitTestTextBoxes(ctxOut, canvasOut, state.texts, pos.x, pos.y, { plane: "out" })
+          : null;
+        if (tbHit && ws() && typeof ws().openItemSettingsAt === "function") {
+          selectTextBox(tbHit.tb.id);
+          ws().openItemSettingsAt("text", tbHit.tb.id, e.clientX, e.clientY);
+          return;
+        }
         const hit = hitElementOut(pos.x, pos.y);
         if (hit && ws() && typeof ws().openItemSettingsAt === "function") {
           if (hit.kind === "shape") selectShape(hit.id);
@@ -3396,7 +4462,7 @@
   });
   canvasOut.addEventListener("wheel", (e) => {
     e.preventDefault();
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) { window.RiemannSphere.onWheel(e.deltaY); requestRender(); return; }
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) { window.RiemannSphere.onWheel(e.deltaY); requestRender("out"); return; }
     const pos = localPos(canvasOut, e);
     const f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     const scaleXOnly = e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
@@ -3631,34 +4697,30 @@
       setProjection(state.projection === "sphere" ? "planar" : "sphere");
     });
   }
+  if (inProjSelect) {
+    inProjSelect.addEventListener("change", () => {
+      setInProjection(inProjSelect.value);
+    });
+  }
   if (outProjSelect) {
     outProjSelect.addEventListener("change", () => {
       setProjection(outProjSelect.value);
     });
   }
-  if (customProjInput) {
-    customProjInput.addEventListener("input", () => {
-      state.projectionExpr = customProjInput.value;
-      if (state.projection === "custom" && window.CFVProjections) {
-        const { err } = window.CFVProjections.getCustomProjector(state.projectionExpr);
-        if (customProjErr) {
-          customProjErr.textContent = err || "";
-          customProjErr.classList.toggle("hidden", !err);
-        }
-        if (outputSub) outputSub.textContent = window.CFVProjections.getSubtitle("custom", state.projectionExpr);
-        requestRender();
-        notifyState(false, true);
+
+  const optOutDomain = document.getElementById("opt-out-domain");
+  if (optOutDomain) {
+    optOutDomain.addEventListener("change", () => {
+      state.showOutDomain = optOutDomain.checked;
+      if (state.showOutDomain) {
+        if (!state.domainImg) fetchDomain();
+        else requestRender("out");
+      } else {
+        requestRender("out");
       }
+      notifyState(true, true);
     });
   }
-  document.querySelectorAll(".proj-chip[data-proj-expr]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const expr = btn.dataset.projExpr || "(w - i) / (w + i)";
-      if (customProjInput) customProjInput.value = expr;
-      setProjection("custom", { expr });
-    });
-  });
-
   const optDomainScheme = document.getElementById("opt-domain-scheme");
   const optDomainOpacity = document.getElementById("opt-domain-opacity");
   const optDomainOpacityVal = document.getElementById("opt-domain-opacity-val");
@@ -3713,7 +4775,7 @@
   document.getElementById("in-zoom-out").addEventListener("click", () => zoomAt(state.inView, canvasIn, canvasIn.clientWidth * 0.5, canvasIn.clientHeight * 0.5, 1 / 1.35));
   document.getElementById("in-reset").addEventListener("click", () => setView(state.inView, canvasIn, state.defaultInView.cx, state.defaultInView.cy, state.defaultInView.r));
   document.getElementById("out-autofit").addEventListener("click", () => {
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) {
       window.RiemannSphere.focusOnShapes(state.shapes, (s) =>
         state.mode === "integral" ? (s.integral ? s.integral.cumPts : null) : s.boundary ? s.boundary.outPts : null
       );
@@ -3728,7 +4790,7 @@
     autoFitOutput();
   });
   document.getElementById("out-zoom-in").addEventListener("click", () => {
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) {
       window.RiemannSphere.zoomBy(1.22);
       requestRender();
       return;
@@ -3736,7 +4798,7 @@
     zoomAt(state.outView, canvasOut, canvasOut.clientWidth * 0.5, canvasOut.clientHeight * 0.5, 1.35);
   });
   document.getElementById("out-zoom-out").addEventListener("click", () => {
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) {
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) {
       window.RiemannSphere.zoomBy(1 / 1.22);
       requestRender();
       return;
@@ -3744,7 +4806,7 @@
     zoomAt(state.outView, canvasOut, canvasOut.clientWidth * 0.5, canvasOut.clientHeight * 0.5, 1 / 1.35);
   });
   document.getElementById("out-reset").addEventListener("click", () => {
-    if (window.RiemannSphere && (state.projection === "sphere" || window.RiemannSphere.state.enabled)) { window.RiemannSphere.reset(); requestRender(); return; }
+    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) { window.RiemannSphere.reset(); requestRender(); return; }
     if (state.projection === "stereographic" || state.projection === "poincare") {
       setSquareAspect("out", true);
       setView(state.outView, canvasOut, 0, 0, 1.32);
@@ -3946,6 +5008,56 @@
     requestRender();
   }
 
+  function addTextBox(opts = {}, silent = false) {
+    if (!silent) pushUndoSnapshot();
+    const tb = {
+      id: state.nextTextId++,
+      kind: "text",
+      title: opts.title !== undefined ? String(opts.title) : "Note",
+      text: opts.text !== undefined ? String(opts.text) : "Explain the math or what to try here…",
+      anchor: opts.anchor || "bottom-left",
+      plane: opts.plane === "out" ? "out" : "in",
+      x: opts.x !== undefined ? Number(opts.x) : Number(state.inView.cx.toFixed(3)),
+      y: opts.y !== undefined ? Number(opts.y) : Number(state.inView.cy.toFixed(3)),
+      nx: Number.isFinite(Number(opts.nx)) ? Number(opts.nx) : undefined,
+      ny: Number.isFinite(Number(opts.ny)) ? Number(opts.ny) : undefined,
+      xExpr: opts.xExpr ? String(opts.xExpr) : "",
+      yExpr: opts.yExpr ? String(opts.yExpr) : "",
+      color: opts.color || "#38bdf8",
+      width: Number(opts.width || opts.maxWidth) || 305,
+      height: Number(opts.height) > 0 ? Number(opts.height) : 0,
+      fontSize: Number(opts.fontSize) || 12,
+      opacity: normOpacity(opts.opacity, 0.94),
+      locked: Boolean(opts.locked),
+      visible: opts.visible !== undefined ? Boolean(opts.visible) : true,
+      collapsed: Boolean(opts.collapsed),
+      cardHeight: Number(opts.cardHeight) > 0 ? Number(opts.cardHeight) : 0,
+    };
+    state.texts.push(tb);
+    clearSelection();
+    state.selectedTextId = tb.id;
+    notifyDomain();
+    if (!silent) notifyState(true);
+    requestRender();
+    return tb;
+  }
+
+  function deleteTextBox(id) {
+    if (state.texts.some((t) => t.id === id)) pushUndoSnapshot();
+    state.texts = state.texts.filter((t) => t.id !== id);
+    if (state.selectedTextId === id) state.selectedTextId = null;
+    notifyDomain();
+    notifyState(true);
+    requestRender();
+  }
+
+  function selectTextBox(id) {
+    clearSelection();
+    state.selectedTextId = id;
+    notifyDomain();
+    requestRender();
+  }
+
   function selectShape(id, opts = {}) {
     state.selectedLineId = null;
     if (opts.range && state.selectedShapeId !== null) {
@@ -4062,21 +5174,30 @@
     const shapeIdxById = new Map(state.shapes.map((s, i) => [s.id, i]));
     const pointIdxById = new Map(state.points.map((p, i) => [p.id, i]));
     const lineIdxById = new Map(state.lines.map((l, i) => [l.id, i]));
+    const textIdxById = new Map(state.texts.map((t, i) => [t.id, i]));
     const layerRefs = ordered.map((e) => {
       if (e.kind === "shape") return `s:${shapeIdxById.get(e.id)}`;
       if (e.kind === "point") return `p:${pointIdxById.get(e.id)}`;
+      if (e.kind === "text") return `t:${textIdxById.get(e.id)}`;
       return `l:${lineIdxById.get(e.id)}`;
     });
+    const r12 = (v) => (Number.isFinite(v) ? Number(Number(v).toPrecision(12)) : 0);
     return {
-      iv: [r4(state.inView.cx), r4(state.inView.cy), r4(viewRadius(state.inView, canvasIn))],
-      ov: [r4(state.outView.cx), r4(state.outView.cy), r4(viewRadius(state.outView, canvasOut))],
+      iv: [r12(state.inView.cx), r12(state.inView.cy), r12(viewRadius(state.inView, canvasIn))],
+      ov: [r12(state.outView.cx), r12(state.outView.cy), r12(viewRadius(state.outView, canvasOut))],
       isq: state.inSquare ? 1 : 0,
       osq: state.outSquare ? 1 : 0,
+      cm: state.contourMode ? 1 : 0,
+      msh: state.showMesh ? 1 : 0,
+      lmk: state.showLandmarks ? 1 : 0,
+      cln: state.showCriticalLine ? 1 : 0,
+      dwa: state.showDirichletWall ? 1 : 0,
       sph: state.projection === "sphere" || (sp && sp.enabled) ? 1 : 0,
+      ...(state.inProjection && state.inProjection !== "planar" ? { iproj: state.inProjection } : {}),
       proj: state.projection || "planar",
-      pexpr: state.projection === "custom" ? (state.projectionExpr || "") : undefined,
       spv: sp ? [r4(sp.yaw), r4(sp.pitch), r4(sp.zoom)] : [-0.58, 0.22, 1.0],
       dom: state.showDomain ? 1 : 0,
+      ...(state.showOutDomain ? { odom: 1, ...(state.outDomainMapping && state.outDomainMapping !== "stereo" ? { odm: state.outDomainMapping } : {}) } : {}),
       dscm: state.domainScheme || "classic",
       dop: r4(normOpacity(state.domainOpacity, 0.72)),
       lo: layerRefs,
@@ -4089,11 +5210,14 @@
           l: s.label || "",
           c: s.color || "#38bdf8",
           w: normLineWidth(s.lineWidth, 2.2),
-          op: r4(normOpacity(s.opacity, 1.0)),
+          op: r4(normOpacity(s.opacity, s.closed ? 0.22 : 1.0)),
+          ...(s.isOcean ? { oc: 1 } : {}),
           st: s.lineStyle || "solid",
           lk: s.locked ? 1 : 0,
           cl: s.closed ? 1 : 0,
           v: s.visible !== false ? 1 : 0,
+          ...(s.collapsed ? { col: 1 } : {}),
+          ...(Number(s.cardHeight) > 0 ? { ch: Math.round(Number(s.cardHeight)) } : {}),
           p: flat,
         };
         if (s.formula) rec.f = { ...s.formula };
@@ -4102,6 +5226,8 @@
       pt: state.points.map((p) => ({
         x: r4(p.x),
         y: r4(p.y),
+        ...(p.xExpr ? { xe: p.xExpr } : {}),
+        ...(p.yExpr ? { ye: p.yExpr } : {}),
         l: p.label || "",
         i: p.icon || "dot",
         c: p.color || "#34d399",
@@ -4110,10 +5236,13 @@
         lk: p.locked ? 1 : 0,
         v: p.visible !== false ? 1 : 0,
         sl: p.showLabel !== false ? 1 : 0,
+        ...(p.collapsed ? { col: 1 } : {}),
+        ...(Number(p.cardHeight) > 0 ? { ch: Math.round(Number(p.cardHeight)) } : {}),
       })),
       ln: state.lines.map((ln) => ({
         o: ln.orientation === "horizontal" ? "h" : "v",
         val: r4(ln.value),
+        ...(ln.valExpr ? { ve: ln.valExpr } : {}),
         l: ln.label || "",
         c: ln.color || "#fbbf24",
         w: normLineWidth(ln.lineWidth, 1.5),
@@ -4122,6 +5251,29 @@
         lk: ln.locked ? 1 : 0,
         v: ln.visible !== false ? 1 : 0,
         sl: ln.showLabel !== false ? 1 : 0,
+        ...(ln.collapsed ? { col: 1 } : {}),
+        ...(Number(ln.cardHeight) > 0 ? { ch: Math.round(Number(ln.cardHeight)) } : {}),
+      })),
+      tx: state.texts.map((tb) => ({
+        t: tb.title || "",
+        b: tb.text || "",
+        a: tb.anchor || "bottom-left",
+        pl: tb.plane === "out" ? "out" : "in",
+        x: r4(tb.x || 0),
+        y: r4(tb.y || 0),
+        ...(Number.isFinite(Number(tb.nx)) ? { nx: r4(Number(tb.nx)) } : {}),
+        ...(Number.isFinite(Number(tb.ny)) ? { ny: r4(Number(tb.ny)) } : {}),
+        ...(tb.xExpr ? { xe: tb.xExpr } : {}),
+        ...(tb.yExpr ? { ye: tb.yExpr } : {}),
+        c: tb.color || "#38bdf8",
+        w: Number(tb.width) || 305,
+        ...(Number(tb.height) > 0 ? { h: Math.round(Number(tb.height)) } : {}),
+        fs: Number(tb.fontSize) || 12,
+        op: r4(normOpacity(tb.opacity, 0.94)),
+        lk: tb.locked ? 1 : 0,
+        v: tb.visible !== false ? 1 : 0,
+        ...(tb.collapsed ? { col: 1 } : {}),
+        ...(Number(tb.cardHeight) > 0 ? { ch: Math.round(Number(tb.cardHeight)) } : {}),
       })),
     };
   }
@@ -4136,6 +5288,7 @@
         if (parts[0] === "s" && state.shapes[idx]) state.layerOrder.push({ kind: "shape", id: state.shapes[idx].id });
         else if (parts[0] === "p" && state.points[idx]) state.layerOrder.push({ kind: "point", id: state.points[idx].id });
         else if (parts[0] === "l" && state.lines[idx]) state.layerOrder.push({ kind: "guide_line", id: state.lines[idx].id });
+        else if (parts[0] === "t" && state.texts[idx]) state.layerOrder.push({ kind: "text", id: state.texts[idx].id });
       }
     }
     syncLayerOrder();
@@ -4144,9 +5297,61 @@
   function syncDomainControlsUI() {
     const domCb = document.getElementById("opt-domain");
     if (domCb) domCb.checked = Boolean(state.showDomain);
+    const outDomCb = document.getElementById("opt-out-domain");
+    if (outDomCb) outDomCb.checked = Boolean(state.showOutDomain);
     if (optDomainScheme) optDomainScheme.value = state.domainScheme || "classic";
     if (optDomainOpacity) optDomainOpacity.value = String(normOpacity(state.domainOpacity, 0.72));
     if (optDomainOpacityVal) optDomainOpacityVal.textContent = `${Math.round(normOpacity(state.domainOpacity, 0.72) * 100)}%`;
+  }
+
+  function setContourMode(enabled, opts = {}) {
+    const on = Boolean(enabled);
+    const changed = state.contourMode !== on || state.mode !== (on ? "integral" : "map");
+    state.contourMode = on;
+    state.mode = on ? "integral" : "map";
+    if (inputTag) inputTag.textContent = on ? "CONTOUR PLANE" : "INPUT PLANE";
+    if (inputSub) inputSub.textContent = on ? "γ(t) ⊂ ℂ" : "z = x + iy";
+    if (outputTag) {
+      outputTag.textContent = on ? "INTEGRAL PLANE" : "OUTPUT PLANE";
+      outputTag.classList.toggle("integral-tag", on);
+    }
+    if (outputSub) outputSub.textContent = on ? "I(t) = ∫ f(z) dz" : "w = f(z)";
+    if (btnToggleContour) {
+      btnToggleContour.classList.toggle("active", on);
+      btnToggleContour.setAttribute("aria-pressed", String(on));
+    }
+    if (optContourMode) optContourMode.checked = on;
+    const fnLbl = document.getElementById("fn-tab-label");
+    if (fnLbl && ws() && ws().state && ws().state.mode !== "real") {
+      fnLbl.textContent = on ? "Integrand f(z) & Aux" : "Function w = f(z) & Aux";
+    }
+    updateIntegralPanel();
+    if (!opts.silent && changed) {
+      recomputeAll(1.0);
+      notifyDomain();
+      notifyState(true, true);
+    } else {
+      requestRender();
+    }
+  }
+
+  if (btnToggleContour) {
+    btnToggleContour.addEventListener("click", () => setContourMode(!state.contourMode));
+  }
+  if (optContourMode) {
+    optContourMode.addEventListener("change", () => setContourMode(optContourMode.checked));
+  }
+  if (btnCloseIntegral) {
+    btnCloseIntegral.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      setContourMode(false);
+    });
+  }
+  if (btnIntegralAddCircle) {
+    btnIntegralAddCircle.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      addQuickShape("circle");
+    });
   }
 
   async function restoreSnapshot(snap) {
@@ -4156,26 +5361,42 @@
     ensureCanvasSize(canvasOut);
     setSquareAspect("in", snap.isq !== undefined ? Boolean(snap.isq) : true);
     setSquareAspect("out", snap.osq !== undefined ? Boolean(snap.osq) : true);
+    if (snap.cm !== undefined) setContourMode(Boolean(snap.cm), { silent: true });
+    if (snap.msh !== undefined) {
+      state.showMesh = Boolean(snap.msh);
+      const mCb = document.getElementById("opt-mesh");
+      if (mCb) mCb.checked = state.showMesh;
+    }
+    if (snap.lmk !== undefined) {
+      state.showLandmarks = Boolean(snap.lmk);
+      const lCb = document.getElementById("opt-landmarks");
+      if (lCb) lCb.checked = state.showLandmarks;
+    }
+    if (snap.cln !== undefined) state.showCriticalLine = Boolean(snap.cln);
+    if (snap.dwa !== undefined) state.showDirichletWall = Boolean(snap.dwa);
     const projMode = snap.proj || (snap.sph ? "sphere" : "planar");
     if (window.RiemannSphere && Array.isArray(snap.spv) && snap.spv.length >= 3) {
       window.RiemannSphere.state.yaw = Number(snap.spv[0]) || 0;
       window.RiemannSphere.state.pitch = Number(snap.spv[1]) || 0;
       window.RiemannSphere.state.zoom = Math.max(0.45, Number(snap.spv[2]) || 1.0);
     }
-    setProjection(projMode, { expr: snap.pexpr, keepOutView: true, keepSphereView: true, silent: true });
+    setInProjection(snap.iproj || "planar", { keepInView: true, keepSphereView: true, silent: true });
+    setProjection(projMode, { keepOutView: true, keepSphereView: true, silent: true });
 
     state.showDomain = Boolean(snap.dom);
+    state.showOutDomain = Boolean(snap.odom);
+    state.outDomainMapping = snap.odm || "stereo";
     state.domainScheme = snap.dscm || "classic";
     state.domainOpacity = normOpacity(snap.dop, state.domainScheme === "classic" ? 0.72 : 1.0);
-    if (!state.showDomain) state.domainImg = null;
+    state.domainImg = null;
     syncDomainControlsUI();
 
     if (Array.isArray(snap.iv) && snap.iv.length >= 3) {
-      state.defaultInView = { cx: Number(snap.iv[0]), cy: Number(snap.iv[1]), r: Math.max(0.0001, Number(snap.iv[2])) };
+      state.defaultInView = { cx: Number(snap.iv[0]), cy: Number(snap.iv[1]), r: Math.max(1e-13, Number(snap.iv[2])) };
       setView(state.inView, canvasIn, state.defaultInView.cx, state.defaultInView.cy, state.defaultInView.r);
     }
     if (Array.isArray(snap.ov) && snap.ov.length >= 3) {
-      state.defaultOutView = { cx: Number(snap.ov[0]), cy: Number(snap.ov[1]), r: Math.max(0.0001, Number(snap.ov[2])) };
+      state.defaultOutView = { cx: Number(snap.ov[0]), cy: Number(snap.ov[1]), r: Math.max(1e-13, Number(snap.ov[2])) };
       setView(state.outView, canvasOut, state.defaultOutView.cx, state.defaultOutView.cy, state.defaultOutView.r);
     }
     state.points = (snap.pt || []).map((p) => ({
@@ -4183,6 +5404,8 @@
       kind: "point",
       x: Number(p.x) || 0,
       y: Number(p.y) || 0,
+      xExpr: p.xe ? String(p.xe) : "",
+      yExpr: p.ye ? String(p.ye) : "",
       label: p.l || "",
       icon: p.i || "dot",
       color: p.c || "#34d399",
@@ -4191,6 +5414,8 @@
       locked: Boolean(p.lk),
       visible: p.v !== 0,
       showLabel: p.sl !== 0,
+      collapsed: Boolean(p.col),
+      cardHeight: Number(p.ch) > 0 ? Number(p.ch) : 0,
       outPt: null,
     }));
     state.lines = (snap.ln || []).map((ln) => ({
@@ -4198,6 +5423,7 @@
       kind: "guide_line",
       orientation: ln.o === "h" ? "horizontal" : "vertical",
       value: Number(ln.val) || 0,
+      valExpr: ln.ve ? String(ln.ve) : "",
       label: ln.l || "",
       color: ln.c || "#fbbf24",
       lineWidth: normLineWidth(ln.w, 1.5),
@@ -4206,6 +5432,31 @@
       locked: Boolean(ln.lk),
       visible: ln.v !== 0,
       showLabel: ln.sl !== 0,
+      collapsed: Boolean(ln.col),
+      cardHeight: Number(ln.ch) > 0 ? Number(ln.ch) : 0,
+    }));
+    state.texts = (snap.tx || []).map((tb) => ({
+      id: state.nextTextId++,
+      kind: "text",
+      title: tb.t || "",
+      text: tb.b || "",
+      anchor: tb.a || "bottom-left",
+      plane: tb.pl === "out" ? "out" : "in",
+      x: Number(tb.x) || 0,
+      y: Number(tb.y) || 0,
+      nx: Number.isFinite(Number(tb.nx)) ? Number(tb.nx) : undefined,
+      ny: Number.isFinite(Number(tb.ny)) ? Number(tb.ny) : undefined,
+      xExpr: tb.xe ? String(tb.xe) : "",
+      yExpr: tb.ye ? String(tb.ye) : "",
+      color: tb.c || "#38bdf8",
+      width: Number(tb.w) || 305,
+      height: Number(tb.h) > 0 ? Number(tb.h) : 0,
+      fontSize: Number(tb.fs) || 12,
+      opacity: normOpacity(tb.op, 0.94),
+      locked: Boolean(tb.lk),
+      visible: tb.v !== 0,
+      collapsed: Boolean(tb.col),
+      cardHeight: Number(tb.ch) > 0 ? Number(tb.ch) : 0,
     }));
     state.shapes = (snap.sh || []).map((sh) => {
       const rawPts = [];
@@ -4219,11 +5470,14 @@
         label: sh.l || "Shape",
         color: sh.c || "#38bdf8",
         lineWidth: normLineWidth(sh.w, 2.2),
-        opacity: normOpacity(sh.op, 1.0),
+        opacity: normOpacity(sh.op, sh.cl ? 0.22 : 1.0),
+        isOcean: Boolean(sh.oc),
         lineStyle: sh.st || "solid",
         locked: Boolean(sh.lk),
         closed: Boolean(sh.cl),
         visible: sh.v !== 0,
+        collapsed: Boolean(sh.col),
+        cardHeight: Number(sh.ch) > 0 ? Number(sh.ch) : 0,
         formula: sh.f ? { ...sh.f } : null,
         rawPts,
         boundary: null,
@@ -4246,22 +5500,27 @@
     requestRender,
     recomputeAll,
     isFetchBusy: () => Boolean(state.fetchBusy),
+    isDomainBusy: () => Boolean(state.domainInFlight),
     recomputePoints,
     computeShape,
     updateIntegralPanel,
+    scheduleDomain,
     fetchDomain,
     fetchTaylor,
     huntZeros,
     addQuickShape,
     addPoint,
     addGuideLine,
+    addTextBox,
     addBundleShapes,
     deleteShape,
     deletePoint,
     deleteGuideLine,
+    deleteTextBox,
     selectShape,
     selectPoint,
     selectGuideLine,
+    selectTextBox,
     toggleCloseShape,
     reverseShape,
     joinConnectedShapes,
@@ -4301,41 +5560,47 @@
     },
     setViewportValues(vals) {
       if (!vals) return false;
-      let changed = false;
+      let changedIn = false;
+      let changedOut = false;
       if (vals.in_cx !== undefined || vals.in_cy !== undefined || vals.in_r !== undefined) {
         const cx = vals.in_cx !== undefined && Number.isFinite(vals.in_cx) ? vals.in_cx : state.inView.cx;
         const cy = vals.in_cy !== undefined && Number.isFinite(vals.in_cy) ? vals.in_cy : state.inView.cy;
-        const r = vals.in_r !== undefined && Number.isFinite(vals.in_r) ? Math.max(0.05, vals.in_r) : viewRadius(state.inView, canvasIn);
-        setView(state.inView, canvasIn, cx, cy, r);
-        changed = true;
+        const r = vals.in_r !== undefined && Number.isFinite(vals.in_r) ? Math.max(1e-13, vals.in_r) : viewRadius(state.inView, canvasIn);
+        setView(state.inView, canvasIn, cx, cy, r, true);
+        changedIn = true;
       }
       if (vals.out_cx !== undefined || vals.out_cy !== undefined || vals.out_r !== undefined) {
         const cx = vals.out_cx !== undefined && Number.isFinite(vals.out_cx) ? vals.out_cx : state.outView.cx;
         const cy = vals.out_cy !== undefined && Number.isFinite(vals.out_cy) ? vals.out_cy : state.outView.cy;
-        const r = vals.out_r !== undefined && Number.isFinite(vals.out_r) ? Math.max(0.05, vals.out_r) : viewRadius(state.outView, canvasOut);
-        setView(state.outView, canvasOut, cx, cy, r);
-        changed = true;
+        const r = vals.out_r !== undefined && Number.isFinite(vals.out_r) ? Math.max(1e-13, vals.out_r) : viewRadius(state.outView, canvasOut);
+        setView(state.outView, canvasOut, cx, cy, r, true);
+        changedOut = true;
       }
-      return changed;
+      if (changedIn && state.showDomain) scheduleDomain(true);
+      if (changedIn && changedOut) requestRender("both");
+      else if (changedIn) requestRender("in");
+      else if (changedOut) requestRender("out");
+      return changedIn || changedOut;
     },
     setViewBounds(inV, outV) {
       if (inV) { state.defaultInView = { ...inV }; setView(state.inView, canvasIn, inV.cx, inV.cy, inV.r); }
       if (outV) { state.defaultOutView = { ...outV }; setView(state.outView, canvasOut, outV.cx, outV.cy, outV.r); }
     },
+    setContourMode,
     setMode(mode) {
-      state.mode = mode;
-      inputTag.textContent = mode === "integral" ? "CONTOUR PLANE" : "INPUT PLANE";
-      inputSub.textContent = mode === "integral" ? "γ(t) ⊂ ℂ" : "z = x + iy";
-      outputTag.textContent = mode === "integral" ? "INTEGRAL PLANE" : "OUTPUT PLANE";
-      outputTag.classList.toggle("integral-tag", mode === "integral");
-      outputSub.textContent = mode === "integral" ? "I(t) = ∫ f(z) dz" : "w = f(z)";
-      updateIntegralPanel();
-      requestRender();
+      setContourMode(mode === "integral", { silent: true });
     },
     async loadExampleAndPreset(ex, preset) {
       const pr = preset || (ex.presets && ex.presets[0]) || {};
-      state.showCriticalLine = Boolean(ex.showCriticalLine);
-      state.showDirichletWall = Boolean(ex.showDirichletWall);
+      const wantContour = pr.contourMode !== undefined
+        ? Boolean(pr.contourMode)
+        : (ex.contourMode !== undefined ? Boolean(ex.contourMode) : ex.mode === "integral");
+      setContourMode(wantContour, { silent: true });
+      state.showMesh = pr.showMesh !== undefined ? Boolean(pr.showMesh) : (ex.showMesh !== undefined ? Boolean(ex.showMesh) : true);
+      const meshCb = document.getElementById("opt-mesh");
+      if (meshCb) meshCb.checked = state.showMesh;
+      state.showCriticalLine = Boolean(pr.showCriticalLine !== undefined ? pr.showCriticalLine : ex.showCriticalLine);
+      state.showDirichletWall = Boolean(pr.showDirichletWall !== undefined ? pr.showDirichletWall : ex.showDirichletWall);
       state.foundZeros = [];
       state.undoStack = [];
 
@@ -4348,15 +5613,29 @@
           if (Number.isFinite(pr.sphereView.zoom)) window.RiemannSphere.state.zoom = pr.sphereView.zoom;
         }
       }
-      setProjection(projMode, { expr: pr.projectionExpr || ex.projectionExpr, keepOutView: true, keepSphereView: true, silent: true });
+      const inProjMode = pr.inProjection || ex.defaultInProjection || "planar";
+      if (window.RiemannSphereIn) {
+        if (inProjMode === "sphere" || inProjMode === "cylinder") window.RiemannSphereIn.reset();
+        if (pr.inSphereView || pr.sphereView) {
+          const isv = pr.inSphereView || pr.sphereView;
+          if (Number.isFinite(isv.yaw)) window.RiemannSphereIn.state.yaw = isv.yaw;
+          if (Number.isFinite(isv.pitch)) window.RiemannSphereIn.state.pitch = isv.pitch;
+          if (Number.isFinite(isv.zoom)) window.RiemannSphereIn.state.zoom = isv.zoom;
+        }
+      }
+      setInProjection(inProjMode, { keepInView: true, keepSphereView: true, silent: true });
+      setProjection(projMode, { keepOutView: true, keepSphereView: true, silent: true });
 
       state.showDomain = Boolean(pr.showDomain !== undefined ? pr.showDomain : ex.showDomain);
+      state.showOutDomain = Boolean(pr.showOutDomain !== undefined ? pr.showOutDomain : ex.showOutDomain);
+      state.outDomainMapping = pr.outDomainMapping || ex.outDomainMapping || "stereo";
       state.domainScheme = pr.domainScheme || ex.domainScheme || "classic";
       state.domainOpacity = normOpacity(
         pr.domainOpacity !== undefined ? pr.domainOpacity : ex.domainOpacity,
         state.domainScheme === "classic" ? 0.72 : 1.0
       );
-      if (!state.showDomain) state.domainImg = null;
+      /* Always clear stale cached domain texture on preset switch so Black-Hole / Earth never inherit previous preset's field! */
+      state.domainImg = null;
       syncDomainControlsUI();
 
       ensureCanvasSize(canvasIn);
@@ -4372,8 +5651,10 @@
       state.points = srcPts.map((pt) => ({
         id: state.nextPointId++,
         kind: "point",
-        x: pt.x,
-        y: pt.y,
+        x: Number(pt.x) || 0,
+        y: Number(pt.y) || 0,
+        xExpr: pt.xExpr ? String(pt.xExpr) : "",
+        yExpr: pt.yExpr ? String(pt.yExpr) : "",
         label: pt.label || "",
         icon: pt.icon || "ring",
         color: pt.color || "#34d399",
@@ -4391,6 +5672,7 @@
         kind: "guide_line",
         orientation: ln.orientation || "vertical",
         value: Number(ln.value) || 0,
+        valExpr: ln.valExpr ? String(ln.valExpr) : "",
         label: ln.label || "",
         color: ln.color || "#fbbf24",
         lineWidth: normLineWidth(ln.lineWidth, 1.5),
@@ -4401,17 +5683,45 @@
         showLabel: ln.showLabel !== undefined ? Boolean(ln.showLabel) : true,
       }));
 
+      const srcTexts = pr.texts !== undefined ? pr.texts : (ex.defaultTexts || []);
+      state.texts = (srcTexts || []).map((tb) => ({
+        id: state.nextTextId++,
+        kind: "text",
+        title: tb.title || "",
+        text: tb.text || "",
+        anchor: tb.anchor || "bottom-left",
+        plane: tb.plane === "out" ? "out" : "in",
+        x: Number(tb.x) || 0,
+        y: Number(tb.y) || 0,
+        nx: Number.isFinite(Number(tb.nx)) ? Number(tb.nx) : undefined,
+        ny: Number.isFinite(Number(tb.ny)) ? Number(tb.ny) : undefined,
+        xExpr: tb.xExpr ? String(tb.xExpr) : "",
+        yExpr: tb.yExpr ? String(tb.yExpr) : "",
+        color: tb.color || "#38bdf8",
+        width: Number(tb.width || tb.maxWidth) || 305,
+        height: Number(tb.height) > 0 ? Number(tb.height) : 0,
+        fontSize: Number(tb.fontSize) || 12,
+        opacity: normOpacity(tb.opacity, 0.94),
+        locked: tb.locked !== undefined ? Boolean(tb.locked) : false,
+        visible: tb.visible !== undefined ? Boolean(tb.visible) : true,
+        collapsed: Boolean(tb.collapsed),
+        cardHeight: Number(tb.cardHeight) > 0 ? Number(tb.cardHeight) : 0,
+      }));
+
       state.shapes = (pr.shapes || []).map((sh) => ({
         id: state.nextShapeId++,
         kind: sh.kind || (sh.formula && sh.formula.kind) || "circle",
         label: sh.label,
         color: sh.color || "#38bdf8",
         lineWidth: normLineWidth(sh.lineWidth, 2.2),
-        opacity: normOpacity(sh.opacity, 1.0),
+        opacity: normOpacity(sh.opacity, sh.closed !== false ? 0.22 : 1.0),
+        isOcean: Boolean(sh.isOcean),
         lineStyle: sh.lineStyle || "solid",
         locked: Boolean(sh.locked),
         closed: Boolean(sh.closed),
         visible: sh.visible !== undefined ? Boolean(sh.visible) : true,
+        collapsed: Boolean(sh.collapsed),
+        cardHeight: Number(sh.cardHeight) > 0 ? Number(sh.cardHeight) : 0,
         formula: sh.formula ? { ...sh.formula } : null,
         rawPts: Array.isArray(sh.rawPts) ? sh.rawPts.map((p) => ({ ...p })) : [],
         boundary: null,
@@ -4427,16 +5737,29 @@
       state.shapes = [];
       state.points = [];
       state.lines = [];
+      state.texts = [];
+      state.selectedTextId = null;
       state.layerOrder = [];
       state.foundZeros = [];
       state.undoStack = [];
       clearSelection();
+      setContourMode(false, { silent: true });
+      state.showMesh = true;
+      const mCbBlank = document.getElementById("opt-mesh");
+      if (mCbBlank) mCbBlank.checked = true;
       state.showDomain = false;
+      state.showOutDomain = false;
+      state.outDomainMapping = "stereo";
       state.domainScheme = "classic";
       state.domainOpacity = 0.72;
       state.domainImg = null;
       syncDomainControlsUI();
+      setInProjection("planar", { keepInView: true, silent: true });
       setProjection("planar", { keepOutView: true, silent: true });
+      if (window.RiemannSphereIn) {
+        window.RiemannSphereIn.state.enabled = false;
+        window.RiemannSphereIn.reset();
+      }
       if (window.RiemannSphere) {
         window.RiemannSphere.state.enabled = false;
         window.RiemannSphere.reset();

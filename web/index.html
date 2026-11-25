@@ -3,34 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>C11 Function Studio</title>
-  <link rel="stylesheet" href="/style.css?v=31" />
+  <title>Conformal — C11 Complex &amp; Real Math Studio</title>
+  <link rel="stylesheet" href="/style.css?v=43" />
 </head>
 <body>
   <div class="app-shell">
-    <!-- Clean Single-Tier Top Header: Modes, Pretty Project Bar, Left-Aligned Toolbar, Coords + Top-Right Utilities -->
+    <!-- Clean Single-Tier Top Header: Brand, Modes, Project Bar + Lock, Coords + Utilities -->
     <header class="topbar">
       <div class="header-left">
-        <div class="brand" title="C11 Function Studio">
+        <div class="brand" title="Conformal — Native C11 Complex &amp; Real Function Studio">
           <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="9" opacity="0.35" />
-              <path d="M4 12 C8 5, 16 19, 20 12" stroke="#38bdf8" stroke-width="2.2" />
-              <circle cx="12" cy="12" r="2.2" fill="#a78bfa" stroke="none" />
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+              <defs>
+                <linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#38bdf8" />
+                  <stop offset="55%" stop-color="#a78bfa" />
+                  <stop offset="100%" stop-color="#34d399" />
+                </linearGradient>
+              </defs>
+              <circle cx="12" cy="12" r="9.2" stroke="url(#brandGrad)" stroke-width="1.8" />
+              <ellipse cx="12" cy="12" rx="9.2" ry="3.8" stroke="#38bdf8" stroke-opacity="0.55" stroke-width="1.2" />
+              <ellipse cx="12" cy="12" rx="4.2" ry="9.2" stroke="#a78bfa" stroke-opacity="0.55" stroke-width="1.2" />
+              <circle cx="12" cy="2.8" r="1.8" fill="#fb7185" />
+              <circle cx="12" cy="12" r="2.0" fill="#34d399" />
             </svg>
           </div>
+          <span class="brand-name">Conformal</span>
         </div>
 
-        <!-- Unified 3-Way Workspace Switcher -->
+        <!-- Unified 2-Way Workspace Switcher (Complex + Real; Contour Integration toggles inside Complex) -->
         <div class="workspace-switch" role="tablist" aria-label="Workspace Mode">
-          <button class="ws-btn active" data-ws-mode="map" role="tab" aria-selected="true" title="Complex Mapping w = f(z)">
-            <span class="ws-sym">&Copf;</span><span>Map</span>
+          <button class="ws-btn active" data-ws-mode="map" role="tab" aria-selected="true" title="Complex Analysis: Mapping w = f(z), Domain Coloring, Riemann Sphere &amp; Contour Integrals">
+            <span class="ws-sym">&Copf;</span><span>Complex</span>
           </button>
-          <button class="ws-btn" data-ws-mode="integral" role="tab" aria-selected="false" title="Complex Contour Integrals ∫ f(z) dz">
-            <span class="ws-sym">&oint;</span><span>Integral</span>
-          </button>
-          <button class="ws-btn" data-ws-mode="real" role="tab" aria-selected="false" title="2D Real Functions, Vertical Lines &amp; Implicit Relations">
-            <span class="ws-sym">&Ropf;</span><span>2D Real</span>
+          <button class="ws-btn" data-ws-mode="real" role="tab" aria-selected="false" title="Real Functions, Parametric Curves, Implicit Relations &amp; Landmarks">
+            <span class="ws-sym">&Ropf;</span><span>Real</span>
           </button>
         </div>
 
@@ -71,10 +78,11 @@
           </div>
 
           <div class="topbar-proj-pill-group">
-            <button id="btn-save-project" class="proj-seg-btn" disabled title="Save changes to current saved project (Ctrl+S)">Save</button>
-            <button id="btn-save-as-project" class="proj-seg-btn" title="Save as a new project in any folder (Ctrl+Shift+S)">Save As</button>
+            <button id="btn-save-project" class="proj-seg-btn" disabled title="Save changes to current unlocked project (Ctrl+S)">Save</button>
+            <button id="btn-save-as-project" class="proj-seg-btn" title="Save as a new unlocked project in any folder (Ctrl+Shift+S)">Save As</button>
             <span class="proj-seg-div" aria-hidden="true"></span>
-            <button id="btn-top-rename-project" class="proj-seg-btn icon-seg" title="Rename current project">✎</button>
+            <button id="btn-top-lock-project" class="proj-seg-btn icon-seg proj-lock-btn" title="Lock / unlock project (locked projects cannot be overwritten, renamed, or deleted)">🔓</button>
+            <button id="btn-top-rename-project" class="proj-seg-btn icon-seg" title="Rename / edit project details">✎</button>
             <button id="btn-top-json-project" class="proj-seg-btn mono-seg" title="Export current project as Full Project JSON">JSON</button>
             <button id="btn-top-delete-project" class="proj-seg-btn danger-seg" disabled title="Delete current project">&times;</button>
           </div>
@@ -109,40 +117,7 @@
         </div>
       </div>
 
-      <!-- Left-Aligned Contextual Drawing & Polygon Toolbar -->
-      <div class="topbar-toolbar-slot">
-        <div class="topbar-draw-dock" id="complex-draw-dock">
-          <button class="dock-tool" data-tool="move" title="Select, Multi-Select (Ctrl/Shift+Click or Drag Box), Move &amp; Resize (V)">Move</button>
-          <button class="dock-tool active" data-tool="freehand" title="Freehand Path (1) — Snap end to start to close">Draw</button>
-          <button class="dock-tool" data-tool="line" title="Line Segment (2) — Endpoints magnetically snap">Line</button>
-          <button class="dock-tool" data-tool="circle" title="Closed Circle (3)">Circle</button>
-          <button class="dock-tool" data-tool="rect" title="Closed Rectangle (4)">Rect</button>
-          <button class="dock-tool" data-tool="polygon" title="Polygon (5)">Poly</button>
-          <button class="dock-tool" data-tool="pan" title="Pan (Space or Right-drag)">Pan</button>
-          <span class="dock-sep"></span>
-          <button class="dock-act dock-join-btn" id="btn-join-shapes" title="Join selected or touching open paths into one continuous contour / closed loop">Join</button>
-          <button class="dock-act" id="btn-close-shape" title="Close open path">Close</button>
-          <button class="dock-act" id="btn-reverse-shape" title="Reverse orientation">&rlarr;</button>
-          <button class="dock-act play" id="btn-trace-play" title="Animate tracer (P)">&#9654;</button>
-          <button class="dock-act" id="btn-undo-shape" title="Undo">Undo</button>
-          <button class="dock-act danger" id="btn-clear-shapes" title="Clear unlocked shapes">Clear</button>
-        </div>
-
-        <div class="topbar-draw-dock hidden" id="real-poly-dock">
-          <button class="dock-tool real-dock-tool" data-real-tool="select" title="Select / Box-Select (V) · Ctrl/Shift+Click to deselect · Alt+Drag box-deselect">Select</button>
-          <button class="dock-tool real-dock-tool deselect-tool" data-real-tool="deselect" title="Click or drag-paint to deselect cells (D)">Deselect</button>
-          <button class="dock-tool real-dock-tool" data-real-tool="add" title="Click or drag-paint to add square cells (A)">+ Cell</button>
-          <button class="dock-tool real-dock-tool active" data-real-tool="pan" title="Pan view (Space or Right-drag)">Pan</button>
-          <span class="dock-sep"></span>
-          <button class="dock-act" id="btn-real-select-all" title="Select all polygons (Ctrl+A)">All</button>
-          <button class="dock-act danger" id="btn-real-del-polys" title="Delete selected polygons (Delete / Backspace)">Delete</button>
-          <button class="dock-act" id="btn-real-undo-polys" title="Undo polygon edit (Ctrl+Z)">Undo</button>
-          <button class="dock-act" id="btn-real-fill-grid" title="Fill entire [-R, R]×[-R, R] play area with square polygons">Fill [-R,R]&sup2;</button>
-          <button class="dock-act danger" id="btn-real-clear-polys" title="Clear all polygons">Clear</button>
-        </div>
-      </div>
-
-      <!-- Top-Right Cluster: Live Coordinates to the Left of Docs & AI, Tools, PNG -->
+      <!-- Top-Right Cluster: Live Coordinates to the Left of Docs & AI, Tools, PNG, Theme -->
       <div class="header-right">
         <div class="readout-strip">
           <span class="readout-label" id="readout-in-label">z</span>
@@ -201,6 +176,13 @@
       <!-- Persistent Mini Sliders & Variables Sidebar (Shown whenever main sidebar is closed, even when all display panels are hidden!) -->
       <aside id="mini-slider-sidebar" class="mini-slider-sidebar hidden" aria-label="Compact Sliders &amp; Variables Rail">
         <div class="mini-sidebar-hdr">
+          <button id="btn-mini-show-sidebar" class="mini-sidebar-toggle-btn" title="Expand Full Sidebar" aria-label="Expand Full Sidebar">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2.5"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+              <polyline points="13 9 16 12 13 15"></polyline>
+            </svg>
+          </button>
           <span class="mini-sidebar-title">Sliders &amp; Vars</span>
           <span class="vtab-count" id="mini-sliders-count">0</span>
         </div>
@@ -226,18 +208,6 @@
         </div>
         <pre id="compile-diag" class="compile-diag hidden"></pre>
 
-        <!-- Collapsible Project Description / Notes Strip -->
-        <div id="project-desc-bar" class="project-desc-bar">
-          <button id="btn-toggle-desc" class="project-desc-toggle" type="button" aria-expanded="false" title="View or edit this project's description">
-            <span class="desc-chev">&#9656;</span>
-            <span class="desc-lbl">Description</span>
-            <span id="project-desc-preview" class="desc-preview">Add project description…</span>
-          </button>
-          <div id="project-desc-editor" class="project-desc-editor hidden">
-            <textarea id="project-desc-input" class="project-desc-textarea" rows="3" maxlength="500" placeholder="Describe the math, sliders, presets, or goals of this project..."></textarea>
-          </div>
-        </div>
-
         <!-- Scrollable 2-Tab Vertical Accordion (Unified Elements & Layers!) -->
         <div class="sidebar-scroll">
           <!-- TAB 1: Function Tab (with integrated Library, Syntax Guide, +Fn, +Slider, +Var!) -->
@@ -249,28 +219,17 @@
                 <span class="vtab-count" id="fn-tab-count">0</span>
               </span>
               <div class="domain-quick-adds fn-quick-adds" id="fn-quick-adds">
-                <div class="fn-lib-wrap">
-                  <button class="mini-hdr-btn fn-lib-btn" id="btn-fn-library" type="button" title="Browse prewritten C11 functions for this graph mode">&#402; Library &#9662;</button>
-                  <div id="fn-library-dropdown" class="fn-library-dropdown hidden" role="menu">
-                    <div class="fn-lib-head">
-                      <span id="fn-lib-title" class="fn-lib-title">Complex Function Library</span>
-                      <input type="text" id="fn-lib-search" class="fn-lib-search" placeholder="Search functions..." autocomplete="off" />
-                    </div>
-                    <div id="fn-lib-cats" class="fn-lib-cats"></div>
-                    <div id="fn-lib-list" class="fn-lib-list"></div>
-                  </div>
-                </div>
-                <button class="mini-hdr-btn fn-guide-btn" id="btn-fn-guide" type="button" title="Show strict C11 syntax rules, parameter names &amp; input examples">? Guide</button>
+                <button class="mini-hdr-btn fn-lib-btn" id="btn-fn-library" type="button" title="Browse prewritten C11 functions for this graph mode">&#402; Library &#9662;</button>
+                <button class="mini-hdr-btn fn-guide-btn" id="btn-fn-guide" type="button" title="Show strict C11 syntax rules, parameter names &amp; global variables">? Guide</button>
                 <button class="mini-hdr-btn fn-hdr-btn" id="btn-add-fn" title="Add a C11 function / auxiliary card">+ Fn</button>
                 <button class="mini-hdr-btn" id="btn-add-slider" title="Add interactive parameter slider">+ Slider</button>
                 <button class="mini-hdr-btn" id="btn-add-var" title="Add computed variable (e.g. R = 2.2 + 18*t*t)">+ Var</button>
               </div>
             </div>
-            <div id="fn-syntax-guide" class="fn-syntax-guide hidden"></div>
             <div id="fn-cards" class="expr-cards vtab-body"></div>
           </div>
 
-          <!-- TAB 2: Unified Elements & Layers Tab (Shapes, Points, Lines — Locked & Unlocked together in exact layer order!) -->
+          <!-- TAB 2: Unified Elements & Layers Tab (Shapes, Points, Lines & Text Cards — Back->Front) -->
           <div class="vtab-section" id="vtab-domain">
             <div class="sidebar-section-hdr domain-hdr vtab-hdr" id="tab-domain-hdr" role="button" tabindex="0" aria-expanded="true">
               <span class="vtab-title">
@@ -279,17 +238,76 @@
                 <span class="vtab-count" id="domain-tab-count">0</span>
                 <span class="layer-order-hint" title="Elements draw in list order (top = back, bottom = front). Drag cards to reorder layers.">Back&rarr;Front</span>
               </span>
-              <div class="domain-quick-adds" id="domain-quick-adds">
-                <button class="mini-hdr-btn complex-only-add" id="btn-quick-circle" title="Add circle contour">+ Circle</button>
-                <button class="mini-hdr-btn complex-only-add" id="btn-quick-arc" title="Add variable circular arc (Pac-Man / Semicircle)">+ Arc</button>
-                <button class="mini-hdr-btn complex-only-add" id="btn-quick-rect" title="Add rectangle contour">+ Rect</button>
-                <button class="mini-hdr-btn complex-only-add" id="btn-quick-line" title="Add line segment contour">+ Seg</button>
-                <button class="mini-hdr-btn" id="btn-add-point" title="Add a point">+ Pt</button>
-                <button class="mini-hdr-btn" id="btn-add-guide" title="Add a vertical or horizontal guide line">+ Line</button>
-                <button class="mini-hdr-btn join-hdr-btn complex-only-add" id="btn-sidebar-join" title="Join selected or touching open paths into one continuous contour / closed loop">Join</button>
-              </div>
             </div>
             <div id="domain-cards" class="expr-cards vtab-body"></div>
+          </div>
+        </div>
+
+        <!-- Standardized Bottom Drawing & Add-Element Tools Dock (Identical across Complex & Real; moves to Mini Rail when Sidebar is closed!) -->
+        <div id="sidebar-tools-dock" class="sidebar-tools-dock">
+          <div class="sidebar-tools-hdr">
+            <span id="sidebar-tools-title" class="sidebar-tools-title">Tools &amp; Elements</span>
+          </div>
+
+          <div class="sidebar-draw-dock" id="complex-draw-dock">
+            <div class="dock-btn-group">
+              <button class="dock-tool active" data-tool="move" title="Select, Multi-Select (Ctrl/Shift+Click or Drag Box), Move, Resize &amp; Rotate (V)">Move</button>
+              <button class="dock-tool" data-tool="pan" title="Pan (Space or Right-drag)">Pan</button>
+              <button class="dock-tool" data-tool="freehand" title="Freehand Path (1) — Snap end to start to close">Draw</button>
+              <button class="dock-tool" data-tool="infline" title="Infinite Line — Click or drag 2 points on the plane">Line</button>
+              <button class="dock-tool" data-tool="ray" title="Ray — Click or drag from anchor point through direction">Ray</button>
+              <button class="dock-tool" data-tool="seg" title="Line Segment (2) — Click or drag endpoints (magnetically snaps)">Seg</button>
+            </div>
+            <div class="dock-btn-group dock-acts-row">
+              <button class="dock-tool" data-tool="arc" title="Circular Arc — Click or drag radius on the plane">Arc</button>
+              <button class="dock-tool" data-tool="circle" title="Closed Circle (3) — Click or drag radius">Circle</button>
+              <button class="dock-tool" data-tool="rect" title="Closed Rectangle (4) — Click or drag corners">Rect</button>
+              <button class="dock-tool" data-tool="polygon" title="Polygon (5) — Click vertices, double-click to finish">Poly</button>
+              <button class="dock-tool" data-tool="point" title="Point — Click anywhere on the plane to drop a point">Point</button>
+              <button class="dock-tool" data-tool="text" title="Text Box — Click anywhere on the plane to drop a draggable note">Text</button>
+            </div>
+            <div class="dock-btn-group dock-acts-row">
+              <button class="dock-act dock-join-btn" id="btn-join-shapes" title="Join selected or touching open paths into one continuous contour / closed loop">Join</button>
+              <button class="dock-act" id="btn-close-shape" title="Close open path">Close</button>
+              <button class="dock-act" id="btn-reverse-shape" title="Reverse orientation">&rlarr;</button>
+              <button class="dock-act play" id="btn-trace-play" title="Animate tracer (P)">&#9654;</button>
+              <button class="dock-act" id="btn-undo-shape" title="Undo">Undo</button>
+              <button class="dock-act danger" id="btn-clear-shapes" title="Clear unlocked shapes">Clear</button>
+            </div>
+          </div>
+
+          <div class="sidebar-draw-dock hidden" id="real-draw-dock">
+            <div class="dock-btn-group">
+              <button class="dock-tool real-dock-tool active" data-real-tool="move" title="Select, Multi-Select, Move, Resize &amp; Rotate (V)">Move</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="pan" title="Pan view (Space or Right-drag)">Pan</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="freehand" title="Freehand Path (1) — Snap end to start to close">Draw</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="infline" title="Infinite Line — Click or drag 2 points on the plane">Line</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="ray" title="Ray — Click or drag from anchor point through direction">Ray</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="seg" title="Line Segment (2) — Click or drag endpoints">Seg</button>
+            </div>
+            <div class="dock-btn-group dock-acts-row">
+              <button class="dock-tool real-dock-tool" data-real-tool="arc" title="Circular Arc — Click or drag radius on the plane">Arc</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="circle" title="Closed Circle (3) — Click or drag radius">Circle</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="rect" title="Closed Rectangle (4) — Click or drag corners">Rect</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="polygon" title="Polygon (5) — Click vertices, double-click to finish">Poly</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="point" title="Point — Click anywhere on the plane to drop a point">Point</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="text" title="Text Box — Click anywhere on the plane to drop a draggable note">Text</button>
+            </div>
+            <div class="dock-btn-group dock-acts-row">
+              <button class="dock-act" id="btn-real-close-shape" title="Toggle selected shape open/closed">Close</button>
+              <button class="dock-act" id="btn-real-undo-shape" title="Undo drawn shape edit">Undo</button>
+              <button class="dock-act danger" id="btn-real-clear-shapes" title="Clear unlocked drawn shapes">Clear</button>
+            </div>
+            <div class="dock-btn-group dock-acts-row hidden" id="real-poly-dock">
+              <button class="dock-tool real-dock-tool" data-real-tool="select" title="Select / Box-Select cells (V) · Ctrl/Shift+Click to deselect · Alt+Drag box-deselect">Select</button>
+              <button class="dock-tool real-dock-tool deselect-tool" data-real-tool="deselect" title="Click or drag-paint to deselect cells (D)">Deselect</button>
+              <button class="dock-tool real-dock-tool" data-real-tool="add" title="Click or drag-paint to add square cells (A)">+ Cell</button>
+              <button class="dock-act" id="btn-real-select-all" title="Select all polygons (Ctrl+A)">All</button>
+              <button class="dock-act danger" id="btn-real-del-polys" title="Delete selected polygons (Delete / Backspace)">Delete</button>
+              <button class="dock-act" id="btn-real-undo-polys" title="Undo polygon edit (Ctrl+Z)">Undo</button>
+              <button class="dock-act" id="btn-real-fill-grid" title="Fill entire [-R, R]×[-R, R] play area with square polygons">Fill [-R,R]&sup2;</button>
+              <button class="dock-act danger" id="btn-real-clear-polys" title="Clear all polygons">Clear</button>
+            </div>
           </div>
         </div>
       </aside>
@@ -307,24 +325,34 @@
           <!-- Complex Stage: Resizable Dual Synchronized Planes -->
           <div id="stage-complex" class="planes-container">
             <div class="plane-card" id="input-plane-card">
-              <div class="plane-hud top-left">
-                <span class="plane-tag input-tag" id="input-tag">INPUT PLANE</span>
-                <span class="plane-sub" id="input-sub">z = x + iy</span>
-              </div>
-              <div class="plane-hud top-right">
-                <button class="hud-btn square-btn active" id="in-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
-                <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
-                  <button class="hud-btn axis-btn" id="in-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
-                  <button class="hud-btn axis-btn" id="in-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
-                </span>
-                <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
-                  <button class="hud-btn axis-btn" id="in-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
-                  <button class="hud-btn axis-btn" id="in-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
-                </span>
-                <button class="hud-btn" id="in-zoom-in" title="Zoom in">+</button>
-                <button class="hud-btn" id="in-zoom-out" title="Zoom out">&minus;</button>
-                <button class="hud-btn" id="in-reset" title="Reset view">Reset</button>
-                <button class="hud-btn panel-hide-btn" id="btn-hide-input" title="Hide Input Plane (Output fills remaining space)">&times;</button>
+              <div class="plane-hud-bar">
+                <div class="plane-hud top-left">
+                  <span class="plane-tag input-tag" id="input-tag">INPUT PLANE</span>
+                  <span class="plane-sub" id="input-sub">z = x + iy</span>
+                </div>
+                <div class="plane-hud top-right">
+                  <select id="in-projection-select" class="hud-select proj-select" title="Input space view (edit elements in Planar ℂ or Polar ℂ)">
+                    <option value="planar">Planar &#8450;</option>
+                    <option value="polar">Polar &#8450;</option>
+                    <option value="mercator">Mercator</option>
+                    <option value="stereographic">Stereographic Disk</option>
+                    <option value="poincare">Poincar&eacute; Disk</option>
+                    <option value="sphere">Riemann Sphere</option>
+                  </select>
+                  <button class="hud-btn square-btn active" id="in-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
+                  <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
+                    <button class="hud-btn axis-btn" id="in-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
+                    <button class="hud-btn axis-btn" id="in-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
+                  </span>
+                  <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
+                    <button class="hud-btn axis-btn" id="in-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
+                    <button class="hud-btn axis-btn" id="in-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
+                  </span>
+                  <button class="hud-btn" id="in-zoom-in" title="Zoom in">+</button>
+                  <button class="hud-btn" id="in-zoom-out" title="Zoom out">&minus;</button>
+                  <button class="hud-btn" id="in-reset" title="Reset view">Reset</button>
+                  <button class="hud-btn panel-hide-btn" id="btn-hide-input" title="Hide Input Plane (Output fills remaining space)">&times;</button>
+                </div>
               </div>
 
               <!-- Multi-Selection & Join Context Pill -->
@@ -344,106 +372,119 @@
             </div>
 
             <div class="plane-card" id="output-plane-card">
-              <div class="plane-hud top-left">
-                <span class="plane-tag output-tag" id="output-tag">OUTPUT PLANE</span>
-                <span class="plane-sub" id="output-sub">w = f(z)</span>
-              </div>
-              <div class="plane-hud top-right">
-                <select id="out-projection-select" class="hud-select proj-select" title="Output space projection (Planar, 3D Riemann Sphere, Stereographic Finite Disk, Poincaré Disk, or Custom P(w))">
-                  <option value="planar">Planar &#8450;</option>
-                  <option value="sphere">3D Sphere</option>
-                  <option value="stereographic">Stereographic Disk</option>
-                  <option value="poincare">Poincar&eacute; Disk</option>
-                  <option value="custom">Custom P(w)</option>
-                </select>
-                <button class="hud-btn sphere-btn hidden" id="btn-toggle-sphere" title="Toggle 3D Riemann Sphere">3D Sphere</button>
-                <button class="hud-btn square-btn active" id="out-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
-                <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
-                  <button class="hud-btn axis-btn" id="out-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
-                  <button class="hud-btn axis-btn" id="out-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
-                </span>
-                <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
-                  <button class="hud-btn axis-btn" id="out-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
-                  <button class="hud-btn axis-btn" id="out-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
-                </span>
-                <button class="hud-btn accent-btn" id="out-autofit" title="Auto-fit output">Fit</button>
-                <button class="hud-btn" id="out-zoom-in" title="Zoom in">+</button>
-                <button class="hud-btn" id="out-zoom-out" title="Zoom out">&minus;</button>
-                <button class="hud-btn" id="out-reset" title="Reset output view">Reset</button>
-                <button class="hud-btn panel-hide-btn" id="btn-hide-output" title="Hide Output Plane (Input fills remaining space)">&times;</button>
-              </div>
-
-              <!-- Custom Arbitrary Projection Bar (visible when Custom P(w) projection is active) -->
-              <div class="custom-proj-bar hidden" id="custom-proj-bar">
-                <span class="custom-proj-lbl">P(w) =</span>
-                <input type="text" id="custom-proj-input" class="custom-proj-input" spellcheck="false" value="(w - i) / (w + i)" placeholder="e.g. (w - i)/(w + i), log(w), w/(1+r), tanh(r)*w/r" />
-                <div class="custom-proj-chips">
-                  <button type="button" class="proj-chip" data-proj-expr="(w - i) / (w + i)" title="Cayley map: upper half-plane -> unit disk">Cayley</button>
-                  <button type="button" class="proj-chip" data-proj-expr="w / (1 + r)" title="Radial disk compactification">Disk</button>
-                  <button type="button" class="proj-chip" data-proj-expr="log(w)" title="Log-polar / Mercator projection">Log-Polar</button>
-                  <button type="button" class="proj-chip" data-proj-expr="1 / w" title="Complex inversion around infinity">1/w</button>
+              <div class="plane-hud-bar">
+                <div class="plane-hud top-left">
+                  <span class="plane-tag output-tag" id="output-tag">OUTPUT PLANE</span>
+                  <span class="plane-sub" id="output-sub">w = f(z)</span>
                 </div>
-                <span id="custom-proj-err" class="custom-proj-err hidden"></span>
+                <div class="plane-hud top-right">
+                  <button class="hud-btn contour-toggle-btn" id="btn-toggle-contour" title="Toggle Contour Integration Mode (∮ f(z) dz &amp; Cauchy Residues) — saved per preset &amp; project">&oint; Contour</button>
+                  <select id="out-projection-select" class="hud-select proj-select" title="Output space projection">
+                    <option value="planar">Planar &#8450;</option>
+                    <option value="polar">Polar &#8450;</option>
+                    <option value="mercator">Mercator</option>
+                    <option value="stereographic">Stereographic Disk</option>
+                    <option value="poincare">Poincar&eacute; Disk</option>
+                    <option value="sphere">Riemann Sphere</option>
+                  </select>
+                  <button class="hud-btn sphere-btn hidden" id="btn-toggle-sphere" title="Toggle Riemann Sphere">Riemann Sphere</button>
+                  <button class="hud-btn square-btn active" id="out-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
+                  <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
+                    <button class="hud-btn axis-btn" id="out-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
+                    <button class="hud-btn axis-btn" id="out-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
+                  </span>
+                  <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
+                    <button class="hud-btn axis-btn" id="out-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
+                    <button class="hud-btn axis-btn" id="out-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
+                  </span>
+                  <button class="hud-btn accent-btn" id="out-autofit" title="Auto-fit output">Fit</button>
+                  <button class="hud-btn" id="out-zoom-in" title="Zoom in">+</button>
+                  <button class="hud-btn" id="out-zoom-out" title="Zoom out">&minus;</button>
+                  <button class="hud-btn" id="out-reset" title="Reset output view">Reset</button>
+                  <button class="hud-btn panel-hide-btn" id="btn-hide-output" title="Hide Output Plane (Input fills remaining space)">&times;</button>
+                </div>
               </div>
 
-              <!-- Multi-Contour Integral Results Panel (draggable & minimizable; points & landmark lines ignored!) -->
+              <!-- Multi-Contour Integral Results Panel (clean, intuitive, draggable, resizable & minimizable) -->
               <div class="integral-panel hidden" id="integral-panel">
                 <div class="integral-panel-hdr" id="integral-panel-hdr" title="Drag to move panel">
                   <span class="integral-hdr-left">
                     <span class="integral-drag-grip" aria-hidden="true">&#8942;&#8942;</span>
-                    <span>Contour Integrals</span>
+                    <span class="integral-hdr-title">&oint; Contour Integration</span>
                     <span class="integral-min-sum hidden" id="integral-min-sum"></span>
                   </span>
                   <span class="integral-hdr-right">
-                    <span class="integral-panel-sub">Points &amp; guides ignored &middot; C11 GL</span>
                     <button class="integral-min-btn" id="btn-min-integral" title="Minimize / expand panel">&minus;</button>
+                    <button class="integral-min-btn integral-close-btn" id="btn-close-integral" title="Exit Contour Integration mode">&times;</button>
                   </span>
                 </div>
-                <div id="integral-rows" class="integral-rows"></div>
-                <div id="integral-sum-row" class="integral-sum-row hidden">
-                  <span>Sum of contours</span>
-                  <strong id="integral-sum-val">—</strong>
+                <div id="integral-summary-bar" class="integral-summary-bar hidden">
+                  <div class="integral-summary-cell">
+                    <span class="integral-metric-lbl" id="integral-sum-label">Total &int; f(z) dz</span>
+                    <strong class="integral-summary-val" id="integral-sum-val">—</strong>
+                  </div>
+                  <div class="integral-summary-cell" id="integral-res-cell">
+                    <span class="integral-metric-lbl">Net Residue (&divide; 2&pi;i)</span>
+                    <strong class="integral-summary-res" id="integral-sum-res">—</strong>
+                  </div>
                 </div>
-                <div class="integral-resize-handle" id="integral-resize-handle" title="Drag to resize Contour Integrals box"></div>
+                <div id="integral-rows" class="integral-rows"></div>
+                <div id="integral-sum-row" class="integral-sum-row hidden"></div>
+                <div class="integral-resize-handle" id="integral-resize-handle" title="Drag to resize Contour Integration window"></div>
               </div>
 
               <canvas id="canvas-out"></canvas>
             </div>
           </div>
 
-          <!-- 2D Real Stage -->
+          <!-- Real Stage -->
           <div id="stage-real" class="real-stage hidden">
             <div class="plane-card real-card" id="real-plane-card">
-              <div class="plane-hud top-left">
-                <span class="plane-tag real-tag">2D REAL PLANE</span>
-                <span class="plane-sub" id="real-plane-sub">y = f(x)</span>
-              </div>
-              <div class="plane-hud top-right">
-                <button class="hud-btn square-btn active" id="real-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
-                <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
-                  <button class="hud-btn axis-btn" id="real-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
-                  <button class="hud-btn axis-btn" id="real-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
-                </span>
-                <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
-                  <button class="hud-btn axis-btn" id="real-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
-                  <button class="hud-btn axis-btn" id="real-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
-                </span>
-                <button class="hud-btn accent-btn" id="real-fit-y" title="Auto-fit Y range">Fit Y</button>
-                <button class="hud-btn" id="real-zoom-in" title="Zoom in">+</button>
-                <button class="hud-btn" id="real-zoom-out" title="Zoom out">&minus;</button>
-                <button class="hud-btn" id="real-reset" title="Reset 2D view">Reset</button>
-                <button class="hud-btn panel-hide-btn" id="btn-hide-real" title="Hide 2D Real Plane (Sidebar fills space)">&times;</button>
+              <div class="plane-hud-bar">
+                <div class="plane-hud top-left">
+                  <span class="plane-tag real-tag">REAL PLANE</span>
+                  <span class="plane-sub" id="real-plane-sub">y = f(x)</span>
+                </div>
+                <div class="plane-hud top-right">
+                  <select id="real-coord-select" class="hud-select proj-select" title="Real plane coordinate grid system">
+                    <option value="cartesian">Cartesian (x, y)</option>
+                    <option value="polar">Polar Grid (r, &theta;)</option>
+                    <option value="logx">Log-X Grid</option>
+                    <option value="loglog">Log-Log Grid</option>
+                  </select>
+                  <button class="hud-btn square-btn active" id="real-square" title="1:1 equal axes (click to toggle normal 1:1 scaling; Shift+Scroll scales X, Ctrl+Scroll scales Y)">1:1</button>
+                  <span class="hud-axis-grp" title="Scale X axis independently (or Shift+Scroll)">
+                    <button class="hud-btn axis-btn" id="real-zoom-x-in" title="Stretch X axis (zoom in X)">X+</button>
+                    <button class="hud-btn axis-btn" id="real-zoom-x-out" title="Compress X axis (zoom out X)">X&minus;</button>
+                  </span>
+                  <span class="hud-axis-grp" title="Scale Y axis independently (or Ctrl+Scroll)">
+                    <button class="hud-btn axis-btn" id="real-zoom-y-in" title="Stretch Y axis (zoom in Y)">Y+</button>
+                    <button class="hud-btn axis-btn" id="real-zoom-y-out" title="Compress Y axis (zoom out Y)">Y&minus;</button>
+                  </span>
+                  <button class="hud-btn accent-btn" id="real-fit-y" title="Auto-fit Y range">Fit Y</button>
+                  <button class="hud-btn" id="real-zoom-in" title="Zoom in">+</button>
+                  <button class="hud-btn" id="real-zoom-out" title="Zoom out">&minus;</button>
+                  <button class="hud-btn" id="real-reset" title="Reset Real view">Reset</button>
+                  <button class="hud-btn panel-hide-btn" id="btn-hide-real" title="Hide Real Plane (Sidebar fills space)">&times;</button>
+                </div>
               </div>
 
               <div class="real-legend-card" id="real-legend-card">
-                <div class="real-legend-header">
-                  <span>Curves &amp; Relations</span>
-                  <span class="real-legend-x" id="real-legend-x">Hover graph</span>
+                <div class="real-legend-header" id="real-legend-hdr" title="Drag to move panel">
+                  <span class="real-legend-hdr-left">
+                    <span class="integral-drag-grip" aria-hidden="true">&#8942;&#8942;</span>
+                    <span>Curves &amp; Relations</span>
+                  </span>
+                  <span class="real-legend-hdr-right">
+                    <span class="real-legend-x" id="real-legend-x">Hover graph</span>
+                    <button class="integral-min-btn" id="btn-min-real-legend" title="Minimize / expand panel">&minus;</button>
+                  </span>
                 </div>
                 <div class="real-legend-rows" id="real-legend-rows"></div>
+                <div class="integral-resize-handle" id="real-legend-resize-handle" title="Drag to resize Curves &amp; Relations panel"></div>
               </div>
 
-              <!-- 2D Real Polygon Selection Pill -->
+              <!-- Real Mode Polygon Selection Pill -->
               <div class="selection-banner hidden" id="real-selection-banner">
                 <span class="sel-banner-text" id="real-sel-banner-text">0 selected</span>
                 <button class="sel-banner-btn" id="btn-real-sel-invert" title="Invert selection">Invert</button>
@@ -480,9 +521,31 @@
         <button id="btn-show-sidebar" class="panel-restore-pill hidden" title="Show Full Sidebar">+ Sidebar</button>
         <button id="btn-show-input" class="panel-restore-pill hidden" title="Show Input Plane">+ Input</button>
         <button id="btn-show-output" class="panel-restore-pill hidden" title="Show Output Plane">+ Output</button>
-        <button id="btn-show-real" class="panel-restore-pill hidden" title="Show 2D Real Plane">+ 2D Plane</button>
+        <button id="btn-show-real" class="panel-restore-pill hidden" title="Show Real Plane">+ Real Plane</button>
       </div>
     </footer>
+
+    <!-- =================================================================
+         SIDE-BY-SIDE FLOATING FUNCTION LIBRARY & SYNTAX GUIDE PANELS
+         Dock cleanly to the right of the sidebar so BOTH can stay open while editing!
+         ================================================================= -->
+    <div id="fn-library-dropdown" class="fn-library-dropdown hidden" role="menu">
+      <div class="fn-lib-head">
+        <span id="fn-lib-title" class="fn-lib-title">Complex Function Library</span>
+        <input type="text" id="fn-lib-search" class="fn-lib-search" placeholder="Search functions..." autocomplete="off" />
+        <button id="btn-close-fn-lib" class="icon-btn" title="Close Function Library">&times;</button>
+      </div>
+      <div class="fn-lib-hint" id="fn-lib-hint">Click a function to insert at your cursor (or add a new card if none focused)</div>
+      <div id="fn-lib-list" class="fn-lib-list"></div>
+    </div>
+
+    <div id="fn-syntax-guide" class="fn-guide-popover hidden" role="dialog" aria-label="C11 Syntax &amp; Feature Guide">
+      <div class="fn-lib-head">
+        <span id="fn-guide-title" class="fn-lib-title">C11 Studio Guide</span>
+        <button id="btn-close-fn-guide" class="icon-btn" title="Close Guide">&times;</button>
+      </div>
+      <div id="fn-guide-body" class="fn-guide-body"></div>
+    </div>
 
     <!-- =================================================================
          ITEM SETTINGS POPOVER (Color, Size/Width, Style/Icon, Lock, Closed)
@@ -507,8 +570,10 @@
       <div id="tools-complex-body" class="tools-body">
         <div class="tools-section">
           <div class="tools-sec-label">Display Overlays &amp; Color Field</div>
+          <label class="toggle-row"><span>Contour Integration Mode (&oint; f(z) dz)</span><input type="checkbox" id="opt-contour-mode" /></label>
           <label class="toggle-row"><span>Interior Conformal Grid</span><input type="checkbox" id="opt-mesh" checked /></label>
           <label class="toggle-row"><span>Domain / Fractal Coloring (C11)</span><input type="checkbox" id="opt-domain" /></label>
+          <label class="toggle-row"><span>Color Output Plane / Riemann Sphere</span><input type="checkbox" id="opt-out-domain" /></label>
           <div class="tools-subrow">
             <label class="mini-field">
               <span>Color Scheme</span>
@@ -588,6 +653,31 @@
     </div>
 
     <!-- =================================================================
+         EDIT PROJECT NAME & DESCRIPTION MODAL
+         ================================================================= -->
+    <div id="edit-project-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog unsaved-dialog">
+        <div class="modal-header">
+          <div>
+            <h2>Edit Project Details</h2>
+            <span class="modal-sub" id="edit-project-sub">Update the project's name and optional description.</span>
+          </div>
+          <button id="btn-close-edit-project" class="icon-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label class="unsaved-field-label" for="edit-project-name">Project Name</label>
+          <input type="text" id="edit-project-name" class="modal-input" placeholder="Project name..." maxlength="48" />
+          <label class="unsaved-field-label" for="edit-project-desc">Description</label>
+          <textarea id="edit-project-desc" class="modal-input save-desc-input" rows="3" maxlength="500" placeholder="Optional project description or math notes..."></textarea>
+          <div class="btn-row unsaved-actions">
+            <button id="btn-confirm-edit-project" class="btn-primary flex-1">Save Changes</button>
+            <button id="btn-cancel-edit-project" class="btn-subtle">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================
          DELETE PROJECT CONFIRMATION MODAL
          ================================================================= -->
     <div id="delete-project-modal" class="modal-backdrop hidden">
@@ -624,6 +714,8 @@
         <div class="modal-body">
           <label class="unsaved-field-label" for="unsaved-preset-name">Project Name (optional if discarding)</label>
           <input type="text" id="unsaved-preset-name" class="modal-input" placeholder="e.g. My Custom Project" maxlength="48" />
+          <label class="unsaved-field-label" for="unsaved-project-desc">Description (optional)</label>
+          <textarea id="unsaved-project-desc" class="modal-input save-desc-input" rows="2" maxlength="500" placeholder="Optional project description or math notes..."></textarea>
           <div class="btn-row unsaved-actions">
             <button id="btn-unsaved-save" class="btn-primary flex-1">Save Project &amp; Continue</button>
             <button id="btn-unsaved-discard" class="btn-danger flex-1">Discard &amp; Continue</button>
@@ -658,7 +750,7 @@
           <p class="modal-note" id="prompt-mode-note">
             Describe the project you want. Copy the prompt into ChatGPT / Claude / Gemini — it instructs the AI to output a complete <strong>Full Project JSON (<code>cfv_project_v1</code>)</strong> encoding all C11 cards, sliders, computed variables, shapes/cells, viewports, and presets. Paste the returned JSON into <strong>Project Import &amp; Export JSON</strong>!
           </p>
-          <input type="text" id="prompt-goal" class="modal-input" placeholder="e.g. Build a keyhole contour project with 3 presets, or a 2D Real epicycle/cellular automaton centered at (0,0)..." />
+          <input type="text" id="prompt-goal" class="modal-input" placeholder="e.g. Build a keyhole contour project with 3 presets, or a Real epicycle/cellular automaton centered at (0,0)..." />
           <div class="prompt-opts-row">
             <label class="prompt-opt-chip"><input type="checkbox" id="prompt-opt-context" checked /><span>Include current workspace state</span></label>
             <label class="prompt-opt-chip"><input type="checkbox" id="prompt-opt-sliders" checked /><span>Include sliders, vars &amp; presets</span></label>
@@ -688,7 +780,7 @@
               <button id="btn-download-terminal-json" class="doc-mini-btn" title="Download terminal JSON as a .json project file">Download .json</button>
               <button id="btn-load-sample-bundle" class="doc-mini-btn">Sample: Current</button>
               <button id="btn-load-sample-integral" class="doc-mini-btn">Sample: Integral</button>
-              <button id="btn-load-sample-real" class="doc-mini-btn">Sample: 2D Real</button>
+              <button id="btn-load-sample-real" class="doc-mini-btn">Sample: Real</button>
             </div>
             <textarea id="ai-terminal-input" class="ai-terminal-input" spellcheck="false" rows="11" placeholder="$ Paste Full Project JSON (cfv_project_v1), GenAI response, or click '⤓ Load Current Project JSON' to export..."></textarea>
             <div id="ai-terminal-preview" class="ai-preview-strip">Paste a Full Project JSON or click ⤓ Load Current Project JSON above for instant validation &amp; breakdown.</div>
@@ -720,13 +812,13 @@
     </div>
   </div>
 
-  <script src="/sphere3d.js?v=31"></script>
-  <script src="/projections.js?v=31"></script>
-  <script src="/function_library.js?v=31"></script>
-  <script src="/examples.js?v=31"></script>
-  <script src="/docs_prompt.js?v=31"></script>
-  <script src="/canvas_complex.js?v=31"></script>
-  <script src="/canvas_real.js?v=31"></script>
-  <script src="/workspace.js?v=31"></script>
+  <script src="/sphere3d.js?v=43"></script>
+  <script src="/projections.js?v=43"></script>
+  <script src="/function_library.js?v=43"></script>
+  <script src="/examples.js?v=43"></script>
+  <script src="/docs_prompt.js?v=43"></script>
+  <script src="/canvas_complex.js?v=43"></script>
+  <script src="/canvas_real.js?v=43"></script>
+  <script src="/workspace.js?v=43"></script>
 </body>
 </html>

@@ -476,7 +476,7 @@
     {
       title: "Blaschke Product (Multi-Line C11 Loop)",
       badge: "Map · Multi-Line C",
-      desc: "Maps the unit disk onto itself with a configurable number of interior zeros via a native C11 product loop. Try toggling 3D Sphere on the output!",
+      desc: "Maps the unit disk onto itself with a configurable number of interior zeros via a native C11 product loop. Try toggling Riemann Sphere on the output!",
       bundle: {
         mode: "map",
         cards: [
@@ -555,21 +555,22 @@
   ];
 
   const STUDIO_SHORTCUTS = [
-    ["1 – 5", "Draw / Line / Circle / Rect / Polygon (endpoints magnetically snap!)"],
+    ["1 – 5", "Draw / Line / Circle / Rect / Polygon (available in BOTH Complex & 2D Real modes!)"],
     ["V  or  Alt+Drag", "Select, Move, Resize & Rotate unlocked shapes / points"],
     ["Ctrl/Shift + Click", "Toggle-select or DESELECT individual shapes, points, or 2D Real cell polygons"],
     ["Drag Box / Alt+Drag Box", "Marquee select (blue) or Alt+Drag marquee DESELECT (rose) multiple items"],
     ["Rotate Handle (+Shift)", "Drag circular grip above selection to rotate (Shift snaps every 15°)"],
-    ["Ctrl + A  /  Escape", "Select all unlocked items / Clear selection"],
-    ["Ctrl + Z", "Undo last edit (Join, Move, Resize, Rotate, Delete, Polygon edits)"],
+    ["Ctrl + A  /  Escape", "Select all unlocked items / Clear selection or close popovers"],
+    ["Ctrl + Z", "Undo last edit (Join, Move, Resize, Rotate, Delete, 2D Real Shapes & Polygon edits)"],
     ["Delete / Backspace", "Delete all currently selected unlocked shapes, points, or cell polygons"],
     ["Join (Dock or Sidebar)", "Weld selected or touching open paths into one continuous contour / loop"],
-    ["Space  or  Right-Drag", "Pan plane"],
-    ["Scroll Wheel", "Zoom plane (Shift/Alt+Scroll stretches X/Y when 1:1 is unlocked) or 3D Sphere"],
+    ["Space  or  Right-Drag", "Pan plane (Right-click any element on any 2D graph for Color/Opacity/Width/Layer menu)"],
+    ["Scroll Wheel", "Zoom plane (Shift+Scroll = X-axis, Ctrl+Scroll = Y-axis) or Riemann Sphere"],
     ["Ctrl + Enter", "Compile all C11 cards natively with clang"],
+    ["Ctrl + S", "Save current custom project in-place"],
     ["P", "Play / Pause animated contour tracer"],
     ["Double-Click Splitter", "Reset sidebar width or Input/Output split"],
-    ["Shift + Click Dot", "Open item color / width / icon / lock settings"],
+    ["Shift + Click Dot", "Open item color / opacity (0–100% solid) / width (down to 0) / icon / lock settings"],
   ];
 
   function buildGenAIPrompt(mode, userRequest, sliders, opts = {}) {
@@ -598,352 +599,88 @@
     }
 
     const compilerSpec = isReal
-      ? `=== 1. NATIVE C11 COMPILATION & EXECUTION ENVIRONMENT (2D REAL MODE) ===
-- Your card code is wrapped into a shared library and compiled with:
-  \`clang -O1 -shared -fPIC -Wall -Wextra -Werror -Wpedantic -lm\`
-  Because \`-Werror\` is enabled, ANY compiler warning (unused local variables, missing return path, implicit type mismatch, GNU extensions) FAILS compilation!
-- Capacity limits:
-  - Up to **24 function cards** (\`f1\`..\`f24\`), mutually forward-declared so ANY card can call \`f1(x)\`, \`f2(x)\`, etc.
-  - Up to **8 total parameters** combined across \`"sliders"\` + \`"vars"\` (\`sliders.length + vars.length <= 8\`). Every slider and variable is injected as a \`double\` C variable in scope inside every card!
-- Multi-card plotting rule:
-  - In **2D Real mode**, **ALL** cards with \`"visible": true\` are graphed simultaneously!
-  - Curves do **NOT** need to be functions \`y = f(x)\`! The studio parser automatically detects 6 native card syntaxes:
-    1. **Multi-Line Parametric Curve** (BEST for cursive names, drawings, loops, piecewise paths, numerical integrals like Cornu spirals):
-       \`parametric [t0, t1]:\`
-       followed by C11 statements that compute \`double px, py;\` from \`double t\` (sampled at 1,200 points across 4 POSIX pthreads!).
-       - \`px\` and \`py\` are pre-declared as \`NAN\`; assign \`px = ...; py = ...;\`.
-       - Set \`px = NAN; py = NAN;\` ONLY to lift the pen between disconnected strokes.
-       - \`t0\` and \`t1\` accept numbers or simple expressions with \`M_PI\` / \`pi\` (e.g. \`[0, 2*M_PI]\`, \`[-4.5, 4.5]\`).
-       - NOTE: In parametric cards, \`double t\` is the curve parameter, so do NOT also name a slider \`t\` if you use a parametric card!
-    2. **Single-Line Parametric Curve**:
-       \`(x_expr(t), y_expr(t)) for t in [t0, t1]\`
-       Example: \`(0.22*(16.0*pow(sin(t),3)), 0.22*(13.0*cos(t)-5.0*cos(2*t)-2.0*cos(3*t)-cos(4*t))) for t in [0, 2*M_PI]\`
-    3. **Implicit Relation \`LHS = RHS\`** (4-thread Marching Squares tracing \`LHS - RHS = 0\`):
-       Examples: \`x*x + y*y = r*r\`, \`y*y = x*x*x + a*x + b\`, \`sin(x*y) = 0.5\`.
-       Must reference BOTH \`x\` and \`y\` and contain a single \`=\` (not \`==\`).
-    4. **Vertical Line \`x = expr\`**:
-       Examples: \`x = 5.0\`, \`x = r\`, \`x = -R\`, \`x = M_PI\`. Right-hand side must not depend on \`x\` or \`y\`.
-    5. **Inverted Curve \`x = g(y)\`**:
-       Example: \`x = sin(y) * 2.0\`. Sampled smoothly along visible \`[ymin, ymax]\`.
-    6. **Standard Function \`y = f(x)\` or bare C11 expression / multi-line C11 body**:
-       Input is \`double x\`. Return \`double\` (return \`NAN\` outside the valid domain for clean breaks/asymptotes).
-       If the card contains \`;\`, \`{\`, or \`return\`, it is compiled as a full C11 function body (loops, local variables, conditionals all supported!).
-       Single-expression cards are wrapped as \`return (<expr>);\`.
-- Built-in C11 Real & Number Theory API (already \`#include\`d & linked):
-  - Prime counting & explicit formulas (0 ≤ K ≤ 200):
-    - \`double real_pi_exact(double x)\` — exact step function π(x) up to x = 100,000
-    - \`double real_pi_explicit(double x, int K)\` — Riemann's 1859 explicit formula using first K zeros
-    - \`double real_li(double x)\` — logarithmic integral li(x) = Ei(ln x) for x > 1 (\`NAN\` for x ≤ 1)
-    - \`double real_J_exact(double x)\`, \`double real_J_explicit(double x, int K)\`
-    - \`double real_psi_exact(double x)\`, \`double real_psi_explicit(double x, int K)\`
-    - \`double real_zero_wave(double x, int idx)\` (0 ≤ idx < 200), \`RIEMANN_ZEROS[200]\`, \`RIEMANN_ZERO_COUNT\` (200)
-  - Analytic & special functions:
-    - \`double c_hardy_z(double t)\` — Hardy's real critical-line function Z(t)
-  - Interactive Centered [-R, R]² Grid & Conway's Game of Life C11 API (populated live from 2D Real selectable/deselectable/deletable cell polygons or \`"seedCells"\`):
-    - Single radius variable \`R\` (\`"vars": [{ "name": "R", "expr": "32", "label": "Boundary radius [-R, R] from (0,0)" }]\`) sets how many blocks out from \`(0, 0)\` in each direction (\`-x, +x, -y, +y\`) the play area extends (\`[-R, R] × [-R, R]\`, \`4 <= R <= 60\`, up to \`120 × 120 = 14,400\` cells).
-    - \`int real_life_cell_at(int R, int gen, int cell_idx, int *out_gx, int *out_gy)\` — Simulates Conway's Game of Life (B3/S23) on \`[-R, R-1]²\` from the user's live cell polygons (\`"seedCells": [[gx, gy], ...]\`), cached per \`(R, gen)\` in O(1)! Returns total alive cells at generation \`gen\` and writes the \`cell_idx\`-th alive cell's signed coordinates \`(gx, gy)\` into \`*out_gx, *out_gy\`.
-    - \`uint64_t real_seed_row(int r)\` (0 ≤ r < 64) & \`int real_seed_count(void)\` — legacy bitmask & total seed count.
-  - Global Viewport Variables (readable directly in C11 cards & formulas, and dynamically writable via \`"vars"\` or \`"sliders"\`!):
-    - \`sphere_yaw\`, \`sphere_pitch\`, \`sphere_zoom\` (3D Riemann Sphere camera — animates at 60 FPS with zero server calls!)
-    - \`in_cx\`, \`in_cy\`, \`in_r\`, \`out_cx\`, \`out_cy\`, \`out_r\` (Complex Input/Output plane bounds)
-    - \`real_xmin\`, \`real_xmax\`, \`real_ymin\`, \`real_ymax\` (2D Real viewport bounds)
-    - \`double c_e1_real(double x)\` — exponential integral E₁(x) for x > 0
-    - Complex helpers usable via \`creal(...)\` / \`cabs(...)\`: \`c_zeta(s)\`, \`c_xi(s)\`, \`c_eta(s)\`, \`c_gamma(z)\`, \`c_make(re, im)\`
-  - Standard \`<math.h>\`: \`sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh, exp, log, log10, pow, sqrt, cbrt, fabs, floor, ceil, fmod, M_PI, M_E, NAN, INFINITY\`.`
-      : `=== 1. NATIVE C11 COMPILATION & EXECUTION ENVIRONMENT (${mode === "integral" ? "CONTOUR INTEGRAL" : "COMPLEX MAP"} MODE) ===
-- Your card code is wrapped into a shared library and compiled with:
-  \`clang -O1 -shared -fPIC -Wall -Wextra -Werror -Wpedantic -lm\`
-  Because \`-Werror\` and \`-Wpedantic\` are enabled, ANY warning or non-ISO extension (unused local variables, missing return path, \`1.0i\`, \`I\`, \`_Complex_I\`) FAILS compilation!
-- Exact C wrapper signature for card #k:
-  \`static double complex fK(double complex z, const double *P)\`
-  - Alias \`double complex s = z;\` is automatically defined (both \`z\` and \`s\` work seamlessly!).
-  - Every slider and computed variable is injected as a \`double\` local variable of the exact same name.
-  - Up to **24 function cards** (\`f1\`..\`f24\`), mutually forward-declared so ANY card can call \`f1(z)\`, \`f2(z)\`, etc.
-  - Up to **16 total parameters** combined across \`"sliders"\` + \`"vars"\` (\`sliders.length + vars.length <= 16\`).
-  - If a card contains \`;\`, \`{\`, or \`return\`, it is compiled as a full multi-line C11 function body (loops, conditionals, finite differences, local variables); otherwise it is wrapped as \`return (<expr>);\`.
-- STRICT SINGLE-ACTIVE-FUNCTION ARCHITECTURE:
-  - In Complex Map & Contour Integral modes, you may create multiple **auxiliary helper cards** (\`f1(z)\`, \`f2(z)\`, …) with \`"active": false\`.
-  - **EXACTLY ONE** card MUST have \`"active": true\` — that card is the sole graphed function \`w = f(z)\` (in Map mode) or integrand \`f(z)\` (in Integral mode)!
-- ${mode === "integral"
-  ? `CONTOUR INTEGRAL EVALUATION ENGINE:
-  - Every visible domain shape in \`"shapes"\` (whether \`"closed": false\` open piece or \`"closed": true\` closed loop) is evaluated independently via adaptive native C11 **16-point Gauss-Legendre quadrature** along its piecewise segments.
-  - The Output Plane plots the cumulative integral path \`I(τ) = ∫₀^τ f(γ(u)) γ'(u) du\` starting from 0, lists every contour's individual value \`∫ f(z) dz\` (and \`÷ 2πi\` for closed loops), AND displays the **Sum of contours** \`Σ_k ∫_{γ_k} f(z) dz\`.
-  - \`"points"\` and \`"lines"\` are strictly visual landmarks and are **NEVER** integrated.`
-  : `COMPLEX MAP & 3D RIEMANN SPHERE EVALUATION ENGINE:
-  - Every visible domain shape in \`"shapes"\` maps its boundary (and interior conformal grid for closed shapes) via \`w = f(z)\` onto the Output Plane AND onto the interactive **3D Riemann Sphere** (\`"showSphere": true\`).
-  - Closed shapes enclosing a pole automatically detect orientation inversion and shade the **unbounded exterior** in output space!
-  - **Unlocked vs Locked Points (\`"points"\`)**:
-    - Unlocked points (\`"locked": false\`) are mapped through \`w = f(z)\` and rendered **WITH their text labels** on both the 2D Output Plane and the 3D Riemann Sphere (ideal for labeling cities, landmarks, or test points on the sphere!).
-    - Locked landmarks (\`"locked": true\` in \`"points"\` / \`"lines"\` / \`"shapes"\`) live in the Landmarks tab and stay strictly on the Input Plane (hidden from Output).`}
-- Built-in C11 Analytic Functions (already \`#include\`d & linked):
-  - \`double complex c_make(double re, double im)\` — REQUIRED ISO C11 complex constructor (NEVER use \`1.0i\` or \`I\`!)
-  - \`bool c_isfinite(double complex w)\` — checks both \`isfinite(creal(w))\` and \`isfinite(cimag(w))\`
-  - \`c_zeta(s)\` — full analytic continuation of Riemann ζ(s) across ℂ \\ {1} (~15-digit accuracy; simple pole at s = 1 with Res = 1)
-  - \`c_xi(s)\` — entire completed zeta ξ(s) = ½ s(s−1) π^(−s/2) Γ(s/2) ζ(s)
-  - \`c_eta(s)\` — entire Dirichlet eta η(s) = (1 − 2^(1−s)) ζ(s)
-  - \`c_zeta_deriv(s)\` — ζ'(s) (4th-order central difference)
-  - \`c_zeta_log_deriv(s)\` — ζ'(s)/ζ(s) (Argument Principle zero/pole counter: \`(1/2πi) ∮ = Z − P\`)
-  - \`c_zeta_partial(s, int N)\` — truncated Dirichlet partial sum Σ_{n=1}^N n^(−s)
-  - \`c_gamma(z)\`, \`c_lgamma(z)\` — Euler Gamma Γ(z) (poles at 0, −1, −2, … with Res = (−1)^n/n!) and principal ln Γ(z)
-  - \`c_ei(z)\`, \`c_e1_real(x)\`, \`c_hardy_z(t)\`
-  - **Standard `<stdlib.h>`** is also included (`abs`, `labs`, etc.).
-  - Standard \`<complex.h>\` & \`<math.h>\`: \`cexp, clog, csin, ccos, ctan, csinh, ccosh, ctanh, cpow, csqrt, cabs, carg, creal, cimag, conj, sin, cos, tan, exp, log, pow, sqrt, fabs, M_PI, M_E, NAN, INFINITY\`.`;
+      ? `C11 REAL CARD SYNTAX (clang -Wall -Wextra -Werror -Wpedantic):
+- Input: double x (plus every slider/var as double). Return double (NAN for gaps). Multi-line bodies need ';', '{', or 'return'.
+- Smart formats: y = f(x) | x = c | x = g(y) | LHS = RHS (implicit) | (x(t), y(t)) for t in [a, b] | parametric [a, b]: px = ...; py = ...;
+- Built-ins: real_pi_exact(x), real_pi_explicit(x, K), real_li(x), real_psi_exact(x), real_psi_explicit(x, K), c_hardy_z(t), real_life_cell_at(R, gen, idx, &gx, &gy), <math.h> (sin, cos, exp, log, pow, sqrt, fabs, hypot, fmin, fmax, floor, ceil, M_PI, NAN).`
+      : `C11 COMPLEX CARD SYNTAX (clang -Wall -Wextra -Werror -Wpedantic):
+- Signature: fK(double complex z) (alias s = z; sliders/vars injected as double). Up to 24 cards (f1..f24 callable across cards); EXACTLY ONE card has "active": true.
+- REQUIRED: use c_make(re, im) — NEVER 1.0i or I. Guard poles: if (cabs(d) < 1e-12) return c_make(INFINITY, 0.0);
+- Built-ins: c_make, c_isfinite, c_zeta, c_xi, c_eta, c_zeta_deriv, c_zeta_log_deriv, c_zeta_partial(s, N), c_gamma, c_lgamma, c_ei, <complex.h> & <math.h> (cexp, clog, csin, ccos, cpow, csqrt, cabs, carg, creal, cimag, conj, hypot, M_PI).
+- Branch cut on [0, +∞): use clog(-z) + c_make(0.0, M_PI) instead of clog(z).`;
 
-    const varsAndContoursSpec = `=== 2. SLIDERS (WITH SPEED), COMPUTED VARIABLES ("vars") & VIEWPORT GLOBALS ===
-- Keep interactive parameters and derived quantities cleanly separated (Desmos-style!):
-  - \`"sliders"\`: ONLY independent user-draggable controls:
-    \`{ "name": "t", "label": "Limit (0 -> 1)", "value": 0.35, "min": 0.0, "max": 1.0, "step": 0.01, "speed": 0.5 }\`
-    - Include \`"speed"\` (\`0.1\`, \`0.25\`, \`0.5\`, \`1.0\`, \`2.0\`, or \`4.0\`; default \`0.5\` or \`1.0\`) to set a comfortable playback/scrub animation speed!
-  - \`"vars"\`: Computed variables defined as live math expressions of sliders, earlier vars, or viewport globals:
-    \`{ "name": "R", "expr": "2.2 + 18*t*t", "label": "Outer radius" }\`
-  - **Dynamic Viewport & 3D Camera Control via \`"vars"\`**:
-    - Naming a \`"vars"\` entry after any of the 13 global viewport variables (\`sphere_yaw\`, \`sphere_pitch\`, \`sphere_zoom\`, \`in_cx\`, \`in_cy\`, \`in_r\`, \`out_cx\`, \`out_cy\`, \`out_r\`, \`real_xmin\`, \`real_xmax\`, \`real_ymin\`, \`real_ymax\`) dynamically drives the camera/viewport at 60 FPS without recompiling or re-evaluating C11!
-    - Example: \`{ "name": "sphere_yaw", "expr": "-0.58 + spin", "label": "3D Sphere Longitude (rad)" }\`.
-  - Why \`"vars"\` rocks for Residue Theory: use ONE master slider \`t\` in \`[0, 1]\`, and derive \`R\`, \`r\`, \`eps\` as \`"vars"\` (e.g. \`R = 2.2 + 18*t*t\`, \`r = 0.52*(1 - 0.88*t)\`, \`eps = 0.34*(1 - 0.9*t)\`). Scrubbing \`t\` smoothly sends \`R -> ∞\`, \`r -> 0\`, and \`eps -> 0\` together!
-- Allowed math functions inside \`"vars"\` expressions and shape \`"formula"\` fields:
-  \`pi, e, sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh, exp, log, sqrt, abs, pow, min, max, floor, ceil\` plus any earlier slider/var name.
-- Combined limit: \`sliders.length + vars.length <= 16\`.
-- Reserved names NEVER allowed as slider or var names: \`z, s, x, y, P, slot\` (and avoid \`t\` in 2D Real if using a parametric card, or \`u\` if using a parametric domain shape).${isReal ? `
-
-=== 3. 2D REAL VIEWPORT, 1:1 ORIGIN DEFAULTS & OPTIONAL [-R, R]² SEED CELLS ===
-- **1:1 Origin-Centered Viewport**:
-  - Viewports begin in \`1:1\` square aspect ratio mode (\`"squareAspect": true\`) centered at the origin \`(0, 0)\` (e.g., \`"view": { "xmin": -10, "xmax": 10, "ymin": -10, "ymax": 10 }\`).
-- **Optional \`"seedCells"\` for Cellular Automata / Grid Patterns**:
-  - If your 2D Real project uses \`real_life_cell_at((int)R, (int)G, idx, &gx, &gy)\`, include a variable \`{ "name": "R", "expr": "32", "label": "Boundary radius [-R, R] from (0,0)" }\` and provide \`"seedCells": [[gx0, gy0], [gx1, gy1], ...]\` with signed integer coordinates in \`[-R, R-1]²\` centered around \`(0, 0)\`.` : `
-
-=== 3. VARIABLE DOMAIN SHAPES, MULTI-PIECE CONTOURS & RESIDUE THEORY ===
-- Static shapes in \`"shapes"\`:
-  - \`{ "kind": "circle", "cx": 0, "cy": 0, "r": 1, "label": "...", "color": "#38bdf8", "closed": true }\`
-  - \`{ "kind": "arc", "cx": 0, "cy": 0, "r": 2, "a0": 0, "a1": 3.14159, "label": "...", "closed": false }\`
-  - \`{ "kind": "rect", "x0": -1, "y0": -1, "x1": 1, "y1": 1, "label": "...", "closed": true }\`
-  - \`{ "kind": "line", "x0": -1, "y0": 0, "x1": 1, "y1": 0, "label": "...", "closed": false }\`
-  - \`{ "kind": "polygon" | "freehand", "rawPts": [{"x": 0, "y": 0}, ...], "closed": true | false }\`
-- **Variable-Driven Shapes (\`"formula"\`)** — geometry recomputes live as sliders/vars change! Omit \`rawPts\` when providing \`formula\`:
-  - Arc:        \`"formula": { "kind": "arc", "cx": "0", "cy": "0", "r": "R", "a0": "eps", "a1": "2*pi - eps" }\`
-  - Line:       \`"formula": { "kind": "line", "x0": "r*cos(eps)", "y0": "r*sin(eps)", "x1": "R*cos(eps)", "y1": "R*sin(eps)" }\`
-  - Circle:     \`"formula": { "kind": "circle", "cx": "a", "cy": "0", "r": "R" }\`
-  - Rect:       \`"formula": { "kind": "rect", "x0": "-R", "y0": "0", "x1": "R", "y1": "H" }\`
-  - Parametric: \`"formula": { "kind": "parametric", "xExpr": "R*cos(u)", "yExpr": "R*sin(u)", "u0": "0", "u1": "pi", "closed": false }\`
-- **MULTI-PIECE CONTOUR RULES (Pac-Man / Keyhole, Indented Semicircle, Dogbone, Wedge, Box):**
-  1. Emit each contour piece as its OWN entry in \`"shapes"\` with \`"closed": false\` so every piece shows its own \`∫ f(z) dz\` row on the right AND their sum equals \`2πi Σ Res\`!
-  2. Match adjacent piece endpoints **EXACTLY** using the same variable formulas (e.g., Top Cut ends at \`(R*cos(eps), R*sin(eps))\` and Outer Arc starts at \`a0 = "eps"\` on radius \`R\`), so the pieces form an exact closed contour and the user can also click **Join** to weld them into 1 closed loop!
-  3. Orientation: outer arcs MUST run **CCW** (\`a0 < a1\`, e.g. \`"eps"\` to \`"2*pi - eps"\`), while inner keyhole / pole-indentation arcs MUST run **CW** (\`a0 > a1\`, e.g. \`"2*pi - eps"\` to \`"eps"\`, or \`"pi"\` to \`"0"\`).
-  4. **CRITICAL C11 BRANCH-CUT RULE:** Standard \`clog(z)\` and \`cpow(z, alpha)\` place the branch cut on the **negative real axis \`(-∞, 0]\`** (\`arg(z) ∈ (-π, π]\`).
-     - For a **right-facing Pac-Man / Keyhole contour** with branch cut on **\`[0, +∞)\`** (\`arg(z) ∈ (0, 2π)\`), NEVER call \`clog(z)\` or \`cpow(z, alpha)\` directly!
-     - ALWAYS write: \`clog(-z) + c_make(0.0, M_PI)\` for \`log(z)\`, and \`cexp(alpha * (clog(-z) + c_make(0.0, M_PI)))\` for \`z^alpha\`!
-     - For a general branch cut along ray \`arg(z) = phi\`: \`clog(z * cexp(c_make(0.0, M_PI - phi))) + c_make(0.0, phi - M_PI)\`.
-     - For a finite branch cut on \`[-1, 1]\` (dogbone contour): \`sqrt(z^2 - 1) = cexp(0.5 * (clog(z - 1.0) + clog(z + 1.0)))\` has its branch cuts cancel on \`(-∞, -1)\`, leaving a clean cut ONLY on \`[-1, 1]\`!
-  5. Frame \`inView\` and \`outView\` in \`1:1\` mode (\`"inSquare": true, "outSquare": true\`) centered at \`(0, 0)\` unless a specific offset is needed.`}`;
-
+    const wantContour = mode === "integral" || (!isReal && window.CFVComplex && window.CFVComplex.state && window.CFVComplex.state.contourMode);
     const exampleJson = isReal
       ? `{
   "format": "cfv_project_v1",
-  "name": "Harmonic Star & Implicit Circle Explorer",
-  "subtitle": "Implicit circle, vertical tangent, and parametric epicycle star in 1:1 mode at (0,0)",
+  "name": "Mean Value Theorem Explorer",
+  "subtitle": "Interactive secant, movable tangent & guaranteed parallel tangent",
+  "description": "Demonstrates Lagrange's Mean Value Theorem with live endpoints a, b and probe c.",
   "mode": "real",
+  "folder": "cat_calculus",
   "cards": [
-    { "title": "Circle x^2 + y^2 = r^2", "code": "x*x + y*y = r*r", "color": "#38bdf8", "lineWidth": 2.4, "visible": true },
-    { "title": "Right Vertical Tangent", "code": "x = r", "color": "#fb7185", "lineStyle": "dashed", "visible": true },
-    { "title": "Parametric Star Loop", "code": "(R_star*cos(t) + 0.8*cos(4.0*t), R_star*sin(t) - 0.8*sin(4.0*t)) for t in [0, 2*M_PI]", "color": "#34d399", "visible": true }
+    { "title": "f(x) = x^3/4 - x + 1", "code": "0.25*x*x*x - x + 1.0", "color": "#38bdf8", "visible": true },
+    { "title": "Secant [a, b]", "code": "double fa=0.25*a*a*a-a+1, fb=0.25*b*b*b-b+1; return fa + ((fb-fa)/(b-a))*(x-a);", "color": "#fbbf24", "lineStyle": "dashed", "visible": true }
   ],
   "sliders": [
-    { "name": "r", "label": "Circle radius", "value": 5.0, "min": 1.0, "max": 8.0, "step": 0.1, "speed": 0.5 }
+    { "name": "a", "label": "Left a", "value": -1.5, "min": -2.5, "max": 0.5, "step": 0.05, "speed": 0.4 },
+    { "name": "b", "label": "Right b", "value": 2.5, "min": 0.5, "max": 3.0, "step": 0.05, "speed": 0.4 }
   ],
-  "vars": [
-    { "name": "R_star", "expr": "0.65 * r", "label": "Inner star radius" }
-  ],
-  "points": [
-    { "x": 5.0, "y": 0.0, "label": "Tangent (r, 0)", "icon": "diamond", "color": "#34d399", "size": 5, "locked": false }
-  ],
-  "lines": [
-    { "orientation": "vertical", "value": -5.0, "label": "Guide x = -5", "color": "#fbbf24", "lineStyle": "dashed", "locked": true }
-  ],
-  "viewport": {
-    "view": { "xmin": -10, "xmax": 10, "ymin": -10, "ymax": 10 },
-    "squareAspect": true
-  },
+  "vars": [],
+  "points": [{ "x": -1.5, "y": 1.656, "xExpr": "a", "yExpr": "0.25*a*a*a - a + 1", "label": "a", "icon": "dot", "color": "#fbbf24", "locked": true }],
+  "lines": [{ "orientation": "vertical", "value": -1.5, "valExpr": "a", "label": "x = a", "color": "#fbbf24", "lineStyle": "dotted", "locked": true }],
+  "texts": [{ "title": "Mean Value Theorem", "text": "Drag a and b — locked landmarks move automatically via xExpr/yExpr/valExpr!", "anchor": "bottom-left", "color": "#38bdf8" }],
+  "viewport": { "view": { "xmin": -3.5, "xmax": 3.5, "ymin": -2, "ymax": 3.5 }, "squareAspect": true },
   "presets": [
-    {
-      "id": "default_origin",
-      "name": "1:1 Origin View (r = 5)",
-      "sliderValues": { "r": 5.0 },
-      "visibleFnIndices": [0, 1, 2],
-      "viewport": { "view": { "xmin": -10, "xmax": 10, "ymin": -10, "ymax": 10 }, "squareAspect": true }
-    },
-    {
-      "id": "animate_radius",
-      "name": "Animate Radius Sweep",
-      "sliderValues": { "r": 1.5 },
-      "startSlider": "r",
-      "visibleFnIndices": [0, 1, 2],
-      "viewport": { "view": { "xmin": -10, "xmax": 10, "ymin": -10, "ymax": 10 }, "squareAspect": true }
-    }
-  ]
-}`
-      : mode === "integral"
-      ? `{
-  "format": "cfv_project_v1",
-  "name": "Keyhole Contour Residue Integrator",
-  "subtitle": "4-piece variable keyhole contour for z^(a-1)/(z+1) across branch cut [0, inf)",
-  "mode": "integral",
-  "splitPct": 50,
-  "cards": [
-    { "title": "Integrand z^(a-1)/(z+1) [cut R+]", "code": "double complex d = z + c_make(1.0, 0.0);\\nif (cabs(d) < 1e-12 || cabs(z) < 1e-12) return c_make(INFINITY, 0.0);\\nreturn cexp((a - 1.0) * (clog(-z) + c_make(0.0, M_PI))) / d;", "color": "#38bdf8", "active": true }
-  ],
-  "sliders": [
-    { "name": "t", "label": "Limit progress (0 -> 1)", "value": 0.35, "min": 0.0, "max": 1.0, "step": 0.01, "speed": 0.5 },
-    { "name": "a", "label": "Exponent a", "value": 0.5, "min": 0.15, "max": 0.85, "step": 0.05, "speed": 0.5 }
-  ],
-  "vars": [
-    { "name": "R", "expr": "2.2 + 18*t*t", "label": "Outer radius" },
-    { "name": "r", "expr": "0.52*(1 - 0.88*t)", "label": "Inner radius" },
-    { "name": "eps", "expr": "0.34*(1 - 0.9*t)", "label": "Mouth angle" }
-  ],
-  "points": [
-    { "x": 0.0, "y": 0.0, "label": "Branch pt 0", "icon": "diamond", "color": "#fbbf24", "size": 6, "locked": true },
-    { "x": -1.0, "y": 0.0, "label": "Pole z = -1", "icon": "cross", "color": "#fb7185", "size": 6, "locked": true }
-  ],
-  "lines": [
-    { "orientation": "horizontal", "value": 0.0, "label": "Branch Cut [0, inf)", "color": "#fbbf24", "lineStyle": "dotted", "locked": true }
-  ],
-  "shapes": [
-    { "kind": "line", "label": "1. Top Cut (r -> R)", "color": "#34d399", "closed": false, "formula": { "kind": "line", "x0": "r*cos(eps)", "y0": "r*sin(eps)", "x1": "R*cos(eps)", "y1": "R*sin(eps)" } },
-    { "kind": "arc", "label": "2. Outer Arc gamma_R (CCW)", "color": "#38bdf8", "closed": false, "formula": { "kind": "arc", "cx": "0", "cy": "0", "r": "R", "a0": "eps", "a1": "2*pi - eps" } },
-    { "kind": "line", "label": "3. Bottom Cut (R -> r)", "color": "#a78bfa", "closed": false, "formula": { "kind": "line", "x0": "R*cos(eps)", "y0": "-R*sin(eps)", "x1": "r*cos(eps)", "y1": "-r*sin(eps)" } },
-    { "kind": "arc", "label": "4. Inner Arc gamma_r (CW)", "color": "#fbbf24", "closed": false, "formula": { "kind": "arc", "cx": "0", "cy": "0", "r": "r", "a0": "2*pi - eps", "a1": "eps" } }
-  ],
-  "viewport": {
-    "inView": { "cx": 0.0, "cy": 0.0, "r": 6.2 },
-    "outView": { "cx": 0.0, "cy": 0.0, "r": 5.5 },
-    "inSquare": true,
-    "outSquare": true,
-    "showSphere": false,
-    "sphereView": { "yaw": -0.58, "pitch": 0.22, "zoom": 1.0 }
-  },
-  "presets": [
-    {
-      "id": "open_keyhole",
-      "name": "Open Pac-Man (t = 0.35, a = 1/2)",
-      "sliderValues": { "t": 0.35, "a": 0.5 },
-      "viewport": { "inView": { "cx": 0.0, "cy": 0.0, "r": 6.2 }, "outView": { "cx": 0.0, "cy": 0.0, "r": 5.5 }, "inSquare": true, "outSquare": true }
-    },
-    {
-      "id": "tight_limit",
-      "name": "Tight Keyhole Limit (t = 0.85)",
-      "sliderValues": { "t": 0.85, "a": 0.5 },
-      "viewport": { "inView": { "cx": 0.0, "cy": 0.0, "r": 18.0 }, "outView": { "cx": 0.0, "cy": 0.0, "r": 5.5 }, "inSquare": true, "outSquare": true }
-    }
+    { "id": "default", "name": "MVT View", "sliderValues": { "a": -1.5, "b": 2.5 }, "visibleFnIndices": [0, 1], "viewport": { "view": { "xmin": -3.5, "xmax": 3.5, "ymin": -2, "ymax": 3.5 }, "squareAspect": true } }
   ]
 }`
       : `{
   "format": "cfv_project_v1",
-  "name": "Rational Pole & Riemann Sphere Explorer",
-  "subtitle": "Auxiliary numerator f1(z) composed into f1(z)/(z^2+1) with 2D & 3D Sphere presets",
+  "name": "Rational Map & Contour Residue Explorer",
+  "subtitle": "Unified Complex mode with Mapping, Domain Coloring & Contour Integration presets",
+  "description": "Maps shapes through 1/(z^2+a^2), paints domain coloring, and verifies Cauchy's Residue Theorem.",
   "mode": "map",
-  "splitPct": 50,
+  "folder": "${wantContour ? "cat_contours" : "cat_complex_analysis"}",
   "cards": [
-    { "title": "Helper P(z)", "code": "z*z - c_make(a, 0.0)", "color": "#a78bfa", "active": false },
-    { "title": "Active f(z) = f1(z) / (z^2 + 1)", "code": "double complex d = z*z + c_make(1.0, 0.0);\\nif (cabs(d) < 1e-12) return c_make(INFINITY, 0.0);\\nreturn f1(z) / d;", "color": "#38bdf8", "active": true }
+    { "title": "f(z) = 1 / (z^2 + a^2)", "code": "double complex d = z*z + c_make(a*a, 0.0);\\nif (cabs(d) < 1e-12) return c_make(INFINITY, 0.0);\\nreturn 1.0 / d;", "color": "#38bdf8", "active": true }
   ],
-  "sliders": [
-    { "name": "a", "label": "Zero shift", "value": 1.0, "min": -3.0, "max": 3.0, "step": 0.1, "speed": 0.5 }
-  ],
+  "sliders": [{ "name": "a", "label": "Pole height a", "value": 1.0, "min": 0.4, "max": 2.2, "step": 0.05, "speed": 0.4 }],
   "vars": [],
-  "points": [
-    { "x": 0.0, "y": 1.0, "label": "Pole +i", "icon": "cross", "color": "#fb7185", "size": 6, "locked": true },
-    { "x": 0.0, "y": -1.0, "label": "Pole -i", "icon": "cross", "color": "#fb7185", "size": 6, "locked": true },
-    { "x": 1.0, "y": 1.0, "label": "Tracked Point 1+i", "icon": "star", "color": "#34d399", "size": 6, "locked": false }
-  ],
-  "lines": [
-    { "orientation": "vertical", "value": 0.0, "label": "Imaginary Axis", "color": "#fbbf24", "lineStyle": "dashed", "locked": true }
-  ],
-  "shapes": [
-    { "kind": "circle", "cx": 0.0, "cy": 0.0, "r": 1.6, "label": "Origin Circle r=1.6", "color": "#38bdf8", "closed": true }
-  ],
-  "viewport": {
-    "inView": { "cx": 0.0, "cy": 0.0, "r": 3.5 },
-    "outView": { "cx": 0.0, "cy": 0.0, "r": 3.5 },
-    "inSquare": true,
-    "outSquare": true,
-    "showSphere": false,
-    "sphereView": { "yaw": -0.58, "pitch": 0.22, "zoom": 1.0 }
-  },
+  "points": [{ "x": 0, "y": 1, "xExpr": "0", "yExpr": "a", "label": "Pole +ia", "icon": "cross", "color": "#fb7185", "locked": true }],
+  "shapes": [{ "kind": "circle", "label": "Loop around +ia", "color": "#38bdf8", "closed": true, "formula": { "kind": "circle", "cx": "0", "cy": "a", "r": "0.55" } }],
+  "texts": [{ "title": "Cauchy Residue Theorem", "text": "Toggle ∮ Contour to switch between mapping w=f(z) and live contour integration ∮ f(z) dz.", "anchor": "bottom-left", "plane": "in", "color": "#34d399" }],
+  "viewport": { "inView": { "cx": 0, "cy": 0, "r": 3 }, "outView": { "cx": 0, "cy": 0, "r": 3 }, "inSquare": true, "outSquare": true, "contourMode": ${wantContour ? "true" : "false"}, "projection": "planar", "showDomain": false },
   "presets": [
-    {
-      "id": "origin_2d",
-      "name": "2D Conformal Map (1:1 Origin)",
-      "sliderValues": { "a": 1.0 },
-      "viewport": { "inView": { "cx": 0.0, "cy": 0.0, "r": 3.5 }, "outView": { "cx": 0.0, "cy": 0.0, "r": 3.5 }, "inSquare": true, "outSquare": true, "showSphere": false }
-    },
-    {
-      "id": "sphere_3d",
-      "name": "3D Riemann Sphere Projection",
-      "sliderValues": { "a": 1.0 },
-      "viewport": { "inView": { "cx": 0.0, "cy": 0.0, "r": 3.5 }, "outView": { "cx": 0.0, "cy": 0.0, "r": 3.5 }, "inSquare": true, "outSquare": true, "showSphere": true, "sphereView": { "yaw": -0.58, "pitch": 0.25, "zoom": 1.15 } }
-    }
+    { "id": "contour", "name": "∮ Residue Around +ia", "sliderValues": { "a": 1.0 }, "viewport": { "inView": { "cx": 0, "cy": 0, "r": 3 }, "outView": { "cx": 0, "cy": 0, "r": 3 }, "contourMode": true } },
+    { "id": "domain", "name": "Domain Coloring (Full Input)", "sliderValues": { "a": 1.0 }, "viewport": { "inView": { "cx": 0, "cy": 0, "r": 3 }, "contourMode": false, "showDomain": true, "domainScheme": "classic", "domainOpacity": 0.9 }, "layout": { "outputHidden": true } }
   ]
 }`;
 
-    const prefNotes = [
-      "The output JSON MUST be a complete **Full Project JSON (`\"format\": \"cfv_project_v1\"`)** that encodes the entire project state: `\"name\"`, `\"subtitle\"`, `\"mode\"`, `\"cards\"`, `\"sliders\"` (with `\"speed\"`), `\"vars\"`, `\"shapes\"` (or `\"seedCells\"`), `\"points\"`, `\"lines\"`, `\"viewport\"` (starting in `1:1` mode centered at `(0, 0)`), and 2–4 curated `\"presets\"`!",
-      includeSliders ? "Include helpful interactive `sliders` (with `speed`) plus computed `vars` derived from sliders when multiple geometry parameters or viewport globals should move together." : "Keep sliders minimal unless needed for presets.",
-      includeLandmarks
-        ? "Include domain `shapes` (for Map/Integral) or `seedCells` (for 2D Real grid automata), unlocked points (`\"locked\": false` when you want points/labels mapped onto the 2D Output Plane & 3D Riemann Sphere), and locked reference landmarks (`\"locked\": true` for poles, branch points, and axes that stay strictly on the Input Plane)."
-        : "Keep `points`, `lines`, and `shapes` minimal.",
-    ].join("\n- ");
+    const prefHints = [
+      includeSliders ? "Include interactive sliders (+ speed) and computed vars where helpful." : "Keep sliders minimal.",
+      includeLandmarks ? "Include clear explanation texts[], landmarks (use xExpr/yExpr/valExpr so locked items track sliders!), and shapes." : "Keep annotations concise.",
+    ].join(" ");
 
-    return `You are generating a complete, production-ready **Full Project JSON (\`"format": "cfv_project_v1"\`)** for my native **C11 Function Studio**.
-Read EVERY rule below carefully — your output JSON fully encodes a standalone project (cards, sliders, computed variables, shapes/cells, viewports, and presets) that will be pasted directly into the Studio's Project Import Terminal, compiled with strict ISO C11 (\`-Wall -Wextra -Werror -Wpedantic\`), and saved into \`projects/*.json\` in the repository.
+    return `Generate one valid **C11 Function Studio Full Project JSON** (\`"format": "cfv_project_v1"\`) inside a single \`\`\`json code fence.
 
-=== USER GOAL ===
-${userRequest || (isReal ? "Build an interesting 2D Real project with multiple graphed curves (parametric / implicit / functions), sliders, computed variables, landmarks, 1:1 origin-centered viewport, and 2-3 presets." : mode === "integral" ? "Build a residue-theory contour integral project with a single active C11 integrand, a master slider driving computed variables (R, r, eps), multi-piece variable contour shapes, locked pole/branch-cut landmarks, and 2-3 presets." : "Build a complex mapping project using auxiliary helper card(s) f1(z), … composed into a single active graphed function, plus sliders, domain shapes, landmarks, and 2-3 presets (including a 3D Riemann Sphere preset).")}
-
-ACTIVE WORKSPACE MODE: "${mode}"
-CURRENT SLIDERS: ${activeSliders}
-CURRENT VARIABLES: ${activeVars}${contextSection}
-PREFERENCES:
-- ${prefNotes}
+GOAL: ${userRequest || (isReal ? "Create a polished, educational Real project with interactive sliders, formula-linked landmarks, explanation text boxes, and 2-3 presets." : "Create a polished Complex project with C11 cards, interactive sliders, formula shapes/landmarks, explanation text boxes, and 2-3 presets.")}
+MODE: "${isReal ? "real" : "map"}"${wantContour ? " (with contourMode: true)" : ""} | SLIDERS: ${activeSliders} | VARS: ${activeVars}${contextSection}
+NOTES: ${prefHints}
 
 ${compilerSpec}
 
-${varsAndContoursSpec}
+SCHEMA HIGHLIGHTS:
+- Sliders + vars <= 16 total (never name them z, s, x, y, P, slot; avoid t in parametric Real cards).
+- Dynamic viewport globals (editable via vars/sliders at 60 FPS): sphere_yaw, sphere_pitch, sphere_zoom, in_cx, in_cy, in_r, out_cx, out_cy, out_r, real_xmin, real_xmax, real_ymin, real_ymax.
+- Locked elements with formulas (shape.formula, point.xExpr/yExpr, line.valExpr) STILL move live with sliders!
+- Allowed formula math: pi, e, sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh, exp, log, log2, log10, sqrt, cbrt, hypot, abs, fabs, pow, min, max, fmin, fmax, floor, ceil, round.
+- Complex viewport: contourMode (bool, per-preset!), projection ("planar"|"sphere"|"stereographic"|"poincare"|"custom"), showDomain, domainScheme ("classic"|"smooth_escape"|"inferno"|"ocean"|"neon_prism"|"grayscale"), domainOpacity (0..1), showMesh. Shape opacity=1.0 is 100% solid (lineWidth=0 for fill-only; isOcean=true for 3D globe ocean).
+- Text callouts ("texts"): { title, text, anchor ("bottom-left"|"bottom-right"|"top-left"|"top-right"|"world"), plane ("in"|"out"), color, width }.
+- Presets: { id, name, sliderValues, startSlider, activeFnIndex (Complex) / visibleFnIndices (Real), viewport, layout ({ sidebarCollapsed, inputHidden, outputHidden, realHidden, sidebarWidth, splitPct }), shapes/points/lines/texts }.
+- Strict JSON only: no comments, no trailing commas, escape newlines in C code as \\n.
 
-=== 4. FULL PROJECT JSON SCHEMA ("format": "cfv_project_v1") & PRESETS ===
-- Every generated JSON object MUST represent a complete project:
-  - \`"format": "cfv_project_v1"\`
-  - \`"name"\`: Descriptive project title (e.g. \`"Keyhole Residue Integrator"\`).
-  - \`"subtitle"\`: Concise 1-line summary shown in the project selector folder.
-  - \`"description"\`: Clear 1–3 sentence mathematical description shown in the sidebar Description bar and library tooltips.
-  - \`"mode"\`: \`"${mode}"\` (\`"map"\` | \`"integral"\` | \`"real"\`).
-  - \`"viewport"\`: Full initial viewport state, beginning in **1:1 square aspect ratio mode centered at \`(0, 0)\`**:
-    - For \`"map"\` / \`"integral"\`: \`{ "inView": { "cx": 0, "cy": 0, "r": 4 }, "outView": { "cx": 0, "cy": 0, "r": 4 }, "inSquare": true, "outSquare": true, "projection": "planar", "projectionExpr": "", "showSphere": false, "sphereView": { "yaw": -0.58, "pitch": 0.22, "zoom": 1.0 }, "showDomain": false, "domainScheme": "classic", "domainOpacity": 0.72 }\`
-      - Valid \`"projection"\`: \`"planar"\` | \`"sphere"\` | \`"stereographic"\` (full finite disk) | \`"poincare"\` (Poincaré unit disk) | \`"custom"\` (uses \`"projectionExpr"\`, e.g. \`"(w - i) / (w + i)"\`).
-      - Valid \`"domainScheme"\`: \`"classic"\` | \`"smooth_escape"\` (Mandelbrot/fractal Ultra-Fractal gradient: return \`c_make(nu, 0)\` outside, \`c_make(-1, 0)\` inside) | \`"inferno"\` | \`"ocean"\` | \`"neon_prism"\` | \`"grayscale"\`.
-    - For \`"real"\`: \`{ "view": { "xmin": -10, "xmax": 10, "ymin": -10, "ymax": 10 }, "squareAspect": true }\`
-  - **Element Styling & Unified Layering**:
-    - Shapes, points, guide lines, and cards support \`"opacity"\` (\`0.0\`–\`1.0\`, applied in both input & output space) and \`"lineWidth"\` down to \`0\` (fill-only shapes with no border!).
-    - Elements render in unified back-to-front layer order (\`"layerOrder"\`: e.g. \`["s:0", "l:0", "p:0"]\`; locked elements stay right in the unified list with a visible LOCKED badge).
-  - \`"presets"\`: Array of **2 to 4 curated presets** for the bottom Presets bar! Each preset object supports:
-    - \`"id"\`: unique slug (e.g. \`"default_origin"\`), \`"name"\`: button label.
-    - \`"sliderValues"\`: \`{ "sliderName": number }\` overrides for that preset.
-    - \`"startSlider"\` (optional): slider name to auto-animate when the preset is clicked.
-    - \`"visibleFnIndices"\` (optional, 2D Real): array of 0-based card indices visible in that preset.
-    - \`"viewport"\`: full viewport settings for that preset (including \`inView\`, \`outView\`, \`inSquare\`, \`outSquare\`, \`projection\`, \`projectionExpr\`, \`showSphere\`, \`sphereView\`, \`showDomain\`, \`domainScheme\`, \`domainOpacity\` or \`view\`, \`squareAspect\`).
-- Colors: use crisp high-contrast dark-mode hex palette: \`#38bdf8\` (sky), \`#34d399\` (emerald), \`#a78bfa\` (violet), \`#fbbf24\` (amber), \`#fb7185\` (rose), \`#fb923c\` (orange), \`#f8fafc\` (white).
-- Valid \`lineStyle\`: \`"solid"\`, \`"dashed"\`, \`"dotted"\`.
-- Valid \`points\` icons: \`"dot"\`, \`"ring"\` (zeros/foci), \`"cross"\` (poles!), \`"diamond"\` (branch points / special points), \`"star"\`.
-
-=== 5. STRICT COMPILER & JSON PITFALLS (NEVER DO THESE!) ===
-1. NEVER use \`1.0i\`, \`I\`, or \`_Complex_I\` — ALWAYS use \`c_make(re, im)\`!
-2. NEVER write \`#include\`, \`double complex f(...)\`, or outer function wrappers — provide ONLY the expression or function body!
-3. NEVER leave unused local variables or missing \`return\` statements (\`-Wall -Wextra -Werror\` rejects them).
-4. NEVER divide by zero without guarding poles: \`if (cabs(d) < 1e-12) return c_make(INFINITY, 0.0);\` (or \`NAN\` in 2D Real).
-5. NEVER exceed 16 combined parameters across \`sliders\` + \`vars\`!
-6. NEVER put \`"active": true\` on more than one card in \`map\` / \`integral\` mode (set \`"active": false\` on auxiliary helpers \`f1, f2, ...\`).
-7. NEVER put JavaScript comments (\`//\`), trailing commas, single-quoted strings, or raw unescaped newlines inside JSON strings — escape newlines in multi-line C code as \`\\n\`!
-
-=== 6. REQUIRED OUTPUT FORMAT ===
-Return a single valid Full Project JSON object inside a fenced JSON code block matching this exact schema:
+TEMPLATE:
 \`\`\`json
 ${exampleJson}
 \`\`\``;

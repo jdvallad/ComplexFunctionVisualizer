@@ -1,0 +1,877 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795467352763_702",
+  "name": "Damped & Driven Harmonic Oscillator (Time + Phase Space) (Custom)",
+  "folder": "my",
+  "subtitle": "5 cards · 4 presets",
+  "description": "",
+  "mode": "real",
+  "cards": [
+    {
+      "title": "Time-Domain Wave x(t) for 0 <= t <= T",
+      "code": "if (x < 0.0 || x > T) return NAN;\ndouble tau = x;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\nif (denom < 1e-6 && zeta < 1e-6) {\n  return x0 * cos(w0 * tau) + (F0 / (2.0 * w0)) * tau * sin(w0 * tau);\n}\ndouble A = (denom > 1e-9) ? (F0 / denom) : 0.0;\ndouble phi = atan2(d2, d1);\ndouble xp = A * cos(wd * tau - phi);\ndouble c0 = x0 - A * cos(phi);\ndouble vh = -A * wd * sin(phi);\ndouble gam = zeta * w0;\ndouble xh = 0.0;\nif (zeta < 1.0 - 1e-6) {\n  double w1 = w0 * sqrt(1.0 - zeta * zeta);\n  double B = (vh + gam * c0) / w1;\n  xh = exp(-gam * tau) * (c0 * cos(w1 * tau) + B * sin(w1 * tau));\n} else if (zeta <= 1.0 + 1e-6) {\n  double B = vh + gam * c0;\n  xh = exp(-gam * tau) * (c0 + B * tau);\n} else {\n  double alp = w0 * sqrt(zeta * zeta - 1.0);\n  double r1 = -gam + alp;\n  double r2 = -gam - alp;\n  double C1 = (vh - r2 * c0) / (2.0 * alp);\n  double C2 = c0 - C1;\n  xh = C1 * exp(r1 * tau) + C2 * exp(r2 * tau);\n}\nreturn xh + xp;",
+      "color": "#38bdf8",
+      "lineWidth": 2.4,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Phase Portrait (x(t), dx/dt(t)) up to T",
+      "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\npx = pos;\npy = vel;",
+      "color": "#34d399",
+      "lineWidth": 2.4,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Steady-State Limit Cycle (x_p, v_p)",
+      "code": "parametric [0, 2*M_PI]:\nif (F0 <= 1e-9 || A_ss > 40.0) {\n  px = NAN;\n  py = NAN;\n} else {\n  px = A_ss * cos(t - phi_ss);\n  py = -A_ss * wd * sin(t - phi_ss);\n}",
+      "color": "#fb7185",
+      "lineWidth": 1.8,
+      "opacity": 1,
+      "lineStyle": "dashed",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Current State Markers at Time T",
+      "code": "parametric [0, 2]:\ndouble tau = T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\ndouble rad = 0.24;\nif (t < 0.96) {\n  double ang = (t / 0.96) * 2.0 * M_PI;\n  px = pos + rad * cos(ang);\n  py = vel + rad * sin(ang);\n} else if (t < 1.04) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 1.04) / 0.96) * 2.0 * M_PI;\n  px = T + rad * cos(ang);\n  py = pos + rad * sin(ang);\n}",
+      "color": "#f8fafc",
+      "lineWidth": 2.6,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Driving Force F0 * cos(wd * t)",
+      "code": "if (x < 0.0 || x > T || F0 <= 1e-9) return NAN;\nreturn F0 * cos(wd * x);",
+      "color": "#fbbf24",
+      "lineWidth": 1.4,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [
+    {
+      "name": "zeta",
+      "label": "Damping Ratio zeta",
+      "value": 0.06,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "speed": 0.5
+    },
+    {
+      "name": "w0",
+      "label": "Natural Freq w0 (rad/s)",
+      "value": 2,
+      "min": 0.5,
+      "max": 4,
+      "step": 0.05,
+      "speed": 0.5
+    },
+    {
+      "name": "wd",
+      "label": "Driving Freq wd (rad/s)",
+      "value": 2,
+      "min": 0.1,
+      "max": 5,
+      "step": 0.05,
+      "speed": 0.5
+    },
+    {
+      "name": "F0",
+      "label": "Drive Amplitude F0",
+      "value": 2,
+      "min": 0,
+      "max": 6,
+      "step": 0.1,
+      "speed": 0.5
+    },
+    {
+      "name": "x0",
+      "label": "Initial Position x0",
+      "value": 0.5,
+      "min": -6,
+      "max": 6,
+      "step": 0.1,
+      "speed": 0.5
+    },
+    {
+      "name": "T",
+      "label": "Time Horizon T (s)",
+      "value": 18.348852777777587,
+      "min": 0.1,
+      "max": 20,
+      "step": 0.1,
+      "speed": 1
+    }
+  ],
+  "vars": [
+    {
+      "name": "A_ss",
+      "label": "Steady-State Amplitude",
+      "expr": "F0 / sqrt(pow(w0*w0 - wd*wd, 2) + pow(2*zeta*w0*wd, 2) + 1e-9)"
+    },
+    {
+      "name": "phi_ss",
+      "label": "Steady-State Phase Lag (rad)",
+      "expr": "atan2(2*zeta*w0*wd, w0*w0 - wd*wd)"
+    }
+  ],
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "label": "Equilibrium (0, 0)",
+      "icon": "ring",
+      "color": "#a78bfa",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "lines": [
+    {
+      "orientation": "vertical",
+      "value": 0,
+      "label": "t = 0 / x = 0 Axis",
+      "color": "#a78bfa",
+      "lineWidth": 1.5,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "viewport": {
+    "view": {
+      "xmin": -28.22,
+      "xmax": 28.22,
+      "ymin": -15,
+      "ymax": 15
+    },
+    "squareAspect": true,
+    "showPrimes": false,
+    "showZeros": false
+  },
+  "presets": [
+    {
+      "id": "underdamped_limit_cycle",
+      "name": "Underdamped -> Limit Cycle",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Time-Domain Wave x(t) for 0 <= t <= T",
+          "code": "if (x < 0.0 || x > T) return NAN;\ndouble tau = x;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\nif (denom < 1e-6 && zeta < 1e-6) {\n  return x0 * cos(w0 * tau) + (F0 / (2.0 * w0)) * tau * sin(w0 * tau);\n}\ndouble A = (denom > 1e-9) ? (F0 / denom) : 0.0;\ndouble phi = atan2(d2, d1);\ndouble xp = A * cos(wd * tau - phi);\ndouble c0 = x0 - A * cos(phi);\ndouble vh = -A * wd * sin(phi);\ndouble gam = zeta * w0;\ndouble xh = 0.0;\nif (zeta < 1.0 - 1e-6) {\n  double w1 = w0 * sqrt(1.0 - zeta * zeta);\n  double B = (vh + gam * c0) / w1;\n  xh = exp(-gam * tau) * (c0 * cos(w1 * tau) + B * sin(w1 * tau));\n} else if (zeta <= 1.0 + 1e-6) {\n  double B = vh + gam * c0;\n  xh = exp(-gam * tau) * (c0 + B * tau);\n} else {\n  double alp = w0 * sqrt(zeta * zeta - 1.0);\n  double r1 = -gam + alp;\n  double r2 = -gam - alp;\n  double C1 = (vh - r2 * c0) / (2.0 * alp);\n  double C2 = c0 - C1;\n  xh = C1 * exp(r1 * tau) + C2 * exp(r2 * tau);\n}\nreturn xh + xp;",
+          "color": "#38bdf8",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Phase Portrait (x(t), dx/dt(t)) up to T",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\npx = pos;\npy = vel;",
+          "color": "#34d399",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Steady-State Limit Cycle (x_p, v_p)",
+          "code": "parametric [0, 2*M_PI]:\nif (F0 <= 1e-9 || A_ss > 40.0) {\n  px = NAN;\n  py = NAN;\n} else {\n  px = A_ss * cos(t - phi_ss);\n  py = -A_ss * wd * sin(t - phi_ss);\n}",
+          "color": "#fb7185",
+          "lineWidth": 1.8,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Current State Markers at Time T",
+          "code": "parametric [0, 2]:\ndouble tau = T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\ndouble rad = 0.24;\nif (t < 0.96) {\n  double ang = (t / 0.96) * 2.0 * M_PI;\n  px = pos + rad * cos(ang);\n  py = vel + rad * sin(ang);\n} else if (t < 1.04) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 1.04) / 0.96) * 2.0 * M_PI;\n  px = T + rad * cos(ang);\n  py = pos + rad * sin(ang);\n}",
+          "color": "#f8fafc",
+          "lineWidth": 2.6,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Driving Force F0 * cos(wd * t)",
+          "code": "if (x < 0.0 || x > T || F0 <= 1e-9) return NAN;\nreturn F0 * cos(wd * x);",
+          "color": "#fbbf24",
+          "lineWidth": 1.4,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        }
+      ],
+      "sliders": [
+        {
+          "name": "zeta",
+          "label": "Damping Ratio zeta",
+          "value": 0.15,
+          "min": 0,
+          "max": 2,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "w0",
+          "label": "Natural Freq w0 (rad/s)",
+          "value": 2,
+          "min": 0.5,
+          "max": 4,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "wd",
+          "label": "Driving Freq wd (rad/s)",
+          "value": 1.4,
+          "min": 0.1,
+          "max": 5,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "F0",
+          "label": "Drive Amplitude F0",
+          "value": 2.5,
+          "min": 0,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "x0",
+          "label": "Initial Position x0",
+          "value": 4,
+          "min": -6,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "T",
+          "label": "Time Horizon T (s)",
+          "value": 11,
+          "min": 0.1,
+          "max": 20,
+          "step": 0.1,
+          "speed": 1
+        }
+      ],
+      "vars": [
+        {
+          "name": "A_ss",
+          "label": "Steady-State Amplitude",
+          "expr": "F0 / sqrt(pow(w0*w0 - wd*wd, 2) + pow(2*zeta*w0*wd, 2) + 1e-9)"
+        },
+        {
+          "name": "phi_ss",
+          "label": "Steady-State Phase Lag (rad)",
+          "expr": "atan2(2*zeta*w0*wd, w0*w0 - wd*wd)"
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Equilibrium (0, 0)",
+          "icon": "ring",
+          "color": "#a78bfa",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "t = 0 / x = 0 Axis",
+          "color": "#a78bfa",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "view": {
+          "xmin": -12,
+          "xmax": 12,
+          "ymin": -12,
+          "ymax": 12
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "resonance_buildup",
+      "name": "Resonance Sweep (wd = w0)",
+      "startSlider": "T",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Time-Domain Wave x(t) for 0 <= t <= T",
+          "code": "if (x < 0.0 || x > T) return NAN;\ndouble tau = x;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\nif (denom < 1e-6 && zeta < 1e-6) {\n  return x0 * cos(w0 * tau) + (F0 / (2.0 * w0)) * tau * sin(w0 * tau);\n}\ndouble A = (denom > 1e-9) ? (F0 / denom) : 0.0;\ndouble phi = atan2(d2, d1);\ndouble xp = A * cos(wd * tau - phi);\ndouble c0 = x0 - A * cos(phi);\ndouble vh = -A * wd * sin(phi);\ndouble gam = zeta * w0;\ndouble xh = 0.0;\nif (zeta < 1.0 - 1e-6) {\n  double w1 = w0 * sqrt(1.0 - zeta * zeta);\n  double B = (vh + gam * c0) / w1;\n  xh = exp(-gam * tau) * (c0 * cos(w1 * tau) + B * sin(w1 * tau));\n} else if (zeta <= 1.0 + 1e-6) {\n  double B = vh + gam * c0;\n  xh = exp(-gam * tau) * (c0 + B * tau);\n} else {\n  double alp = w0 * sqrt(zeta * zeta - 1.0);\n  double r1 = -gam + alp;\n  double r2 = -gam - alp;\n  double C1 = (vh - r2 * c0) / (2.0 * alp);\n  double C2 = c0 - C1;\n  xh = C1 * exp(r1 * tau) + C2 * exp(r2 * tau);\n}\nreturn xh + xp;",
+          "color": "#38bdf8",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Phase Portrait (x(t), dx/dt(t)) up to T",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\npx = pos;\npy = vel;",
+          "color": "#34d399",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Steady-State Limit Cycle (x_p, v_p)",
+          "code": "parametric [0, 2*M_PI]:\nif (F0 <= 1e-9 || A_ss > 40.0) {\n  px = NAN;\n  py = NAN;\n} else {\n  px = A_ss * cos(t - phi_ss);\n  py = -A_ss * wd * sin(t - phi_ss);\n}",
+          "color": "#fb7185",
+          "lineWidth": 1.8,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Current State Markers at Time T",
+          "code": "parametric [0, 2]:\ndouble tau = T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\ndouble rad = 0.24;\nif (t < 0.96) {\n  double ang = (t / 0.96) * 2.0 * M_PI;\n  px = pos + rad * cos(ang);\n  py = vel + rad * sin(ang);\n} else if (t < 1.04) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 1.04) / 0.96) * 2.0 * M_PI;\n  px = T + rad * cos(ang);\n  py = pos + rad * sin(ang);\n}",
+          "color": "#f8fafc",
+          "lineWidth": 2.6,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Driving Force F0 * cos(wd * t)",
+          "code": "if (x < 0.0 || x > T || F0 <= 1e-9) return NAN;\nreturn F0 * cos(wd * x);",
+          "color": "#fbbf24",
+          "lineWidth": 1.4,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "zeta",
+          "label": "Damping Ratio zeta",
+          "value": 0.06,
+          "min": 0,
+          "max": 2,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "w0",
+          "label": "Natural Freq w0 (rad/s)",
+          "value": 2,
+          "min": 0.5,
+          "max": 4,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "wd",
+          "label": "Driving Freq wd (rad/s)",
+          "value": 2,
+          "min": 0.1,
+          "max": 5,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "F0",
+          "label": "Drive Amplitude F0",
+          "value": 2,
+          "min": 0,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "x0",
+          "label": "Initial Position x0",
+          "value": 0.5,
+          "min": -6,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "T",
+          "label": "Time Horizon T (s)",
+          "value": 0.1,
+          "min": 0.1,
+          "max": 20,
+          "step": 0.1,
+          "speed": 1
+        }
+      ],
+      "vars": [
+        {
+          "name": "A_ss",
+          "label": "Steady-State Amplitude",
+          "expr": "F0 / sqrt(pow(w0*w0 - wd*wd, 2) + pow(2*zeta*w0*wd, 2) + 1e-9)"
+        },
+        {
+          "name": "phi_ss",
+          "label": "Steady-State Phase Lag (rad)",
+          "expr": "atan2(2*zeta*w0*wd, w0*w0 - wd*wd)"
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Equilibrium (0, 0)",
+          "icon": "ring",
+          "color": "#a78bfa",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "t = 0 / x = 0 Axis",
+          "color": "#a78bfa",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "view": {
+          "xmin": -15,
+          "xmax": 15,
+          "ymin": -15,
+          "ymax": 15
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "critical_damping",
+      "name": "Critically Damped (zeta = 1)",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Time-Domain Wave x(t) for 0 <= t <= T",
+          "code": "if (x < 0.0 || x > T) return NAN;\ndouble tau = x;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\nif (denom < 1e-6 && zeta < 1e-6) {\n  return x0 * cos(w0 * tau) + (F0 / (2.0 * w0)) * tau * sin(w0 * tau);\n}\ndouble A = (denom > 1e-9) ? (F0 / denom) : 0.0;\ndouble phi = atan2(d2, d1);\ndouble xp = A * cos(wd * tau - phi);\ndouble c0 = x0 - A * cos(phi);\ndouble vh = -A * wd * sin(phi);\ndouble gam = zeta * w0;\ndouble xh = 0.0;\nif (zeta < 1.0 - 1e-6) {\n  double w1 = w0 * sqrt(1.0 - zeta * zeta);\n  double B = (vh + gam * c0) / w1;\n  xh = exp(-gam * tau) * (c0 * cos(w1 * tau) + B * sin(w1 * tau));\n} else if (zeta <= 1.0 + 1e-6) {\n  double B = vh + gam * c0;\n  xh = exp(-gam * tau) * (c0 + B * tau);\n} else {\n  double alp = w0 * sqrt(zeta * zeta - 1.0);\n  double r1 = -gam + alp;\n  double r2 = -gam - alp;\n  double C1 = (vh - r2 * c0) / (2.0 * alp);\n  double C2 = c0 - C1;\n  xh = C1 * exp(r1 * tau) + C2 * exp(r2 * tau);\n}\nreturn xh + xp;",
+          "color": "#38bdf8",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Phase Portrait (x(t), dx/dt(t)) up to T",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\npx = pos;\npy = vel;",
+          "color": "#34d399",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Steady-State Limit Cycle (x_p, v_p)",
+          "code": "parametric [0, 2*M_PI]:\nif (F0 <= 1e-9 || A_ss > 40.0) {\n  px = NAN;\n  py = NAN;\n} else {\n  px = A_ss * cos(t - phi_ss);\n  py = -A_ss * wd * sin(t - phi_ss);\n}",
+          "color": "#fb7185",
+          "lineWidth": 1.8,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "Current State Markers at Time T",
+          "code": "parametric [0, 2]:\ndouble tau = T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\ndouble rad = 0.24;\nif (t < 0.96) {\n  double ang = (t / 0.96) * 2.0 * M_PI;\n  px = pos + rad * cos(ang);\n  py = vel + rad * sin(ang);\n} else if (t < 1.04) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 1.04) / 0.96) * 2.0 * M_PI;\n  px = T + rad * cos(ang);\n  py = pos + rad * sin(ang);\n}",
+          "color": "#f8fafc",
+          "lineWidth": 2.6,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Driving Force F0 * cos(wd * t)",
+          "code": "if (x < 0.0 || x > T || F0 <= 1e-9) return NAN;\nreturn F0 * cos(wd * x);",
+          "color": "#fbbf24",
+          "lineWidth": 1.4,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        }
+      ],
+      "sliders": [
+        {
+          "name": "zeta",
+          "label": "Damping Ratio zeta",
+          "value": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "w0",
+          "label": "Natural Freq w0 (rad/s)",
+          "value": 2,
+          "min": 0.5,
+          "max": 4,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "wd",
+          "label": "Driving Freq wd (rad/s)",
+          "value": 2,
+          "min": 0.1,
+          "max": 5,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "F0",
+          "label": "Drive Amplitude F0",
+          "value": 0,
+          "min": 0,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "x0",
+          "label": "Initial Position x0",
+          "value": 5,
+          "min": -6,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "T",
+          "label": "Time Horizon T (s)",
+          "value": 8,
+          "min": 0.1,
+          "max": 20,
+          "step": 0.1,
+          "speed": 1
+        }
+      ],
+      "vars": [
+        {
+          "name": "A_ss",
+          "label": "Steady-State Amplitude",
+          "expr": "F0 / sqrt(pow(w0*w0 - wd*wd, 2) + pow(2*zeta*w0*wd, 2) + 1e-9)"
+        },
+        {
+          "name": "phi_ss",
+          "label": "Steady-State Phase Lag (rad)",
+          "expr": "atan2(2*zeta*w0*wd, w0*w0 - wd*wd)"
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Equilibrium (0, 0)",
+          "icon": "ring",
+          "color": "#a78bfa",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "t = 0 / x = 0 Axis",
+          "color": "#a78bfa",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "view": {
+          "xmin": -10,
+          "xmax": 10,
+          "ymin": -10,
+          "ymax": 10
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "beating_undamped",
+      "name": "Undamped Beats (zeta = 0)",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Time-Domain Wave x(t) for 0 <= t <= T",
+          "code": "if (x < 0.0 || x > T) return NAN;\ndouble tau = x;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\nif (denom < 1e-6 && zeta < 1e-6) {\n  return x0 * cos(w0 * tau) + (F0 / (2.0 * w0)) * tau * sin(w0 * tau);\n}\ndouble A = (denom > 1e-9) ? (F0 / denom) : 0.0;\ndouble phi = atan2(d2, d1);\ndouble xp = A * cos(wd * tau - phi);\ndouble c0 = x0 - A * cos(phi);\ndouble vh = -A * wd * sin(phi);\ndouble gam = zeta * w0;\ndouble xh = 0.0;\nif (zeta < 1.0 - 1e-6) {\n  double w1 = w0 * sqrt(1.0 - zeta * zeta);\n  double B = (vh + gam * c0) / w1;\n  xh = exp(-gam * tau) * (c0 * cos(w1 * tau) + B * sin(w1 * tau));\n} else if (zeta <= 1.0 + 1e-6) {\n  double B = vh + gam * c0;\n  xh = exp(-gam * tau) * (c0 + B * tau);\n} else {\n  double alp = w0 * sqrt(zeta * zeta - 1.0);\n  double r1 = -gam + alp;\n  double r2 = -gam - alp;\n  double C1 = (vh - r2 * c0) / (2.0 * alp);\n  double C2 = c0 - C1;\n  xh = C1 * exp(r1 * tau) + C2 * exp(r2 * tau);\n}\nreturn xh + xp;",
+          "color": "#38bdf8",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Phase Portrait (x(t), dx/dt(t)) up to T",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\npx = pos;\npy = vel;",
+          "color": "#34d399",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Steady-State Limit Cycle (x_p, v_p)",
+          "code": "parametric [0, 2*M_PI]:\nif (F0 <= 1e-9 || A_ss > 40.0) {\n  px = NAN;\n  py = NAN;\n} else {\n  px = A_ss * cos(t - phi_ss);\n  py = -A_ss * wd * sin(t - phi_ss);\n}",
+          "color": "#fb7185",
+          "lineWidth": 1.8,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "Current State Markers at Time T",
+          "code": "parametric [0, 2]:\ndouble tau = T;\ndouble d1 = w0 * w0 - wd * wd;\ndouble d2 = 2.0 * zeta * w0 * wd;\ndouble denom = sqrt(d1 * d1 + d2 * d2);\ndouble pos = 0.0;\ndouble vel = 0.0;\nif (denom < 1e-6 && zeta < 1e-6) {\n  double s = sin(w0 * tau);\n  double c = cos(w0 * tau);\n  pos = x0 * c + (F0 / (2.0 * w0)) * tau * s;\n  vel = -x0 * w0 * s + (F0 / (2.0 * w0)) * s + 0.5 * F0 * tau * c;\n} else {\n  double A = (denom > 1e-9) ? (F0 / denom) : 0.0;\n  double phi = atan2(d2, d1);\n  double xp = A * cos(wd * tau - phi);\n  double vp = -A * wd * sin(wd * tau - phi);\n  double c0 = x0 - A * cos(phi);\n  double vh = -A * wd * sin(phi);\n  double gam = zeta * w0;\n  double xh = 0.0;\n  double v_h = 0.0;\n  if (zeta < 1.0 - 1e-6) {\n    double w1 = w0 * sqrt(1.0 - zeta * zeta);\n    double B = (vh + gam * c0) / w1;\n    double e = exp(-gam * tau);\n    double c = cos(w1 * tau);\n    double s = sin(w1 * tau);\n    xh = e * (c0 * c + B * s);\n    v_h = e * ((B * w1 - gam * c0) * c - (c0 * w1 + gam * B) * s);\n  } else if (zeta <= 1.0 + 1e-6) {\n    double B = vh + gam * c0;\n    double e = exp(-gam * tau);\n    xh = e * (c0 + B * tau);\n    v_h = e * (vh - gam * B * tau);\n  } else {\n    double alp = w0 * sqrt(zeta * zeta - 1.0);\n    double r1 = -gam + alp;\n    double r2 = -gam - alp;\n    double C1 = (vh - r2 * c0) / (2.0 * alp);\n    double C2 = c0 - C1;\n    double e1 = exp(r1 * tau);\n    double e2 = exp(r2 * tau);\n    xh = C1 * e1 + C2 * e2;\n    v_h = C1 * r1 * e1 + C2 * r2 * e2;\n  }\n  pos = xh + xp;\n  vel = v_h + vp;\n}\ndouble rad = 0.24;\nif (t < 0.96) {\n  double ang = (t / 0.96) * 2.0 * M_PI;\n  px = pos + rad * cos(ang);\n  py = vel + rad * sin(ang);\n} else if (t < 1.04) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 1.04) / 0.96) * 2.0 * M_PI;\n  px = T + rad * cos(ang);\n  py = pos + rad * sin(ang);\n}",
+          "color": "#f8fafc",
+          "lineWidth": 2.6,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Driving Force F0 * cos(wd * t)",
+          "code": "if (x < 0.0 || x > T || F0 <= 1e-9) return NAN;\nreturn F0 * cos(wd * x);",
+          "color": "#fbbf24",
+          "lineWidth": 1.4,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "zeta",
+          "label": "Damping Ratio zeta",
+          "value": 0,
+          "min": 0,
+          "max": 2,
+          "step": 0.01,
+          "speed": 0.5
+        },
+        {
+          "name": "w0",
+          "label": "Natural Freq w0 (rad/s)",
+          "value": 2,
+          "min": 0.5,
+          "max": 4,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "wd",
+          "label": "Driving Freq wd (rad/s)",
+          "value": 1.75,
+          "min": 0.1,
+          "max": 5,
+          "step": 0.05,
+          "speed": 0.5
+        },
+        {
+          "name": "F0",
+          "label": "Drive Amplitude F0",
+          "value": 2,
+          "min": 0,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "x0",
+          "label": "Initial Position x0",
+          "value": 0,
+          "min": -6,
+          "max": 6,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "T",
+          "label": "Time Horizon T (s)",
+          "value": 12,
+          "min": 0.1,
+          "max": 20,
+          "step": 0.1,
+          "speed": 1
+        }
+      ],
+      "vars": [
+        {
+          "name": "A_ss",
+          "label": "Steady-State Amplitude",
+          "expr": "F0 / sqrt(pow(w0*w0 - wd*wd, 2) + pow(2*zeta*w0*wd, 2) + 1e-9)"
+        },
+        {
+          "name": "phi_ss",
+          "label": "Steady-State Phase Lag (rad)",
+          "expr": "atan2(2*zeta*w0*wd, w0*w0 - wd*wd)"
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Equilibrium (0, 0)",
+          "icon": "ring",
+          "color": "#a78bfa",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "t = 0 / x = 0 Axis",
+          "color": "#a78bfa",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "view": {
+          "xmin": -12,
+          "xmax": 12,
+          "ymin": -12,
+          "ymax": 12
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    }
+  ]
+}

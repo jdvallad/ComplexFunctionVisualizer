@@ -233,8 +233,12 @@ bool hot_compile_workspace(bool is_real, const char *const *card_codes, size_t c
         } else {
             ok_gen &= sb_printf(&sb, "    double complex s = z; (void)z; (void)s;\n");
         }
+        bool is_param_card = is_real && (strstr(code, "double px =") != NULL || strstr(code, "double py =") != NULL);
         for (size_t p = 0; p < param_count; p++) {
             if (is_valid_ident(param_names[p])) {
+                if (is_param_card && (strcmp(param_names[p], "px") == 0 || strcmp(param_names[p], "py") == 0 || strcmp(param_names[p], "t") == 0)) {
+                    continue;
+                }
                 ok_gen &= sb_printf(&sb, "    double %s = P->v[%zu]; (void)%s;\n", param_names[p],
                                     p, param_names[p]);
             }
@@ -565,9 +569,10 @@ void hot_sample_real_slot(int slot, const EvalParams *params, const double *xs, 
     }
 
     if (count >= 96) {
-        const int nthreads = 4;
-        pthread_t threads[4];
-        HotRealJob jobs[4];
+        long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+        int nthreads = (ncpu >= 4 && ncpu <= 12) ? (int)ncpu : (ncpu > 12 ? 12 : 4);
+        pthread_t threads[12];
+        HotRealJob jobs[12];
         size_t chunk = (count + (size_t)nthreads - 1) / (size_t)nthreads;
         int launched = 0;
         for (int t = 0; t < nthreads; t++) {
@@ -804,8 +809,8 @@ typedef struct {
     double half_h;
     int width;
     int height;
-    int y_start;
-    int y_end;
+    int y_offset;
+    int y_stride;
     int scheme;
     uint8_t *rgba;
 } HotDomainJob;
@@ -821,28 +826,49 @@ static void *hot_domain_worker(void *arg) {
     HotComplexSlotFn fn = g_complex_slot_fn;
     int max_s = g_complex_slots;
     if (fn && j->slot >= 0 && j->slot < max_s) {
-        for (int py = j->y_start; py < j->y_end; py++) {
+        bool edge_aa = (j->scheme == 3 || j->scheme == 4 || j->scheme == 5);
+        /* Interleaved scanlines balance Mandelbrot/fractal interior rows evenly across all threads! */
+        for (int py = j->y_offset; py < j->height; py += j->y_stride) {
             double im = y0 - ((double)py + 0.5) * dy;
+            uint8_t *row = j->rgba + ((size_t)py * (size_t)j->width) * 4;
+            uint8_t pr = 0, pg = 0, pb = 0;
             for (int px = 0; px < j->width; px++) {
                 double re = x0 + ((double)px + 0.5) * dx;
                 double complex w = fn(j->slot, c_make(re, im), &j->params);
-                size_t idx = ((size_t)py * (size_t)j->width + (size_t)px) * 4;
                 uint8_t r, g, b;
                 sampler_color_complex(w, j->scheme, &r, &g, &b);
-                j->rgba[idx + 0] = r;
-                j->rgba[idx + 1] = g;
-                j->rgba[idx + 2] = b;
-                j->rgba[idx + 3] = 255;
+                /* Selective 4x subpixel MSAA on high-contrast fractal filaments eliminates live-zoom shimmering! */
+                if (edge_aa && px > 0) {
+                    int diff = abs((int)r - (int)pr) + abs((int)g - (int)pg) + abs((int)b - (int)pb);
+                    if (diff > 40) {
+                        int sr = r, sg = g, sb_acc = b;
+                        static const double offs[3][2] = {{-0.28, -0.28}, {0.28, -0.28}, {0.0, 0.30}};
+                        for (int s = 0; s < 3; s++) {
+                            double complex ws = fn(j->slot, c_make(re + offs[s][0] * dx, im - offs[s][1] * dy), &j->params);
+                            uint8_t tr, tg, tb;
+                            sampler_color_complex(ws, j->scheme, &tr, &tg, &tb);
+                            sr += tr; sg += tg; sb_acc += tb;
+                        }
+                        r = (uint8_t)(sr >> 2);
+                        g = (uint8_t)(sg >> 2);
+                        b = (uint8_t)(sb_acc >> 2);
+                    }
+                }
+                pr = r; pg = g; pb = b;
+                row[px * 4 + 0] = r;
+                row[px * 4 + 1] = g;
+                row[px * 4 + 2] = b;
+                row[px * 4 + 3] = 255;
             }
         }
     } else {
-        for (int py = j->y_start; py < j->y_end; py++) {
+        for (int py = j->y_offset; py < j->height; py += j->y_stride) {
+            uint8_t *row = j->rgba + ((size_t)py * (size_t)j->width) * 4;
             for (int px = 0; px < j->width; px++) {
-                size_t idx = ((size_t)py * (size_t)j->width + (size_t)px) * 4;
-                j->rgba[idx + 0] = 10;
-                j->rgba[idx + 1] = 14;
-                j->rgba[idx + 2] = 23;
-                j->rgba[idx + 3] = 255;
+                row[px * 4 + 0] = 10;
+                row[px * 4 + 1] = 14;
+                row[px * 4 + 2] = 23;
+                row[px * 4 + 3] = 255;
             }
         }
     }
@@ -859,21 +885,25 @@ void hot_render_domain_slot(int slot, const EvalParams *params, double cx, doubl
     if (params) {
         p_copy = *params;
     }
-    const int nthreads = (height >= 32) ? 4 : 1;
+    int nthreads = 1;
+    if (height >= 32) {
+        long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+        if (ncpu < 4) {
+            ncpu = 4;
+        }
+        if (ncpu > 16) {
+            ncpu = 16;
+        }
+        nthreads = (int)ncpu;
+        if (nthreads > height) {
+            nthreads = height;
+        }
+    }
     if (nthreads > 1) {
-        pthread_t threads[4];
-        HotDomainJob jobs[4];
-        int rows_per = (height + nthreads - 1) / nthreads;
+        pthread_t threads[16];
+        HotDomainJob jobs[16];
         int launched = 0;
         for (int t = 0; t < nthreads; t++) {
-            int ys = t * rows_per;
-            if (ys >= height) {
-                break;
-            }
-            int ye = ys + rows_per;
-            if (ye > height) {
-                ye = height;
-            }
             jobs[t] = (HotDomainJob){.slot = slot,
                                      .params = p_copy,
                                      .cx = cx,
@@ -882,8 +912,8 @@ void hot_render_domain_slot(int slot, const EvalParams *params, double cx, doubl
                                      .half_h = half_h,
                                      .width = width,
                                      .height = height,
-                                     .y_start = ys,
-                                     .y_end = ye,
+                                     .y_offset = t,
+                                     .y_stride = nthreads,
                                      .scheme = scheme,
                                      .rgba = rgba_out};
             if (pthread_create(&threads[t], NULL, hot_domain_worker, &jobs[t]) == 0) {
@@ -904,8 +934,8 @@ void hot_render_domain_slot(int slot, const EvalParams *params, double cx, doubl
                             .half_h = half_h,
                             .width = width,
                             .height = height,
-                            .y_start = 0,
-                            .y_end = height,
+                            .y_offset = 0,
+                            .y_stride = 1,
                             .scheme = scheme,
                             .rgba = rgba_out};
         hot_domain_worker(&job);

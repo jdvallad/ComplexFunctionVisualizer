@@ -1,0 +1,4858 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795568766725_152",
+  "name": "Morph",
+  "folder": "my",
+  "subtitle": "6 cards · 5 presets",
+  "description": "",
+  "mode": "real",
+  "cards": [
+    {
+      "title": "Active Morphed Curve (8-Shape Loop)",
+      "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Outgoing Ghost Curve (Source)",
+      "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+      "color": "#fbbf24",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "dashed",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Incoming Ghost Curve (Target)",
+      "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+      "color": "#c084fc",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Homotopy Chord A(probe) to B(probe)",
+      "code": "parametric [0, 1]:\ndouble cs = cos(spin), sn = sin(spin);\ndouble ax = scale * (src_rx * cs - src_ry * sn);\ndouble ay = scale * (src_rx * sn + src_ry * cs);\ndouble bx = scale * (dst_rx * cs - dst_ry * sn);\ndouble by = scale * (dst_rx * sn + dst_ry * cs);\npx = (1.0 - t) * ax + t * bx;\npy = (1.0 - t) * ay + t * by;",
+      "color": "#34d399",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "dashed",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Active Tracer Tail [0, probe]",
+      "code": "parametric [0, 1]:\ndouble ang = t * probe;\ndouble ct = cos(ang), st = sin(ang);\ndouble c2 = cos(2.0 * ang), s3 = sin(3.0 * ang), c4 = cos(4.0 * ang);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+      "color": "#f472b6",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": false,
+      "active": false
+    },
+    {
+      "title": "8-Station Cycle Dial Ring",
+      "code": "parametric [0, 6.283185307179586]:\npx = 3.6 * cos(t);\npy = 3.6 * sin(t);",
+      "color": "#64748b",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [
+    {
+      "name": "morph",
+      "label": "Morph Phase (0-8 Loop)",
+      "value": 2.470829200000013,
+      "min": 0,
+      "max": 8,
+      "step": 0.02,
+      "speed": 0.35
+    },
+    {
+      "name": "probe",
+      "label": "Tracer Angle",
+      "value": 0.35,
+      "min": 0,
+      "max": 6.283185,
+      "step": 0.02,
+      "speed": 1.15
+    },
+    {
+      "name": "dwell",
+      "label": "Shape Hold Dwell",
+      "value": 0.12,
+      "min": 0,
+      "max": 0.35,
+      "step": 0.01,
+      "speed": 0.08
+    },
+    {
+      "name": "spin",
+      "label": "Rotation",
+      "value": 0,
+      "min": 0,
+      "max": 6.283185,
+      "step": 0.02,
+      "speed": 0.4
+    },
+    {
+      "name": "scale",
+      "label": "Curve Scale",
+      "value": 1,
+      "min": 0.4,
+      "max": 1.5,
+      "step": 0.02,
+      "speed": 0.2
+    }
+  ],
+  "vars": [
+    {
+      "name": "morph_mod",
+      "label": "",
+      "expr": "morph - 8 * floor(morph / 8)"
+    },
+    {
+      "name": "seg_idx",
+      "label": "",
+      "expr": "floor(morph_mod)"
+    },
+    {
+      "name": "next_idx",
+      "label": "",
+      "expr": "seg_idx + 1 - 8 * floor((seg_idx + 1) / 8)"
+    },
+    {
+      "name": "blend_u",
+      "label": "",
+      "expr": "min(1, max(0, (morph_mod - seg_idx - dwell) / (1 - 2 * dwell)))"
+    },
+    {
+      "name": "blend_w",
+      "label": "",
+      "expr": "blend_u * blend_u * blend_u * (blend_u * (6 * blend_u - 15) + 10)"
+    },
+    {
+      "name": "src_rx",
+      "label": "",
+      "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(seg_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+    },
+    {
+      "name": "src_ry",
+      "label": "",
+      "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(seg_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+    },
+    {
+      "name": "dst_rx",
+      "label": "",
+      "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(next_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+    },
+    {
+      "name": "dst_ry",
+      "label": "",
+      "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(next_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(next_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+    },
+    {
+      "name": "cur_rx",
+      "label": "",
+      "expr": "(1 - blend_w) * src_rx + blend_w * dst_rx"
+    },
+    {
+      "name": "cur_ry",
+      "label": "",
+      "expr": "(1 - blend_w) * src_ry + blend_w * dst_ry"
+    }
+  ],
+  "shapes": [
+    {
+      "kind": "polygon",
+      "label": "Cycle Dial Arena",
+      "color": "#38bdf8",
+      "lineWidth": 1,
+      "opacity": 0.04,
+      "lineStyle": "dashed",
+      "closed": true,
+      "locked": true,
+      "visible": true,
+      "points": [
+        [
+          3.6,
+          0
+        ],
+        [
+          3.5692,
+          0.4699
+        ],
+        [
+          3.4773,
+          0.9317
+        ],
+        [
+          3.326,
+          1.3777
+        ],
+        [
+          3.1177,
+          1.8
+        ],
+        [
+          2.8561,
+          2.1915
+        ],
+        [
+          2.5456,
+          2.5456
+        ],
+        [
+          2.1915,
+          2.8561
+        ],
+        [
+          1.8,
+          3.1177
+        ],
+        [
+          1.3777,
+          3.326
+        ],
+        [
+          0.9317,
+          3.4773
+        ],
+        [
+          0.4699,
+          3.5692
+        ],
+        [
+          0,
+          3.6
+        ],
+        [
+          -0.4699,
+          3.5692
+        ],
+        [
+          -0.9317,
+          3.4773
+        ],
+        [
+          -1.3777,
+          3.326
+        ],
+        [
+          -1.8,
+          3.1177
+        ],
+        [
+          -2.1915,
+          2.8561
+        ],
+        [
+          -2.5456,
+          2.5456
+        ],
+        [
+          -2.8561,
+          2.1915
+        ],
+        [
+          -3.1177,
+          1.8
+        ],
+        [
+          -3.326,
+          1.3777
+        ],
+        [
+          -3.4773,
+          0.9317
+        ],
+        [
+          -3.5692,
+          0.4699
+        ],
+        [
+          -3.6,
+          0
+        ],
+        [
+          -3.5692,
+          -0.4699
+        ],
+        [
+          -3.4773,
+          -0.9317
+        ],
+        [
+          -3.326,
+          -1.3777
+        ],
+        [
+          -3.1177,
+          -1.8
+        ],
+        [
+          -2.8561,
+          -2.1915
+        ],
+        [
+          -2.5456,
+          -2.5456
+        ],
+        [
+          -2.1915,
+          -2.8561
+        ],
+        [
+          -1.8,
+          -3.1177
+        ],
+        [
+          -1.3777,
+          -3.326
+        ],
+        [
+          -0.9317,
+          -3.4773
+        ],
+        [
+          -0.4699,
+          -3.5692
+        ],
+        [
+          0,
+          -3.6
+        ],
+        [
+          0.4699,
+          -3.5692
+        ],
+        [
+          0.9317,
+          -3.4773
+        ],
+        [
+          1.3777,
+          -3.326
+        ],
+        [
+          1.8,
+          -3.1177
+        ],
+        [
+          2.1915,
+          -2.8561
+        ],
+        [
+          2.5456,
+          -2.5456
+        ],
+        [
+          2.8561,
+          -2.1915
+        ],
+        [
+          3.1177,
+          -1.8
+        ],
+        [
+          3.326,
+          -1.3777
+        ],
+        [
+          3.4773,
+          -0.9317
+        ],
+        [
+          3.5692,
+          -0.4699
+        ]
+      ]
+    },
+    {
+      "kind": "polygon",
+      "label": "Origin Circle Reference (r = 2.4)",
+      "color": "#94a3b8",
+      "lineWidth": 1,
+      "opacity": 0.05,
+      "lineStyle": "dotted",
+      "closed": true,
+      "locked": true,
+      "visible": true,
+      "points": [
+        [
+          2.4,
+          0
+        ],
+        [
+          2.3795,
+          0.3133
+        ],
+        [
+          2.3182,
+          0.6212
+        ],
+        [
+          2.2173,
+          0.9184
+        ],
+        [
+          2.0785,
+          1.2
+        ],
+        [
+          1.904,
+          1.461
+        ],
+        [
+          1.6971,
+          1.6971
+        ],
+        [
+          1.461,
+          1.904
+        ],
+        [
+          1.2,
+          2.0785
+        ],
+        [
+          0.9184,
+          2.2173
+        ],
+        [
+          0.6212,
+          2.3182
+        ],
+        [
+          0.3133,
+          2.3795
+        ],
+        [
+          0,
+          2.4
+        ],
+        [
+          -0.3133,
+          2.3795
+        ],
+        [
+          -0.6212,
+          2.3182
+        ],
+        [
+          -0.9184,
+          2.2173
+        ],
+        [
+          -1.2,
+          2.0785
+        ],
+        [
+          -1.461,
+          1.904
+        ],
+        [
+          -1.6971,
+          1.6971
+        ],
+        [
+          -1.904,
+          1.461
+        ],
+        [
+          -2.0785,
+          1.2
+        ],
+        [
+          -2.2173,
+          0.9184
+        ],
+        [
+          -2.3182,
+          0.6212
+        ],
+        [
+          -2.3795,
+          0.3133
+        ],
+        [
+          -2.4,
+          0
+        ],
+        [
+          -2.3795,
+          -0.3133
+        ],
+        [
+          -2.3182,
+          -0.6212
+        ],
+        [
+          -2.2173,
+          -0.9184
+        ],
+        [
+          -2.0785,
+          -1.2
+        ],
+        [
+          -1.904,
+          -1.461
+        ],
+        [
+          -1.6971,
+          -1.6971
+        ],
+        [
+          -1.461,
+          -1.904
+        ],
+        [
+          -1.2,
+          -2.0785
+        ],
+        [
+          -0.9184,
+          -2.2173
+        ],
+        [
+          -0.6212,
+          -2.3182
+        ],
+        [
+          -0.3133,
+          -2.3795
+        ],
+        [
+          0,
+          -2.4
+        ],
+        [
+          0.3133,
+          -2.3795
+        ],
+        [
+          0.6212,
+          -2.3182
+        ],
+        [
+          0.9184,
+          -2.2173
+        ],
+        [
+          1.2,
+          -2.0785
+        ],
+        [
+          1.461,
+          -1.904
+        ],
+        [
+          1.6971,
+          -1.6971
+        ],
+        [
+          1.904,
+          -1.461
+        ],
+        [
+          2.0785,
+          -1.2
+        ],
+        [
+          2.2173,
+          -0.9184
+        ],
+        [
+          2.3182,
+          -0.6212
+        ],
+        [
+          2.3795,
+          -0.3133
+        ]
+      ]
+    }
+  ],
+  "points": [
+    {
+      "x": 1.8877,
+      "y": 1.5049,
+      "xExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+      "yExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+      "label": "P(probe)",
+      "icon": "dot",
+      "color": "#38bdf8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 1.8114,
+      "y": 1.2635,
+      "xExpr": "scale * (src_rx * cos(spin) - src_ry * sin(spin))",
+      "yExpr": "scale * (src_rx * sin(spin) + src_ry * cos(spin))",
+      "label": "A (Source)",
+      "icon": "dot",
+      "color": "#fbbf24",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 1.9894,
+      "y": 1.827,
+      "xExpr": "scale * (dst_rx * cos(spin) - dst_ry * sin(spin))",
+      "yExpr": "scale * (dst_rx * sin(spin) + dst_ry * cos(spin))",
+      "label": "B (Target)",
+      "icon": "dot",
+      "color": "#c084fc",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 3.3567,
+      "y": -1.3011,
+      "xExpr": "3.6 * cos(pi / 2 - morph_mod * pi / 4)",
+      "yExpr": "3.6 * sin(pi / 2 - morph_mod * pi / 4)",
+      "label": "Morph Dial",
+      "icon": "star",
+      "color": "#34d399",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 0,
+      "y": 3.6,
+      "xExpr": "0",
+      "yExpr": "3.6",
+      "label": "0/8: Circle",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 2.5456,
+      "y": 2.5456,
+      "xExpr": "3.6 * cos(pi / 4)",
+      "yExpr": "3.6 * sin(pi / 4)",
+      "label": "1: Astroid",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 3.6,
+      "y": 0,
+      "xExpr": "3.6",
+      "yExpr": "0",
+      "label": "2: Cardioid",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 2.5456,
+      "y": -2.5456,
+      "xExpr": "3.6 * cos(-pi / 4)",
+      "yExpr": "3.6 * sin(-pi / 4)",
+      "label": "3: Heart",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 0,
+      "y": -3.6,
+      "xExpr": "0",
+      "yExpr": "-3.6",
+      "label": "4: Lemniscate",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -2.5456,
+      "y": -2.5456,
+      "xExpr": "3.6 * cos(-3 * pi / 4)",
+      "yExpr": "3.6 * sin(-3 * pi / 4)",
+      "label": "5: Lissajous",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -3.6,
+      "y": 0,
+      "xExpr": "-3.6",
+      "yExpr": "0",
+      "label": "6: 4-Petal Rose",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -2.5456,
+      "y": 2.5456,
+      "xExpr": "3.6 * cos(3 * pi / 4)",
+      "yExpr": "3.6 * sin(3 * pi / 4)",
+      "label": "7: Butterfly",
+      "icon": "dot",
+      "color": "#94a3b8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "lines": [
+    {
+      "orientation": "vertical",
+      "value": 1.8877,
+      "valExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+      "label": "x = P_x",
+      "color": "#38bdf8",
+      "lineWidth": 1.5,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "orientation": "horizontal",
+      "value": 1.5049,
+      "valExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+      "label": "y = P_y",
+      "color": "#38bdf8",
+      "lineWidth": 1.5,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "layerOrder": [
+    "s:0",
+    "s:1",
+    "l:0",
+    "l:1",
+    "p:0",
+    "p:1",
+    "p:2",
+    "p:3",
+    "p:4",
+    "p:5",
+    "p:6",
+    "p:7",
+    "p:8",
+    "p:9",
+    "p:10",
+    "p:11"
+  ],
+  "viewport": {
+    "view": {
+      "xmin": -7.5631,
+      "xmax": 7.5631,
+      "ymin": -4.2,
+      "ymax": 4.2
+    },
+    "squareAspect": true,
+    "showPrimes": false,
+    "showZeros": false
+  },
+  "presets": [
+    {
+      "id": "default",
+      "name": "Morph Loop (With Ghosts & Chord)",
+      "startSlider": "morph",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Active Morphed Curve (8-Shape Loop)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Outgoing Ghost Curve (Source)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Incoming Ghost Curve (Target)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Homotopy Chord A(probe) to B(probe)",
+          "code": "parametric [0, 1]:\ndouble cs = cos(spin), sn = sin(spin);\ndouble ax = scale * (src_rx * cs - src_ry * sn);\ndouble ay = scale * (src_rx * sn + src_ry * cs);\ndouble bx = scale * (dst_rx * cs - dst_ry * sn);\ndouble by = scale * (dst_rx * sn + dst_ry * cs);\npx = (1.0 - t) * ax + t * bx;\npy = (1.0 - t) * ay + t * by;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Active Tracer Tail [0, probe]",
+          "code": "parametric [0, 1]:\ndouble ang = t * probe;\ndouble ct = cos(ang), st = sin(ang);\ndouble c2 = cos(2.0 * ang), s3 = sin(3.0 * ang), c4 = cos(4.0 * ang);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "8-Station Cycle Dial Ring",
+          "code": "parametric [0, 6.283185307179586]:\npx = 3.6 * cos(t);\npy = 3.6 * sin(t);",
+          "color": "#64748b",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Morph Phase (0-8 Loop)",
+          "value": 0,
+          "min": 0,
+          "max": 8,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "probe",
+          "label": "Tracer Angle",
+          "value": 0.35,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 1.15
+        },
+        {
+          "name": "dwell",
+          "label": "Shape Hold Dwell",
+          "value": 0.12,
+          "min": 0,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.08
+        },
+        {
+          "name": "spin",
+          "label": "Rotation",
+          "value": 0,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "scale",
+          "label": "Curve Scale",
+          "value": 1,
+          "min": 0.4,
+          "max": 1.5,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "morph_mod",
+          "label": "",
+          "expr": "morph - 8 * floor(morph / 8)"
+        },
+        {
+          "name": "seg_idx",
+          "label": "",
+          "expr": "floor(morph_mod)"
+        },
+        {
+          "name": "next_idx",
+          "label": "",
+          "expr": "seg_idx + 1 - 8 * floor((seg_idx + 1) / 8)"
+        },
+        {
+          "name": "blend_u",
+          "label": "",
+          "expr": "min(1, max(0, (morph_mod - seg_idx - dwell) / (1 - 2 * dwell)))"
+        },
+        {
+          "name": "blend_w",
+          "label": "",
+          "expr": "blend_u * blend_u * blend_u * (blend_u * (6 * blend_u - 15) + 10)"
+        },
+        {
+          "name": "src_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(seg_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "src_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(seg_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "dst_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(next_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "dst_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(next_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(next_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "cur_rx",
+          "label": "",
+          "expr": "(1 - blend_w) * src_rx + blend_w * dst_rx"
+        },
+        {
+          "name": "cur_ry",
+          "label": "",
+          "expr": "(1 - blend_w) * src_ry + blend_w * dst_ry"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Cycle Dial Arena",
+          "color": "#38bdf8",
+          "lineWidth": 1,
+          "opacity": 0.04,
+          "lineStyle": "dashed",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              3.6,
+              0
+            ],
+            [
+              3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              3.477332974640646,
+              0.9317485623690747
+            ],
+            [
+              3.325966317040632,
+              1.3776603565143233
+            ],
+            [
+              3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              2.8560720250484466,
+              2.1915411444313944
+            ],
+            [
+              2.5455844122715714,
+              2.545584412271571
+            ],
+            [
+              2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              1.8000000000000005,
+              3.117691453623979
+            ],
+            [
+              1.3776603565143235,
+              3.325966317040632
+            ],
+            [
+              0.9317485623690747,
+              3.477332974640646
+            ],
+            [
+              0.4698942919921862,
+              3.5692015009457174
+            ],
+            [
+              2.2043642384652358e-16,
+              3.6
+            ],
+            [
+              -0.46989429199218496,
+              3.569201500945718
+            ],
+            [
+              -0.9317485623690751,
+              3.477332974640646
+            ],
+            [
+              -1.377660356514323,
+              3.325966317040632
+            ],
+            [
+              -1.7999999999999992,
+              3.1176914536239795
+            ],
+            [
+              -2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              -2.545584412271571,
+              2.5455844122715714
+            ],
+            [
+              -2.856072025048446,
+              2.1915411444313952
+            ],
+            [
+              -3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              -3.325966317040632,
+              1.3776603565143237
+            ],
+            [
+              -3.4773329746406456,
+              0.9317485623690757
+            ],
+            [
+              -3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              -3.6,
+              4.4087284769304716e-16
+            ],
+            [
+              -3.5692015009457174,
+              -0.46989429199218635
+            ],
+            [
+              -3.4773329746406465,
+              -0.9317485623690733
+            ],
+            [
+              -3.3259663170406326,
+              -1.3776603565143228
+            ],
+            [
+              -3.117691453623979,
+              -1.8000000000000005
+            ],
+            [
+              -2.8560720250484475,
+              -2.191541144431393
+            ],
+            [
+              -2.545584412271572,
+              -2.545584412271571
+            ],
+            [
+              -2.1915411444313952,
+              -2.8560720250484457
+            ],
+            [
+              -1.8000000000000016,
+              -3.117691453623978
+            ],
+            [
+              -1.3776603565143253,
+              -3.3259663170406317
+            ],
+            [
+              -0.9317485623690743,
+              -3.477332974640646
+            ],
+            [
+              -0.46989429199218585,
+              -3.5692015009457174
+            ],
+            [
+              -6.613092715395707e-16,
+              -3.6
+            ],
+            [
+              0.4698942919921846,
+              -3.569201500945718
+            ],
+            [
+              0.9317485623690731,
+              -3.4773329746406465
+            ],
+            [
+              1.377660356514324,
+              -3.3259663170406317
+            ],
+            [
+              1.8000000000000005,
+              -3.117691453623979
+            ],
+            [
+              2.191541144431394,
+              -2.8560720250484466
+            ],
+            [
+              2.5455844122715705,
+              -2.545584412271572
+            ],
+            [
+              2.8560720250484457,
+              -2.1915411444313952
+            ],
+            [
+              3.117691453623978,
+              -1.8000000000000016
+            ],
+            [
+              3.3259663170406317,
+              -1.3776603565143255
+            ],
+            [
+              3.477332974640646,
+              -0.9317485623690744
+            ],
+            [
+              3.5692015009457174,
+              -0.4698942919921861
+            ]
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Origin Circle Reference (r = 2.4)",
+          "color": "#94a3b8",
+          "lineWidth": 1,
+          "opacity": 0.05,
+          "lineStyle": "dotted",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              2.4,
+              0
+            ],
+            [
+              2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              2.318221983093764,
+              0.6211657082460498
+            ],
+            [
+              2.2173108780270883,
+              0.9184402376762154
+            ],
+            [
+              2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              1.9040480166989644,
+              1.4610274296209296
+            ],
+            [
+              1.697056274847714,
+              1.6970562748477138
+            ],
+            [
+              1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              1.2000000000000002,
+              2.0784609690826525
+            ],
+            [
+              0.9184402376762155,
+              2.2173108780270883
+            ],
+            [
+              0.6211657082460498,
+              2.318221983093764
+            ],
+            [
+              0.3132628613281241,
+              2.3794676672971447
+            ],
+            [
+              1.4695761589768238e-16,
+              2.4
+            ],
+            [
+              -0.3132628613281233,
+              2.379467667297145
+            ],
+            [
+              -0.62116570824605,
+              2.318221983093764
+            ],
+            [
+              -0.9184402376762153,
+              2.2173108780270883
+            ],
+            [
+              -1.1999999999999995,
+              2.078460969082653
+            ],
+            [
+              -1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              -1.6970562748477138,
+              1.697056274847714
+            ],
+            [
+              -1.904048016698964,
+              1.46102742962093
+            ],
+            [
+              -2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              -2.2173108780270883,
+              0.9184402376762157
+            ],
+            [
+              -2.3182219830937636,
+              0.6211657082460504
+            ],
+            [
+              -2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              -2.4,
+              2.9391523179536476e-16
+            ],
+            [
+              -2.3794676672971447,
+              -0.31326286132812425
+            ],
+            [
+              -2.318221983093764,
+              -0.6211657082460488
+            ],
+            [
+              -2.2173108780270883,
+              -0.9184402376762152
+            ],
+            [
+              -2.0784609690826525,
+              -1.2000000000000002
+            ],
+            [
+              -1.9040480166989648,
+              -1.4610274296209287
+            ],
+            [
+              -1.6970562748477145,
+              -1.6970562748477138
+            ],
+            [
+              -1.46102742962093,
+              -1.9040480166989637
+            ],
+            [
+              -1.200000000000001,
+              -2.078460969082652
+            ],
+            [
+              -0.9184402376762167,
+              -2.2173108780270874
+            ],
+            [
+              -0.6211657082460494,
+              -2.318221983093764
+            ],
+            [
+              -0.3132628613281239,
+              -2.3794676672971447
+            ],
+            [
+              -4.408728476930471e-16,
+              -2.4
+            ],
+            [
+              0.31326286132812303,
+              -2.379467667297145
+            ],
+            [
+              0.6211657082460487,
+              -2.318221983093764
+            ],
+            [
+              0.918440237676216,
+              -2.217310878027088
+            ],
+            [
+              1.2000000000000002,
+              -2.0784609690826525
+            ],
+            [
+              1.4610274296209294,
+              -1.9040480166989644
+            ],
+            [
+              1.6970562748477136,
+              -1.6970562748477145
+            ],
+            [
+              1.9040480166989637,
+              -1.46102742962093
+            ],
+            [
+              2.078460969082652,
+              -1.200000000000001
+            ],
+            [
+              2.2173108780270874,
+              -0.9184402376762169
+            ],
+            [
+              2.318221983093764,
+              -0.6211657082460497
+            ],
+            [
+              2.3794676672971447,
+              -0.31326286132812403
+            ]
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 1.48,
+          "y": 0.419,
+          "xExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "yExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "P(probe)",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.904,
+          "y": 0.695,
+          "xExpr": "scale * (src_rx * cos(spin) - src_ry * sin(spin))",
+          "yExpr": "scale * (src_rx * sin(spin) + src_ry * cos(spin))",
+          "label": "A (Source)",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.783,
+          "y": -0.034,
+          "xExpr": "scale * (dst_rx * cos(spin) - dst_ry * sin(spin))",
+          "yExpr": "scale * (dst_rx * sin(spin) + dst_ry * cos(spin))",
+          "label": "B (Target)",
+          "icon": "dot",
+          "color": "#c084fc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.377,
+          "y": 1.246,
+          "xExpr": "3.6 * cos(pi / 2 - morph_mod * pi / 4)",
+          "yExpr": "3.6 * sin(pi / 2 - morph_mod * pi / 4)",
+          "label": "Morph Dial",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": 3.6,
+          "xExpr": "0",
+          "yExpr": "3.6",
+          "label": "0/8: Circle",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(pi / 4)",
+          "yExpr": "3.6 * sin(pi / 4)",
+          "label": "1: Astroid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 3.6,
+          "y": 0,
+          "xExpr": "3.6",
+          "yExpr": "0",
+          "label": "2: Cardioid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-pi / 4)",
+          "yExpr": "3.6 * sin(-pi / 4)",
+          "label": "3: Heart",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": -3.6,
+          "xExpr": "0",
+          "yExpr": "-3.6",
+          "label": "4: Lemniscate",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-3 * pi / 4)",
+          "yExpr": "3.6 * sin(-3 * pi / 4)",
+          "label": "5: Lissajous",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.6,
+          "y": 0,
+          "xExpr": "-3.6",
+          "yExpr": "0",
+          "label": "6: 4-Petal Rose",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(3 * pi / 4)",
+          "yExpr": "3.6 * sin(3 * pi / 4)",
+          "label": "7: Butterfly",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 1.48,
+          "valExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "label": "x = P_x",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "horizontal",
+          "value": 0.419,
+          "valExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "y = P_y",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "texts": [],
+      "viewport": {
+        "view": {
+          "xmin": -4.8,
+          "xmax": 4.8,
+          "ymin": -4.2,
+          "ymax": 4.2
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "clean_loop",
+      "name": "Pure Morph Showcase",
+      "startSlider": "morph",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Active Morphed Curve (8-Shape Loop)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Outgoing Ghost Curve (Source)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "Incoming Ghost Curve (Target)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "Homotopy Chord A(probe) to B(probe)",
+          "code": "parametric [0, 1]:\ndouble cs = cos(spin), sn = sin(spin);\ndouble ax = scale * (src_rx * cs - src_ry * sn);\ndouble ay = scale * (src_rx * sn + src_ry * cs);\ndouble bx = scale * (dst_rx * cs - dst_ry * sn);\ndouble by = scale * (dst_rx * sn + dst_ry * cs);\npx = (1.0 - t) * ax + t * bx;\npy = (1.0 - t) * ay + t * by;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "Active Tracer Tail [0, probe]",
+          "code": "parametric [0, 1]:\ndouble ang = t * probe;\ndouble ct = cos(ang), st = sin(ang);\ndouble c2 = cos(2.0 * ang), s3 = sin(3.0 * ang), c4 = cos(4.0 * ang);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "8-Station Cycle Dial Ring",
+          "code": "parametric [0, 6.283185307179586]:\npx = 3.6 * cos(t);\npy = 3.6 * sin(t);",
+          "color": "#64748b",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Morph Phase (0-8 Loop)",
+          "value": 0,
+          "min": 0,
+          "max": 8,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "probe",
+          "label": "Tracer Angle",
+          "value": 0.35,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 1.15
+        },
+        {
+          "name": "dwell",
+          "label": "Shape Hold Dwell",
+          "value": 0.1,
+          "min": 0,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.08
+        },
+        {
+          "name": "spin",
+          "label": "Rotation",
+          "value": 0,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "scale",
+          "label": "Curve Scale",
+          "value": 1.05,
+          "min": 0.4,
+          "max": 1.5,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "morph_mod",
+          "label": "",
+          "expr": "morph - 8 * floor(morph / 8)"
+        },
+        {
+          "name": "seg_idx",
+          "label": "",
+          "expr": "floor(morph_mod)"
+        },
+        {
+          "name": "next_idx",
+          "label": "",
+          "expr": "seg_idx + 1 - 8 * floor((seg_idx + 1) / 8)"
+        },
+        {
+          "name": "blend_u",
+          "label": "",
+          "expr": "min(1, max(0, (morph_mod - seg_idx - dwell) / (1 - 2 * dwell)))"
+        },
+        {
+          "name": "blend_w",
+          "label": "",
+          "expr": "blend_u * blend_u * blend_u * (blend_u * (6 * blend_u - 15) + 10)"
+        },
+        {
+          "name": "src_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(seg_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "src_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(seg_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "dst_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(next_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "dst_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(next_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(next_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "cur_rx",
+          "label": "",
+          "expr": "(1 - blend_w) * src_rx + blend_w * dst_rx"
+        },
+        {
+          "name": "cur_ry",
+          "label": "",
+          "expr": "(1 - blend_w) * src_ry + blend_w * dst_ry"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Cycle Dial Arena",
+          "color": "#38bdf8",
+          "lineWidth": 1,
+          "opacity": 0.04,
+          "lineStyle": "dashed",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              3.6,
+              0
+            ],
+            [
+              3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              3.477332974640646,
+              0.9317485623690747
+            ],
+            [
+              3.325966317040632,
+              1.3776603565143233
+            ],
+            [
+              3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              2.8560720250484466,
+              2.1915411444313944
+            ],
+            [
+              2.5455844122715714,
+              2.545584412271571
+            ],
+            [
+              2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              1.8000000000000005,
+              3.117691453623979
+            ],
+            [
+              1.3776603565143235,
+              3.325966317040632
+            ],
+            [
+              0.9317485623690747,
+              3.477332974640646
+            ],
+            [
+              0.4698942919921862,
+              3.5692015009457174
+            ],
+            [
+              2.2043642384652358e-16,
+              3.6
+            ],
+            [
+              -0.46989429199218496,
+              3.569201500945718
+            ],
+            [
+              -0.9317485623690751,
+              3.477332974640646
+            ],
+            [
+              -1.377660356514323,
+              3.325966317040632
+            ],
+            [
+              -1.7999999999999992,
+              3.1176914536239795
+            ],
+            [
+              -2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              -2.545584412271571,
+              2.5455844122715714
+            ],
+            [
+              -2.856072025048446,
+              2.1915411444313952
+            ],
+            [
+              -3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              -3.325966317040632,
+              1.3776603565143237
+            ],
+            [
+              -3.4773329746406456,
+              0.9317485623690757
+            ],
+            [
+              -3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              -3.6,
+              4.4087284769304716e-16
+            ],
+            [
+              -3.5692015009457174,
+              -0.46989429199218635
+            ],
+            [
+              -3.4773329746406465,
+              -0.9317485623690733
+            ],
+            [
+              -3.3259663170406326,
+              -1.3776603565143228
+            ],
+            [
+              -3.117691453623979,
+              -1.8000000000000005
+            ],
+            [
+              -2.8560720250484475,
+              -2.191541144431393
+            ],
+            [
+              -2.545584412271572,
+              -2.545584412271571
+            ],
+            [
+              -2.1915411444313952,
+              -2.8560720250484457
+            ],
+            [
+              -1.8000000000000016,
+              -3.117691453623978
+            ],
+            [
+              -1.3776603565143253,
+              -3.3259663170406317
+            ],
+            [
+              -0.9317485623690743,
+              -3.477332974640646
+            ],
+            [
+              -0.46989429199218585,
+              -3.5692015009457174
+            ],
+            [
+              -6.613092715395707e-16,
+              -3.6
+            ],
+            [
+              0.4698942919921846,
+              -3.569201500945718
+            ],
+            [
+              0.9317485623690731,
+              -3.4773329746406465
+            ],
+            [
+              1.377660356514324,
+              -3.3259663170406317
+            ],
+            [
+              1.8000000000000005,
+              -3.117691453623979
+            ],
+            [
+              2.191541144431394,
+              -2.8560720250484466
+            ],
+            [
+              2.5455844122715705,
+              -2.545584412271572
+            ],
+            [
+              2.8560720250484457,
+              -2.1915411444313952
+            ],
+            [
+              3.117691453623978,
+              -1.8000000000000016
+            ],
+            [
+              3.3259663170406317,
+              -1.3776603565143255
+            ],
+            [
+              3.477332974640646,
+              -0.9317485623690744
+            ],
+            [
+              3.5692015009457174,
+              -0.4698942919921861
+            ]
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Origin Circle Reference (r = 2.4)",
+          "color": "#94a3b8",
+          "lineWidth": 1,
+          "opacity": 0.05,
+          "lineStyle": "dotted",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              2.4,
+              0
+            ],
+            [
+              2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              2.318221983093764,
+              0.6211657082460498
+            ],
+            [
+              2.2173108780270883,
+              0.9184402376762154
+            ],
+            [
+              2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              1.9040480166989644,
+              1.4610274296209296
+            ],
+            [
+              1.697056274847714,
+              1.6970562748477138
+            ],
+            [
+              1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              1.2000000000000002,
+              2.0784609690826525
+            ],
+            [
+              0.9184402376762155,
+              2.2173108780270883
+            ],
+            [
+              0.6211657082460498,
+              2.318221983093764
+            ],
+            [
+              0.3132628613281241,
+              2.3794676672971447
+            ],
+            [
+              1.4695761589768238e-16,
+              2.4
+            ],
+            [
+              -0.3132628613281233,
+              2.379467667297145
+            ],
+            [
+              -0.62116570824605,
+              2.318221983093764
+            ],
+            [
+              -0.9184402376762153,
+              2.2173108780270883
+            ],
+            [
+              -1.1999999999999995,
+              2.078460969082653
+            ],
+            [
+              -1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              -1.6970562748477138,
+              1.697056274847714
+            ],
+            [
+              -1.904048016698964,
+              1.46102742962093
+            ],
+            [
+              -2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              -2.2173108780270883,
+              0.9184402376762157
+            ],
+            [
+              -2.3182219830937636,
+              0.6211657082460504
+            ],
+            [
+              -2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              -2.4,
+              2.9391523179536476e-16
+            ],
+            [
+              -2.3794676672971447,
+              -0.31326286132812425
+            ],
+            [
+              -2.318221983093764,
+              -0.6211657082460488
+            ],
+            [
+              -2.2173108780270883,
+              -0.9184402376762152
+            ],
+            [
+              -2.0784609690826525,
+              -1.2000000000000002
+            ],
+            [
+              -1.9040480166989648,
+              -1.4610274296209287
+            ],
+            [
+              -1.6970562748477145,
+              -1.6970562748477138
+            ],
+            [
+              -1.46102742962093,
+              -1.9040480166989637
+            ],
+            [
+              -1.200000000000001,
+              -2.078460969082652
+            ],
+            [
+              -0.9184402376762167,
+              -2.2173108780270874
+            ],
+            [
+              -0.6211657082460494,
+              -2.318221983093764
+            ],
+            [
+              -0.3132628613281239,
+              -2.3794676672971447
+            ],
+            [
+              -4.408728476930471e-16,
+              -2.4
+            ],
+            [
+              0.31326286132812303,
+              -2.379467667297145
+            ],
+            [
+              0.6211657082460487,
+              -2.318221983093764
+            ],
+            [
+              0.918440237676216,
+              -2.217310878027088
+            ],
+            [
+              1.2000000000000002,
+              -2.0784609690826525
+            ],
+            [
+              1.4610274296209294,
+              -1.9040480166989644
+            ],
+            [
+              1.6970562748477136,
+              -1.6970562748477145
+            ],
+            [
+              1.9040480166989637,
+              -1.46102742962093
+            ],
+            [
+              2.078460969082652,
+              -1.200000000000001
+            ],
+            [
+              2.2173108780270874,
+              -0.9184402376762169
+            ],
+            [
+              2.318221983093764,
+              -0.6211657082460497
+            ],
+            [
+              2.3794676672971447,
+              -0.31326286132812403
+            ]
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 1.48,
+          "y": 0.419,
+          "xExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "yExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "P(probe)",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.904,
+          "y": 0.695,
+          "xExpr": "scale * (src_rx * cos(spin) - src_ry * sin(spin))",
+          "yExpr": "scale * (src_rx * sin(spin) + src_ry * cos(spin))",
+          "label": "A (Source)",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.783,
+          "y": -0.034,
+          "xExpr": "scale * (dst_rx * cos(spin) - dst_ry * sin(spin))",
+          "yExpr": "scale * (dst_rx * sin(spin) + dst_ry * cos(spin))",
+          "label": "B (Target)",
+          "icon": "dot",
+          "color": "#c084fc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.377,
+          "y": 1.246,
+          "xExpr": "3.6 * cos(pi / 2 - morph_mod * pi / 4)",
+          "yExpr": "3.6 * sin(pi / 2 - morph_mod * pi / 4)",
+          "label": "Morph Dial",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": 3.6,
+          "xExpr": "0",
+          "yExpr": "3.6",
+          "label": "0/8: Circle",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(pi / 4)",
+          "yExpr": "3.6 * sin(pi / 4)",
+          "label": "1: Astroid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 3.6,
+          "y": 0,
+          "xExpr": "3.6",
+          "yExpr": "0",
+          "label": "2: Cardioid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-pi / 4)",
+          "yExpr": "3.6 * sin(-pi / 4)",
+          "label": "3: Heart",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": -3.6,
+          "xExpr": "0",
+          "yExpr": "-3.6",
+          "label": "4: Lemniscate",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-3 * pi / 4)",
+          "yExpr": "3.6 * sin(-3 * pi / 4)",
+          "label": "5: Lissajous",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.6,
+          "y": 0,
+          "xExpr": "-3.6",
+          "yExpr": "0",
+          "label": "6: 4-Petal Rose",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(3 * pi / 4)",
+          "yExpr": "3.6 * sin(3 * pi / 4)",
+          "label": "7: Butterfly",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 1.48,
+          "valExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "label": "x = P_x",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "horizontal",
+          "value": 0.419,
+          "valExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "y = P_y",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "texts": [],
+      "viewport": {
+        "view": {
+          "xmin": -4.8,
+          "xmax": 4.8,
+          "ymin": -4.2,
+          "ymax": 4.2
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "heart_lemniscate",
+      "name": "Heart -> Lemniscate Tracer Sweep",
+      "startSlider": "probe",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Active Morphed Curve (8-Shape Loop)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Outgoing Ghost Curve (Source)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Incoming Ghost Curve (Target)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Homotopy Chord A(probe) to B(probe)",
+          "code": "parametric [0, 1]:\ndouble cs = cos(spin), sn = sin(spin);\ndouble ax = scale * (src_rx * cs - src_ry * sn);\ndouble ay = scale * (src_rx * sn + src_ry * cs);\ndouble bx = scale * (dst_rx * cs - dst_ry * sn);\ndouble by = scale * (dst_rx * sn + dst_ry * cs);\npx = (1.0 - t) * ax + t * bx;\npy = (1.0 - t) * ay + t * by;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Active Tracer Tail [0, probe]",
+          "code": "parametric [0, 1]:\ndouble ang = t * probe;\ndouble ct = cos(ang), st = sin(ang);\ndouble c2 = cos(2.0 * ang), s3 = sin(3.0 * ang), c4 = cos(4.0 * ang);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "8-Station Cycle Dial Ring",
+          "code": "parametric [0, 6.283185307179586]:\npx = 3.6 * cos(t);\npy = 3.6 * sin(t);",
+          "color": "#64748b",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Morph Phase (0-8 Loop)",
+          "value": 3.5,
+          "min": 0,
+          "max": 8,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "probe",
+          "label": "Tracer Angle",
+          "value": 0,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 1.15
+        },
+        {
+          "name": "dwell",
+          "label": "Shape Hold Dwell",
+          "value": 0.08,
+          "min": 0,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.08
+        },
+        {
+          "name": "spin",
+          "label": "Rotation",
+          "value": 0,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "scale",
+          "label": "Curve Scale",
+          "value": 1,
+          "min": 0.4,
+          "max": 1.5,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "morph_mod",
+          "label": "",
+          "expr": "morph - 8 * floor(morph / 8)"
+        },
+        {
+          "name": "seg_idx",
+          "label": "",
+          "expr": "floor(morph_mod)"
+        },
+        {
+          "name": "next_idx",
+          "label": "",
+          "expr": "seg_idx + 1 - 8 * floor((seg_idx + 1) / 8)"
+        },
+        {
+          "name": "blend_u",
+          "label": "",
+          "expr": "min(1, max(0, (morph_mod - seg_idx - dwell) / (1 - 2 * dwell)))"
+        },
+        {
+          "name": "blend_w",
+          "label": "",
+          "expr": "blend_u * blend_u * blend_u * (blend_u * (6 * blend_u - 15) + 10)"
+        },
+        {
+          "name": "src_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(seg_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "src_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(seg_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "dst_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(next_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "dst_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(next_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(next_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "cur_rx",
+          "label": "",
+          "expr": "(1 - blend_w) * src_rx + blend_w * dst_rx"
+        },
+        {
+          "name": "cur_ry",
+          "label": "",
+          "expr": "(1 - blend_w) * src_ry + blend_w * dst_ry"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Cycle Dial Arena",
+          "color": "#38bdf8",
+          "lineWidth": 1,
+          "opacity": 0.04,
+          "lineStyle": "dashed",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              3.6,
+              0
+            ],
+            [
+              3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              3.477332974640646,
+              0.9317485623690747
+            ],
+            [
+              3.325966317040632,
+              1.3776603565143233
+            ],
+            [
+              3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              2.8560720250484466,
+              2.1915411444313944
+            ],
+            [
+              2.5455844122715714,
+              2.545584412271571
+            ],
+            [
+              2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              1.8000000000000005,
+              3.117691453623979
+            ],
+            [
+              1.3776603565143235,
+              3.325966317040632
+            ],
+            [
+              0.9317485623690747,
+              3.477332974640646
+            ],
+            [
+              0.4698942919921862,
+              3.5692015009457174
+            ],
+            [
+              2.2043642384652358e-16,
+              3.6
+            ],
+            [
+              -0.46989429199218496,
+              3.569201500945718
+            ],
+            [
+              -0.9317485623690751,
+              3.477332974640646
+            ],
+            [
+              -1.377660356514323,
+              3.325966317040632
+            ],
+            [
+              -1.7999999999999992,
+              3.1176914536239795
+            ],
+            [
+              -2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              -2.545584412271571,
+              2.5455844122715714
+            ],
+            [
+              -2.856072025048446,
+              2.1915411444313952
+            ],
+            [
+              -3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              -3.325966317040632,
+              1.3776603565143237
+            ],
+            [
+              -3.4773329746406456,
+              0.9317485623690757
+            ],
+            [
+              -3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              -3.6,
+              4.4087284769304716e-16
+            ],
+            [
+              -3.5692015009457174,
+              -0.46989429199218635
+            ],
+            [
+              -3.4773329746406465,
+              -0.9317485623690733
+            ],
+            [
+              -3.3259663170406326,
+              -1.3776603565143228
+            ],
+            [
+              -3.117691453623979,
+              -1.8000000000000005
+            ],
+            [
+              -2.8560720250484475,
+              -2.191541144431393
+            ],
+            [
+              -2.545584412271572,
+              -2.545584412271571
+            ],
+            [
+              -2.1915411444313952,
+              -2.8560720250484457
+            ],
+            [
+              -1.8000000000000016,
+              -3.117691453623978
+            ],
+            [
+              -1.3776603565143253,
+              -3.3259663170406317
+            ],
+            [
+              -0.9317485623690743,
+              -3.477332974640646
+            ],
+            [
+              -0.46989429199218585,
+              -3.5692015009457174
+            ],
+            [
+              -6.613092715395707e-16,
+              -3.6
+            ],
+            [
+              0.4698942919921846,
+              -3.569201500945718
+            ],
+            [
+              0.9317485623690731,
+              -3.4773329746406465
+            ],
+            [
+              1.377660356514324,
+              -3.3259663170406317
+            ],
+            [
+              1.8000000000000005,
+              -3.117691453623979
+            ],
+            [
+              2.191541144431394,
+              -2.8560720250484466
+            ],
+            [
+              2.5455844122715705,
+              -2.545584412271572
+            ],
+            [
+              2.8560720250484457,
+              -2.1915411444313952
+            ],
+            [
+              3.117691453623978,
+              -1.8000000000000016
+            ],
+            [
+              3.3259663170406317,
+              -1.3776603565143255
+            ],
+            [
+              3.477332974640646,
+              -0.9317485623690744
+            ],
+            [
+              3.5692015009457174,
+              -0.4698942919921861
+            ]
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Origin Circle Reference (r = 2.4)",
+          "color": "#94a3b8",
+          "lineWidth": 1,
+          "opacity": 0.05,
+          "lineStyle": "dotted",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              2.4,
+              0
+            ],
+            [
+              2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              2.318221983093764,
+              0.6211657082460498
+            ],
+            [
+              2.2173108780270883,
+              0.9184402376762154
+            ],
+            [
+              2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              1.9040480166989644,
+              1.4610274296209296
+            ],
+            [
+              1.697056274847714,
+              1.6970562748477138
+            ],
+            [
+              1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              1.2000000000000002,
+              2.0784609690826525
+            ],
+            [
+              0.9184402376762155,
+              2.2173108780270883
+            ],
+            [
+              0.6211657082460498,
+              2.318221983093764
+            ],
+            [
+              0.3132628613281241,
+              2.3794676672971447
+            ],
+            [
+              1.4695761589768238e-16,
+              2.4
+            ],
+            [
+              -0.3132628613281233,
+              2.379467667297145
+            ],
+            [
+              -0.62116570824605,
+              2.318221983093764
+            ],
+            [
+              -0.9184402376762153,
+              2.2173108780270883
+            ],
+            [
+              -1.1999999999999995,
+              2.078460969082653
+            ],
+            [
+              -1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              -1.6970562748477138,
+              1.697056274847714
+            ],
+            [
+              -1.904048016698964,
+              1.46102742962093
+            ],
+            [
+              -2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              -2.2173108780270883,
+              0.9184402376762157
+            ],
+            [
+              -2.3182219830937636,
+              0.6211657082460504
+            ],
+            [
+              -2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              -2.4,
+              2.9391523179536476e-16
+            ],
+            [
+              -2.3794676672971447,
+              -0.31326286132812425
+            ],
+            [
+              -2.318221983093764,
+              -0.6211657082460488
+            ],
+            [
+              -2.2173108780270883,
+              -0.9184402376762152
+            ],
+            [
+              -2.0784609690826525,
+              -1.2000000000000002
+            ],
+            [
+              -1.9040480166989648,
+              -1.4610274296209287
+            ],
+            [
+              -1.6970562748477145,
+              -1.6970562748477138
+            ],
+            [
+              -1.46102742962093,
+              -1.9040480166989637
+            ],
+            [
+              -1.200000000000001,
+              -2.078460969082652
+            ],
+            [
+              -0.9184402376762167,
+              -2.2173108780270874
+            ],
+            [
+              -0.6211657082460494,
+              -2.318221983093764
+            ],
+            [
+              -0.3132628613281239,
+              -2.3794676672971447
+            ],
+            [
+              -4.408728476930471e-16,
+              -2.4
+            ],
+            [
+              0.31326286132812303,
+              -2.379467667297145
+            ],
+            [
+              0.6211657082460487,
+              -2.318221983093764
+            ],
+            [
+              0.918440237676216,
+              -2.217310878027088
+            ],
+            [
+              1.2000000000000002,
+              -2.0784609690826525
+            ],
+            [
+              1.4610274296209294,
+              -1.9040480166989644
+            ],
+            [
+              1.6970562748477136,
+              -1.6970562748477145
+            ],
+            [
+              1.9040480166989637,
+              -1.46102742962093
+            ],
+            [
+              2.078460969082652,
+              -1.200000000000001
+            ],
+            [
+              2.2173108780270874,
+              -0.9184402376762169
+            ],
+            [
+              2.318221983093764,
+              -0.6211657082460497
+            ],
+            [
+              2.3794676672971447,
+              -0.31326286132812403
+            ]
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 1.48,
+          "y": 0.419,
+          "xExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "yExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "P(probe)",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.904,
+          "y": 0.695,
+          "xExpr": "scale * (src_rx * cos(spin) - src_ry * sin(spin))",
+          "yExpr": "scale * (src_rx * sin(spin) + src_ry * cos(spin))",
+          "label": "A (Source)",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.783,
+          "y": -0.034,
+          "xExpr": "scale * (dst_rx * cos(spin) - dst_ry * sin(spin))",
+          "yExpr": "scale * (dst_rx * sin(spin) + dst_ry * cos(spin))",
+          "label": "B (Target)",
+          "icon": "dot",
+          "color": "#c084fc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.377,
+          "y": 1.246,
+          "xExpr": "3.6 * cos(pi / 2 - morph_mod * pi / 4)",
+          "yExpr": "3.6 * sin(pi / 2 - morph_mod * pi / 4)",
+          "label": "Morph Dial",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": 3.6,
+          "xExpr": "0",
+          "yExpr": "3.6",
+          "label": "0/8: Circle",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(pi / 4)",
+          "yExpr": "3.6 * sin(pi / 4)",
+          "label": "1: Astroid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 3.6,
+          "y": 0,
+          "xExpr": "3.6",
+          "yExpr": "0",
+          "label": "2: Cardioid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-pi / 4)",
+          "yExpr": "3.6 * sin(-pi / 4)",
+          "label": "3: Heart",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": -3.6,
+          "xExpr": "0",
+          "yExpr": "-3.6",
+          "label": "4: Lemniscate",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-3 * pi / 4)",
+          "yExpr": "3.6 * sin(-3 * pi / 4)",
+          "label": "5: Lissajous",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.6,
+          "y": 0,
+          "xExpr": "-3.6",
+          "yExpr": "0",
+          "label": "6: 4-Petal Rose",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(3 * pi / 4)",
+          "yExpr": "3.6 * sin(3 * pi / 4)",
+          "label": "7: Butterfly",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 1.48,
+          "valExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "label": "x = P_x",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "horizontal",
+          "value": 0.419,
+          "valExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "y = P_y",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "texts": [],
+      "viewport": {
+        "view": {
+          "xmin": -4.6,
+          "xmax": 4.6,
+          "ymin": -4.1,
+          "ymax": 4.1
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "loop_wrap",
+      "name": "Seamless Wrap (Butterfly -> Circle)",
+      "startSlider": "morph",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Active Morphed Curve (8-Shape Loop)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Outgoing Ghost Curve (Source)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Incoming Ghost Curve (Target)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Homotopy Chord A(probe) to B(probe)",
+          "code": "parametric [0, 1]:\ndouble cs = cos(spin), sn = sin(spin);\ndouble ax = scale * (src_rx * cs - src_ry * sn);\ndouble ay = scale * (src_rx * sn + src_ry * cs);\ndouble bx = scale * (dst_rx * cs - dst_ry * sn);\ndouble by = scale * (dst_rx * sn + dst_ry * cs);\npx = (1.0 - t) * ax + t * bx;\npy = (1.0 - t) * ay + t * by;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Active Tracer Tail [0, probe]",
+          "code": "parametric [0, 1]:\ndouble ang = t * probe;\ndouble ct = cos(ang), st = sin(ang);\ndouble c2 = cos(2.0 * ang), s3 = sin(3.0 * ang), c4 = cos(4.0 * ang);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "8-Station Cycle Dial Ring",
+          "code": "parametric [0, 6.283185307179586]:\npx = 3.6 * cos(t);\npy = 3.6 * sin(t);",
+          "color": "#64748b",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Morph Phase (0-8 Loop)",
+          "value": 0,
+          "min": 0,
+          "max": 8,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "probe",
+          "label": "Tracer Angle",
+          "value": 0.7854,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 1.15
+        },
+        {
+          "name": "dwell",
+          "label": "Shape Hold Dwell",
+          "value": 0.1,
+          "min": 0,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.08
+        },
+        {
+          "name": "spin",
+          "label": "Rotation",
+          "value": 0,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "scale",
+          "label": "Curve Scale",
+          "value": 1,
+          "min": 0.4,
+          "max": 1.5,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "morph_mod",
+          "label": "",
+          "expr": "morph - 8 * floor(morph / 8)"
+        },
+        {
+          "name": "seg_idx",
+          "label": "",
+          "expr": "floor(morph_mod)"
+        },
+        {
+          "name": "next_idx",
+          "label": "",
+          "expr": "seg_idx + 1 - 8 * floor((seg_idx + 1) / 8)"
+        },
+        {
+          "name": "blend_u",
+          "label": "",
+          "expr": "min(1, max(0, (morph_mod - seg_idx - dwell) / (1 - 2 * dwell)))"
+        },
+        {
+          "name": "blend_w",
+          "label": "",
+          "expr": "blend_u * blend_u * blend_u * (blend_u * (6 * blend_u - 15) + 10)"
+        },
+        {
+          "name": "src_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(seg_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "src_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(seg_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "dst_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(next_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "dst_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(next_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(next_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "cur_rx",
+          "label": "",
+          "expr": "(1 - blend_w) * src_rx + blend_w * dst_rx"
+        },
+        {
+          "name": "cur_ry",
+          "label": "",
+          "expr": "(1 - blend_w) * src_ry + blend_w * dst_ry"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Cycle Dial Arena",
+          "color": "#38bdf8",
+          "lineWidth": 1,
+          "opacity": 0.04,
+          "lineStyle": "dashed",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              3.6,
+              0
+            ],
+            [
+              3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              3.477332974640646,
+              0.9317485623690747
+            ],
+            [
+              3.325966317040632,
+              1.3776603565143233
+            ],
+            [
+              3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              2.8560720250484466,
+              2.1915411444313944
+            ],
+            [
+              2.5455844122715714,
+              2.545584412271571
+            ],
+            [
+              2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              1.8000000000000005,
+              3.117691453623979
+            ],
+            [
+              1.3776603565143235,
+              3.325966317040632
+            ],
+            [
+              0.9317485623690747,
+              3.477332974640646
+            ],
+            [
+              0.4698942919921862,
+              3.5692015009457174
+            ],
+            [
+              2.2043642384652358e-16,
+              3.6
+            ],
+            [
+              -0.46989429199218496,
+              3.569201500945718
+            ],
+            [
+              -0.9317485623690751,
+              3.477332974640646
+            ],
+            [
+              -1.377660356514323,
+              3.325966317040632
+            ],
+            [
+              -1.7999999999999992,
+              3.1176914536239795
+            ],
+            [
+              -2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              -2.545584412271571,
+              2.5455844122715714
+            ],
+            [
+              -2.856072025048446,
+              2.1915411444313952
+            ],
+            [
+              -3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              -3.325966317040632,
+              1.3776603565143237
+            ],
+            [
+              -3.4773329746406456,
+              0.9317485623690757
+            ],
+            [
+              -3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              -3.6,
+              4.4087284769304716e-16
+            ],
+            [
+              -3.5692015009457174,
+              -0.46989429199218635
+            ],
+            [
+              -3.4773329746406465,
+              -0.9317485623690733
+            ],
+            [
+              -3.3259663170406326,
+              -1.3776603565143228
+            ],
+            [
+              -3.117691453623979,
+              -1.8000000000000005
+            ],
+            [
+              -2.8560720250484475,
+              -2.191541144431393
+            ],
+            [
+              -2.545584412271572,
+              -2.545584412271571
+            ],
+            [
+              -2.1915411444313952,
+              -2.8560720250484457
+            ],
+            [
+              -1.8000000000000016,
+              -3.117691453623978
+            ],
+            [
+              -1.3776603565143253,
+              -3.3259663170406317
+            ],
+            [
+              -0.9317485623690743,
+              -3.477332974640646
+            ],
+            [
+              -0.46989429199218585,
+              -3.5692015009457174
+            ],
+            [
+              -6.613092715395707e-16,
+              -3.6
+            ],
+            [
+              0.4698942919921846,
+              -3.569201500945718
+            ],
+            [
+              0.9317485623690731,
+              -3.4773329746406465
+            ],
+            [
+              1.377660356514324,
+              -3.3259663170406317
+            ],
+            [
+              1.8000000000000005,
+              -3.117691453623979
+            ],
+            [
+              2.191541144431394,
+              -2.8560720250484466
+            ],
+            [
+              2.5455844122715705,
+              -2.545584412271572
+            ],
+            [
+              2.8560720250484457,
+              -2.1915411444313952
+            ],
+            [
+              3.117691453623978,
+              -1.8000000000000016
+            ],
+            [
+              3.3259663170406317,
+              -1.3776603565143255
+            ],
+            [
+              3.477332974640646,
+              -0.9317485623690744
+            ],
+            [
+              3.5692015009457174,
+              -0.4698942919921861
+            ]
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Origin Circle Reference (r = 2.4)",
+          "color": "#94a3b8",
+          "lineWidth": 1,
+          "opacity": 0.05,
+          "lineStyle": "dotted",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              2.4,
+              0
+            ],
+            [
+              2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              2.318221983093764,
+              0.6211657082460498
+            ],
+            [
+              2.2173108780270883,
+              0.9184402376762154
+            ],
+            [
+              2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              1.9040480166989644,
+              1.4610274296209296
+            ],
+            [
+              1.697056274847714,
+              1.6970562748477138
+            ],
+            [
+              1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              1.2000000000000002,
+              2.0784609690826525
+            ],
+            [
+              0.9184402376762155,
+              2.2173108780270883
+            ],
+            [
+              0.6211657082460498,
+              2.318221983093764
+            ],
+            [
+              0.3132628613281241,
+              2.3794676672971447
+            ],
+            [
+              1.4695761589768238e-16,
+              2.4
+            ],
+            [
+              -0.3132628613281233,
+              2.379467667297145
+            ],
+            [
+              -0.62116570824605,
+              2.318221983093764
+            ],
+            [
+              -0.9184402376762153,
+              2.2173108780270883
+            ],
+            [
+              -1.1999999999999995,
+              2.078460969082653
+            ],
+            [
+              -1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              -1.6970562748477138,
+              1.697056274847714
+            ],
+            [
+              -1.904048016698964,
+              1.46102742962093
+            ],
+            [
+              -2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              -2.2173108780270883,
+              0.9184402376762157
+            ],
+            [
+              -2.3182219830937636,
+              0.6211657082460504
+            ],
+            [
+              -2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              -2.4,
+              2.9391523179536476e-16
+            ],
+            [
+              -2.3794676672971447,
+              -0.31326286132812425
+            ],
+            [
+              -2.318221983093764,
+              -0.6211657082460488
+            ],
+            [
+              -2.2173108780270883,
+              -0.9184402376762152
+            ],
+            [
+              -2.0784609690826525,
+              -1.2000000000000002
+            ],
+            [
+              -1.9040480166989648,
+              -1.4610274296209287
+            ],
+            [
+              -1.6970562748477145,
+              -1.6970562748477138
+            ],
+            [
+              -1.46102742962093,
+              -1.9040480166989637
+            ],
+            [
+              -1.200000000000001,
+              -2.078460969082652
+            ],
+            [
+              -0.9184402376762167,
+              -2.2173108780270874
+            ],
+            [
+              -0.6211657082460494,
+              -2.318221983093764
+            ],
+            [
+              -0.3132628613281239,
+              -2.3794676672971447
+            ],
+            [
+              -4.408728476930471e-16,
+              -2.4
+            ],
+            [
+              0.31326286132812303,
+              -2.379467667297145
+            ],
+            [
+              0.6211657082460487,
+              -2.318221983093764
+            ],
+            [
+              0.918440237676216,
+              -2.217310878027088
+            ],
+            [
+              1.2000000000000002,
+              -2.0784609690826525
+            ],
+            [
+              1.4610274296209294,
+              -1.9040480166989644
+            ],
+            [
+              1.6970562748477136,
+              -1.6970562748477145
+            ],
+            [
+              1.9040480166989637,
+              -1.46102742962093
+            ],
+            [
+              2.078460969082652,
+              -1.200000000000001
+            ],
+            [
+              2.2173108780270874,
+              -0.9184402376762169
+            ],
+            [
+              2.318221983093764,
+              -0.6211657082460497
+            ],
+            [
+              2.3794676672971447,
+              -0.31326286132812403
+            ]
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 1.48,
+          "y": 0.419,
+          "xExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "yExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "P(probe)",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.904,
+          "y": 0.695,
+          "xExpr": "scale * (src_rx * cos(spin) - src_ry * sin(spin))",
+          "yExpr": "scale * (src_rx * sin(spin) + src_ry * cos(spin))",
+          "label": "A (Source)",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.783,
+          "y": -0.034,
+          "xExpr": "scale * (dst_rx * cos(spin) - dst_ry * sin(spin))",
+          "yExpr": "scale * (dst_rx * sin(spin) + dst_ry * cos(spin))",
+          "label": "B (Target)",
+          "icon": "dot",
+          "color": "#c084fc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.377,
+          "y": 1.246,
+          "xExpr": "3.6 * cos(pi / 2 - morph_mod * pi / 4)",
+          "yExpr": "3.6 * sin(pi / 2 - morph_mod * pi / 4)",
+          "label": "Morph Dial",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": 3.6,
+          "xExpr": "0",
+          "yExpr": "3.6",
+          "label": "0/8: Circle",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(pi / 4)",
+          "yExpr": "3.6 * sin(pi / 4)",
+          "label": "1: Astroid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 3.6,
+          "y": 0,
+          "xExpr": "3.6",
+          "yExpr": "0",
+          "label": "2: Cardioid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-pi / 4)",
+          "yExpr": "3.6 * sin(-pi / 4)",
+          "label": "3: Heart",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": -3.6,
+          "xExpr": "0",
+          "yExpr": "-3.6",
+          "label": "4: Lemniscate",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-3 * pi / 4)",
+          "yExpr": "3.6 * sin(-3 * pi / 4)",
+          "label": "5: Lissajous",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.6,
+          "y": 0,
+          "xExpr": "-3.6",
+          "yExpr": "0",
+          "label": "6: 4-Petal Rose",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(3 * pi / 4)",
+          "yExpr": "3.6 * sin(3 * pi / 4)",
+          "label": "7: Butterfly",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 1.48,
+          "valExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "label": "x = P_x",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "horizontal",
+          "value": 0.419,
+          "valExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "y = P_y",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "texts": [],
+      "viewport": {
+        "view": {
+          "xmin": -4.8,
+          "xmax": 4.8,
+          "ymin": -4.2,
+          "ymax": 4.2
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "continuous_spin",
+      "name": "Zero-Dwell Continuous Morph",
+      "startSlider": "morph",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Active Morphed Curve (8-Shape Loop)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Outgoing Ghost Curve (Source)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Incoming Ghost Curve (Target)",
+          "code": "parametric [0, 6.283185307179586]:\ndouble ct = cos(t), st = sin(t);\ndouble c2 = cos(2.0 * t), s3 = sin(3.0 * t), c4 = cos(4.0 * t);\nint k = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble rx = 0.0, ry = 0.0;\nif (k == 0) {\n  rx = 2.4 * ct;\n  ry = 2.4 * st;\n} else if (k == 1) {\n  rx = 2.7 * ct * ct * ct;\n  ry = 2.7 * st * st * st;\n} else if (k == 2) {\n  double rc = 1.9 * (1.0 + ct);\n  rx = rc * ct - 1.65;\n  ry = rc * st;\n} else if (k == 3) {\n  rx = 2.4 * ct * ct * ct;\n  ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n} else if (k == 4) {\n  double den = 1.0 + st * st;\n  rx = 2.75 * ct / den;\n  ry = 2.75 * st * ct / den;\n} else if (k == 5) {\n  rx = 2.2 * c2;\n  ry = 2.1 * s3;\n} else if (k == 6) {\n  rx = 2.65 * c2 * ct;\n  ry = 2.65 * c2 * st;\n} else {\n  double rb = 0.78 * (exp(st) - 2.0 * c4);\n  rx = rb * ct;\n  ry = rb * st - 0.32;\n}\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (rx * cs - ry * sn);\npy = scale * (rx * sn + ry * cs);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Homotopy Chord A(probe) to B(probe)",
+          "code": "parametric [0, 1]:\ndouble cs = cos(spin), sn = sin(spin);\ndouble ax = scale * (src_rx * cs - src_ry * sn);\ndouble ay = scale * (src_rx * sn + src_ry * cs);\ndouble bx = scale * (dst_rx * cs - dst_ry * sn);\ndouble by = scale * (dst_rx * sn + dst_ry * cs);\npx = (1.0 - t) * ax + t * bx;\npy = (1.0 - t) * ay + t * by;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "Active Tracer Tail [0, probe]",
+          "code": "parametric [0, 1]:\ndouble ang = t * probe;\ndouble ct = cos(ang), st = sin(ang);\ndouble c2 = cos(2.0 * ang), s3 = sin(3.0 * ang), c4 = cos(4.0 * ang);\nint id0 = ((int)floor(seg_idx + 0.5) % 8 + 8) % 8;\nint id1 = ((int)floor(next_idx + 0.5) % 8 + 8) % 8;\ndouble ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;\nfor (int pass = 0; pass < 2; pass++) {\n  int k = (pass == 0) ? id0 : id1;\n  double rx = 0.0, ry = 0.0;\n  if (k == 0) {\n    rx = 2.4 * ct;\n    ry = 2.4 * st;\n  } else if (k == 1) {\n    rx = 2.7 * ct * ct * ct;\n    ry = 2.7 * st * st * st;\n  } else if (k == 2) {\n    double rc = 1.9 * (1.0 + ct);\n    rx = rc * ct - 1.65;\n    ry = rc * st;\n  } else if (k == 3) {\n    rx = 2.4 * ct * ct * ct;\n    ry = 0.15 * (13.0 * st + 5.0 * c2 + 2.0 * s3 - c4) + 0.35;\n  } else if (k == 4) {\n    double den = 1.0 + st * st;\n    rx = 2.75 * ct / den;\n    ry = 2.75 * st * ct / den;\n  } else if (k == 5) {\n    rx = 2.2 * c2;\n    ry = 2.1 * s3;\n  } else if (k == 6) {\n    rx = 2.65 * c2 * ct;\n    ry = 2.65 * c2 * st;\n  } else {\n    double rb = 0.78 * (exp(st) - 2.0 * c4);\n    rx = rb * ct;\n    ry = rb * st - 0.32;\n  }\n  if (pass == 0) { ax = rx; ay = ry; } else { bx = rx; by = ry; }\n}\ndouble mx = (1.0 - blend_w) * ax + blend_w * bx;\ndouble my = (1.0 - blend_w) * ay + blend_w * by;\ndouble cs = cos(spin), sn = sin(spin);\npx = scale * (mx * cs - my * sn);\npy = scale * (mx * sn + my * cs);",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": false,
+          "active": false
+        },
+        {
+          "title": "8-Station Cycle Dial Ring",
+          "code": "parametric [0, 6.283185307179586]:\npx = 3.6 * cos(t);\npy = 3.6 * sin(t);",
+          "color": "#64748b",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "morph",
+          "label": "Morph Phase (0-8 Loop)",
+          "value": 0,
+          "min": 0,
+          "max": 8,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "probe",
+          "label": "Tracer Angle",
+          "value": 1.05,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 1.15
+        },
+        {
+          "name": "dwell",
+          "label": "Shape Hold Dwell",
+          "value": 0,
+          "min": 0,
+          "max": 0.35,
+          "step": 0.01,
+          "speed": 0.08
+        },
+        {
+          "name": "spin",
+          "label": "Rotation",
+          "value": 0.35,
+          "min": 0,
+          "max": 6.283185,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "scale",
+          "label": "Curve Scale",
+          "value": 1.02,
+          "min": 0.4,
+          "max": 1.5,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "morph_mod",
+          "label": "",
+          "expr": "morph - 8 * floor(morph / 8)"
+        },
+        {
+          "name": "seg_idx",
+          "label": "",
+          "expr": "floor(morph_mod)"
+        },
+        {
+          "name": "next_idx",
+          "label": "",
+          "expr": "seg_idx + 1 - 8 * floor((seg_idx + 1) / 8)"
+        },
+        {
+          "name": "blend_u",
+          "label": "",
+          "expr": "min(1, max(0, (morph_mod - seg_idx - dwell) / (1 - 2 * dwell)))"
+        },
+        {
+          "name": "blend_w",
+          "label": "",
+          "expr": "blend_u * blend_u * blend_u * (blend_u * (6 * blend_u - 15) + 10)"
+        },
+        {
+          "name": "src_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(seg_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "src_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(seg_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(seg_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(seg_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(seg_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(seg_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(seg_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(seg_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "dst_rx",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * cos(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * cos(probe) - 1.65) + max(0, 1 - abs(next_idx - 3)) * (2.4 * cos(probe) * cos(probe) * cos(probe)) + max(0, 1 - abs(next_idx - 4)) * (2.75 * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.2 * cos(2 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * cos(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * cos(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)))"
+        },
+        {
+          "name": "dst_ry",
+          "label": "",
+          "expr": "max(0, 1 - abs(next_idx - 0)) * (2.4 * sin(probe)) + max(0, 1 - abs(next_idx - 1)) * (2.7 * sin(probe) * sin(probe) * sin(probe)) + max(0, 1 - abs(next_idx - 2)) * (1.9 * (1 + cos(probe)) * sin(probe)) + max(0, 1 - abs(next_idx - 3)) * (0.15 * (13 * sin(probe) + 5 * cos(2 * probe) + 2 * sin(3 * probe) - cos(4 * probe)) + 0.35) + max(0, 1 - abs(next_idx - 4)) * (2.75 * sin(probe) * cos(probe) / (1 + sin(probe) * sin(probe))) + max(0, 1 - abs(next_idx - 5)) * (2.1 * sin(3 * probe)) + max(0, 1 - abs(next_idx - 6)) * (2.65 * cos(2 * probe) * sin(probe)) + max(0, 1 - abs(next_idx - 7)) * (0.78 * sin(probe) * (exp(sin(probe)) - 2 * cos(4 * probe)) - 0.32)"
+        },
+        {
+          "name": "cur_rx",
+          "label": "",
+          "expr": "(1 - blend_w) * src_rx + blend_w * dst_rx"
+        },
+        {
+          "name": "cur_ry",
+          "label": "",
+          "expr": "(1 - blend_w) * src_ry + blend_w * dst_ry"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "polygon",
+          "label": "Cycle Dial Arena",
+          "color": "#38bdf8",
+          "lineWidth": 1,
+          "opacity": 0.04,
+          "lineStyle": "dashed",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              3.6,
+              0
+            ],
+            [
+              3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              3.477332974640646,
+              0.9317485623690747
+            ],
+            [
+              3.325966317040632,
+              1.3776603565143233
+            ],
+            [
+              3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              2.8560720250484466,
+              2.1915411444313944
+            ],
+            [
+              2.5455844122715714,
+              2.545584412271571
+            ],
+            [
+              2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              1.8000000000000005,
+              3.117691453623979
+            ],
+            [
+              1.3776603565143235,
+              3.325966317040632
+            ],
+            [
+              0.9317485623690747,
+              3.477332974640646
+            ],
+            [
+              0.4698942919921862,
+              3.5692015009457174
+            ],
+            [
+              2.2043642384652358e-16,
+              3.6
+            ],
+            [
+              -0.46989429199218496,
+              3.569201500945718
+            ],
+            [
+              -0.9317485623690751,
+              3.477332974640646
+            ],
+            [
+              -1.377660356514323,
+              3.325966317040632
+            ],
+            [
+              -1.7999999999999992,
+              3.1176914536239795
+            ],
+            [
+              -2.1915411444313944,
+              2.8560720250484466
+            ],
+            [
+              -2.545584412271571,
+              2.5455844122715714
+            ],
+            [
+              -2.856072025048446,
+              2.1915411444313952
+            ],
+            [
+              -3.1176914536239795,
+              1.7999999999999998
+            ],
+            [
+              -3.325966317040632,
+              1.3776603565143237
+            ],
+            [
+              -3.4773329746406456,
+              0.9317485623690757
+            ],
+            [
+              -3.5692015009457174,
+              0.4698942919921857
+            ],
+            [
+              -3.6,
+              4.4087284769304716e-16
+            ],
+            [
+              -3.5692015009457174,
+              -0.46989429199218635
+            ],
+            [
+              -3.4773329746406465,
+              -0.9317485623690733
+            ],
+            [
+              -3.3259663170406326,
+              -1.3776603565143228
+            ],
+            [
+              -3.117691453623979,
+              -1.8000000000000005
+            ],
+            [
+              -2.8560720250484475,
+              -2.191541144431393
+            ],
+            [
+              -2.545584412271572,
+              -2.545584412271571
+            ],
+            [
+              -2.1915411444313952,
+              -2.8560720250484457
+            ],
+            [
+              -1.8000000000000016,
+              -3.117691453623978
+            ],
+            [
+              -1.3776603565143253,
+              -3.3259663170406317
+            ],
+            [
+              -0.9317485623690743,
+              -3.477332974640646
+            ],
+            [
+              -0.46989429199218585,
+              -3.5692015009457174
+            ],
+            [
+              -6.613092715395707e-16,
+              -3.6
+            ],
+            [
+              0.4698942919921846,
+              -3.569201500945718
+            ],
+            [
+              0.9317485623690731,
+              -3.4773329746406465
+            ],
+            [
+              1.377660356514324,
+              -3.3259663170406317
+            ],
+            [
+              1.8000000000000005,
+              -3.117691453623979
+            ],
+            [
+              2.191541144431394,
+              -2.8560720250484466
+            ],
+            [
+              2.5455844122715705,
+              -2.545584412271572
+            ],
+            [
+              2.8560720250484457,
+              -2.1915411444313952
+            ],
+            [
+              3.117691453623978,
+              -1.8000000000000016
+            ],
+            [
+              3.3259663170406317,
+              -1.3776603565143255
+            ],
+            [
+              3.477332974640646,
+              -0.9317485623690744
+            ],
+            [
+              3.5692015009457174,
+              -0.4698942919921861
+            ]
+          ]
+        },
+        {
+          "kind": "polygon",
+          "label": "Origin Circle Reference (r = 2.4)",
+          "color": "#94a3b8",
+          "lineWidth": 1,
+          "opacity": 0.05,
+          "lineStyle": "dotted",
+          "closed": true,
+          "locked": true,
+          "visible": true,
+          "points": [
+            [
+              2.4,
+              0
+            ],
+            [
+              2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              2.318221983093764,
+              0.6211657082460498
+            ],
+            [
+              2.2173108780270883,
+              0.9184402376762154
+            ],
+            [
+              2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              1.9040480166989644,
+              1.4610274296209296
+            ],
+            [
+              1.697056274847714,
+              1.6970562748477138
+            ],
+            [
+              1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              1.2000000000000002,
+              2.0784609690826525
+            ],
+            [
+              0.9184402376762155,
+              2.2173108780270883
+            ],
+            [
+              0.6211657082460498,
+              2.318221983093764
+            ],
+            [
+              0.3132628613281241,
+              2.3794676672971447
+            ],
+            [
+              1.4695761589768238e-16,
+              2.4
+            ],
+            [
+              -0.3132628613281233,
+              2.379467667297145
+            ],
+            [
+              -0.62116570824605,
+              2.318221983093764
+            ],
+            [
+              -0.9184402376762153,
+              2.2173108780270883
+            ],
+            [
+              -1.1999999999999995,
+              2.078460969082653
+            ],
+            [
+              -1.4610274296209296,
+              1.9040480166989644
+            ],
+            [
+              -1.6970562748477138,
+              1.697056274847714
+            ],
+            [
+              -1.904048016698964,
+              1.46102742962093
+            ],
+            [
+              -2.078460969082653,
+              1.1999999999999997
+            ],
+            [
+              -2.2173108780270883,
+              0.9184402376762157
+            ],
+            [
+              -2.3182219830937636,
+              0.6211657082460504
+            ],
+            [
+              -2.3794676672971447,
+              0.31326286132812375
+            ],
+            [
+              -2.4,
+              2.9391523179536476e-16
+            ],
+            [
+              -2.3794676672971447,
+              -0.31326286132812425
+            ],
+            [
+              -2.318221983093764,
+              -0.6211657082460488
+            ],
+            [
+              -2.2173108780270883,
+              -0.9184402376762152
+            ],
+            [
+              -2.0784609690826525,
+              -1.2000000000000002
+            ],
+            [
+              -1.9040480166989648,
+              -1.4610274296209287
+            ],
+            [
+              -1.6970562748477145,
+              -1.6970562748477138
+            ],
+            [
+              -1.46102742962093,
+              -1.9040480166989637
+            ],
+            [
+              -1.200000000000001,
+              -2.078460969082652
+            ],
+            [
+              -0.9184402376762167,
+              -2.2173108780270874
+            ],
+            [
+              -0.6211657082460494,
+              -2.318221983093764
+            ],
+            [
+              -0.3132628613281239,
+              -2.3794676672971447
+            ],
+            [
+              -4.408728476930471e-16,
+              -2.4
+            ],
+            [
+              0.31326286132812303,
+              -2.379467667297145
+            ],
+            [
+              0.6211657082460487,
+              -2.318221983093764
+            ],
+            [
+              0.918440237676216,
+              -2.217310878027088
+            ],
+            [
+              1.2000000000000002,
+              -2.0784609690826525
+            ],
+            [
+              1.4610274296209294,
+              -1.9040480166989644
+            ],
+            [
+              1.6970562748477136,
+              -1.6970562748477145
+            ],
+            [
+              1.9040480166989637,
+              -1.46102742962093
+            ],
+            [
+              2.078460969082652,
+              -1.200000000000001
+            ],
+            [
+              2.2173108780270874,
+              -0.9184402376762169
+            ],
+            [
+              2.318221983093764,
+              -0.6211657082460497
+            ],
+            [
+              2.3794676672971447,
+              -0.31326286132812403
+            ]
+          ]
+        }
+      ],
+      "points": [
+        {
+          "x": 1.48,
+          "y": 0.419,
+          "xExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "yExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "P(probe)",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.904,
+          "y": 0.695,
+          "xExpr": "scale * (src_rx * cos(spin) - src_ry * sin(spin))",
+          "yExpr": "scale * (src_rx * sin(spin) + src_ry * cos(spin))",
+          "label": "A (Source)",
+          "icon": "dot",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.783,
+          "y": -0.034,
+          "xExpr": "scale * (dst_rx * cos(spin) - dst_ry * sin(spin))",
+          "yExpr": "scale * (dst_rx * sin(spin) + dst_ry * cos(spin))",
+          "label": "B (Target)",
+          "icon": "dot",
+          "color": "#c084fc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.377,
+          "y": 1.246,
+          "xExpr": "3.6 * cos(pi / 2 - morph_mod * pi / 4)",
+          "yExpr": "3.6 * sin(pi / 2 - morph_mod * pi / 4)",
+          "label": "Morph Dial",
+          "icon": "star",
+          "color": "#34d399",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": 3.6,
+          "xExpr": "0",
+          "yExpr": "3.6",
+          "label": "0/8: Circle",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(pi / 4)",
+          "yExpr": "3.6 * sin(pi / 4)",
+          "label": "1: Astroid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 3.6,
+          "y": 0,
+          "xExpr": "3.6",
+          "yExpr": "0",
+          "label": "2: Cardioid",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-pi / 4)",
+          "yExpr": "3.6 * sin(-pi / 4)",
+          "label": "3: Heart",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0,
+          "y": -3.6,
+          "xExpr": "0",
+          "yExpr": "-3.6",
+          "label": "4: Lemniscate",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": -2.546,
+          "xExpr": "3.6 * cos(-3 * pi / 4)",
+          "yExpr": "3.6 * sin(-3 * pi / 4)",
+          "label": "5: Lissajous",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -3.6,
+          "y": 0,
+          "xExpr": "-3.6",
+          "yExpr": "0",
+          "label": "6: 4-Petal Rose",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -2.546,
+          "y": 2.546,
+          "xExpr": "3.6 * cos(3 * pi / 4)",
+          "yExpr": "3.6 * sin(3 * pi / 4)",
+          "label": "7: Butterfly",
+          "icon": "dot",
+          "color": "#94a3b8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 1.48,
+          "valExpr": "scale * (cur_rx * cos(spin) - cur_ry * sin(spin))",
+          "label": "x = P_x",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "orientation": "horizontal",
+          "value": 0.419,
+          "valExpr": "scale * (cur_rx * sin(spin) + cur_ry * cos(spin))",
+          "label": "y = P_y",
+          "color": "#38bdf8",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "texts": [],
+      "viewport": {
+        "view": {
+          "xmin": -4.8,
+          "xmax": 4.8,
+          "ymin": -4.2,
+          "ymax": 4.2
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    }
+  ]
+}

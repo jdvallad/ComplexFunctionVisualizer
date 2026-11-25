@@ -1,0 +1,2556 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795569438351_796",
+  "name": "Möbius Flows on the Riemann Sphere (Custom)",
+  "folder": "my",
+  "subtitle": "4 cards · 6 presets",
+  "description": "",
+  "mode": "map",
+  "splitPct": 50,
+  "cards": [
+    {
+      "title": "Möbius Flow T_τ(z) = exp(τA)·z",
+      "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": false
+    },
+    {
+      "title": "Conformal Derivative T_τ'(z) = (cz + d)^(-2)",
+      "code": "double complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex den = ch - k * z;\ndouble complex den2 = den * den;\nif (cabs(den2) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / den2;",
+      "color": "#34d399",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": false
+    },
+    {
+      "title": "Lie Algebra Generator V(z) = β(z² - p²)",
+      "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\nreturn beta * (z * z - p * p);",
+      "color": "#fbbf24",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": false
+    },
+    {
+      "title": "Argument Principle (1 / 2πi) · T_τ'(z) / T_τ(z)",
+      "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\ndouble complex prod = num * den;\nif (cabs(prod) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / (c_make(0.0, 2.0 * M_PI) * prod);",
+      "color": "#c084fc",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [
+    {
+      "name": "tau",
+      "label": "Flow Time τ",
+      "value": 0.9649717058799935,
+      "min": -3.141593,
+      "max": 3.141593,
+      "step": 0.02,
+      "speed": 0.6
+    },
+    {
+      "name": "regime",
+      "label": "Regime ψ (0=Hyp, π/2=Ell)",
+      "value": 0.7854,
+      "min": 0,
+      "max": 3.141593,
+      "step": 0.02,
+      "speed": 0.35
+    },
+    {
+      "name": "sep",
+      "label": "Fixed-Point Half-Sep d (0=Par)",
+      "value": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.02,
+      "speed": 0.45
+    },
+    {
+      "name": "axis",
+      "label": "Axis Angle φ",
+      "value": 0,
+      "min": -3.141593,
+      "max": 3.141593,
+      "step": 0.02,
+      "speed": 0.4
+    },
+    {
+      "name": "sphere_yaw",
+      "label": "Sphere Yaw",
+      "value": 0.55,
+      "min": -3.141593,
+      "max": 3.141593,
+      "step": 0.02,
+      "speed": 0.35
+    },
+    {
+      "name": "sphere_pitch",
+      "label": "Sphere Pitch",
+      "value": 0.38,
+      "min": -1.4,
+      "max": 1.4,
+      "step": 0.02,
+      "speed": 0.2
+    }
+  ],
+  "vars": [
+    {
+      "name": "px",
+      "label": "",
+      "expr": "sep * cos(axis)"
+    },
+    {
+      "name": "py",
+      "label": "",
+      "expr": "sep * sin(axis)"
+    },
+    {
+      "name": "s_eff",
+      "label": "",
+      "expr": "max(sep, 0.0001)"
+    },
+    {
+      "name": "ur",
+      "label": "",
+      "expr": "tau * s_eff * cos(regime)"
+    },
+    {
+      "name": "ui",
+      "label": "",
+      "expr": "tau * s_eff * sin(regime)"
+    },
+    {
+      "name": "den_p",
+      "label": "",
+      "expr": "cosh(2 * ur) - cos(2 * ui) + 1e-12"
+    },
+    {
+      "name": "den_z",
+      "label": "",
+      "expr": "cosh(2 * ur) + cos(2 * ui) + 1e-12"
+    },
+    {
+      "name": "pole_x",
+      "label": "",
+      "expr": "s_eff * (cos(axis) * sinh(2 * ur) + sin(axis) * sin(2 * ui)) / den_p"
+    },
+    {
+      "name": "pole_y",
+      "label": "",
+      "expr": "s_eff * (sin(axis) * sinh(2 * ur) - cos(axis) * sin(2 * ui)) / den_p"
+    }
+  ],
+  "shapes": [
+    {
+      "kind": "circle",
+      "label": "Tracking Loop Around z_0",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "opacity": 0.22,
+      "lineStyle": "solid",
+      "locked": true,
+      "closed": true,
+      "visible": true,
+      "formula": {
+        "kind": "circle",
+        "cx": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+        "cy": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+        "r": "0.45"
+      }
+    }
+  ],
+  "points": [
+    {
+      "x": 1,
+      "y": 0,
+      "xExpr": "px",
+      "yExpr": "py",
+      "label": "Fixed +p",
+      "icon": "star",
+      "color": "#fbbf24",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": -1,
+      "y": 0,
+      "xExpr": "-px",
+      "yExpr": "-py",
+      "label": "Fixed -p",
+      "icon": "star",
+      "color": "#f472b6",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 0.799,
+      "y": 0.4275,
+      "xExpr": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+      "yExpr": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+      "label": "Zero z_0",
+      "icon": "dot",
+      "color": "#38bdf8",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    },
+    {
+      "x": 0.973,
+      "y": -0.5206,
+      "xExpr": "pole_x",
+      "yExpr": "pole_y",
+      "label": "Pole z_∞",
+      "icon": "cross",
+      "color": "#fb7185",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "lines": [],
+  "layerOrder": [
+    "s:0",
+    "p:0",
+    "p:1",
+    "p:2",
+    "p:3"
+  ],
+  "viewport": {
+    "inView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 2.8
+    },
+    "outView": {
+      "cx": 0,
+      "cy": 0,
+      "r": 2.8
+    },
+    "inSquare": true,
+    "outSquare": true,
+    "contourMode": true,
+    "showMesh": false,
+    "showLandmarks": true,
+    "showSphere": false,
+    "projection": "planar",
+    "sphereView": {
+      "yaw": 0.55,
+      "pitch": 0.38,
+      "zoom": 1
+    },
+    "showDomain": true,
+    "domainScheme": "classic",
+    "domainOpacity": 0.45
+  },
+  "presets": [
+    {
+      "id": "loxodromic_sphere",
+      "name": "Riemann Sphere: Loxodromic Spiral",
+      "startSlider": "tau",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Möbius Flow T_τ(z) = exp(τA)·z",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Conformal Derivative T_τ'(z) = (cz + d)^(-2)",
+          "code": "double complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex den = ch - k * z;\ndouble complex den2 = den * den;\nif (cabs(den2) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / den2;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Lie Algebra Generator V(z) = β(z² - p²)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\nreturn beta * (z * z - p * p);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Argument Principle (1 / 2πi) · T_τ'(z) / T_τ(z)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\ndouble complex prod = num * den;\nif (cabs(prod) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / (c_make(0.0, 2.0 * M_PI) * prod);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        }
+      ],
+      "sliders": [
+        {
+          "name": "tau",
+          "label": "Flow Time τ",
+          "value": -3.141593,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.6
+        },
+        {
+          "name": "regime",
+          "label": "Regime ψ (0=Hyp, π/2=Ell)",
+          "value": 0.7854,
+          "min": 0,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sep",
+          "label": "Fixed-Point Half-Sep d (0=Par)",
+          "value": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.02,
+          "speed": 0.45
+        },
+        {
+          "name": "axis",
+          "label": "Axis Angle φ",
+          "value": 0,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "Sphere Yaw",
+          "value": 0.55,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sphere_pitch",
+          "label": "Sphere Pitch",
+          "value": 0.38,
+          "min": -1.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "px",
+          "label": "",
+          "expr": "sep * cos(axis)"
+        },
+        {
+          "name": "py",
+          "label": "",
+          "expr": "sep * sin(axis)"
+        },
+        {
+          "name": "s_eff",
+          "label": "",
+          "expr": "max(sep, 0.0001)"
+        },
+        {
+          "name": "ur",
+          "label": "",
+          "expr": "tau * s_eff * cos(regime)"
+        },
+        {
+          "name": "ui",
+          "label": "",
+          "expr": "tau * s_eff * sin(regime)"
+        },
+        {
+          "name": "den_p",
+          "label": "",
+          "expr": "cosh(2 * ur) - cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "den_z",
+          "label": "",
+          "expr": "cosh(2 * ur) + cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "pole_x",
+          "label": "",
+          "expr": "s_eff * (cos(axis) * sinh(2 * ur) + sin(axis) * sin(2 * ui)) / den_p"
+        },
+        {
+          "name": "pole_y",
+          "label": "",
+          "expr": "s_eff * (sin(axis) * sinh(2 * ur) - cos(axis) * sin(2 * ui)) / den_p"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p inner)",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 0.55) * cos(axis)",
+            "cy": "hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p outer)",
+          "color": "#0ea5e9",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 1.15) * cos(axis)",
+            "cy": "hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p inner)",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 0.55) * cos(axis)",
+            "cy": "-hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p outer)",
+          "color": "#ec4899",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 1.15) * cos(axis)",
+            "cy": "-hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (upper)",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-0.75 * sin(axis)",
+            "cy": "0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (lower)",
+          "color": "#f59e0b",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0.75 * sin(axis)",
+            "cy": "-0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (wide)",
+          "color": "#fde047",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-1.8 * sin(axis)",
+            "cy": "1.8 * cos(axis)",
+            "r": "hypot(sep, 1.8)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Isometric Circle |T'(z)| = 1",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dashed",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "pole_x",
+            "cy": "pole_y",
+            "r": "min(25, s_eff * sqrt(2 / den_p))"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Unit Circle (Sphere Equator)",
+          "color": "#94a3b8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dotted",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "1"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 1,
+          "y": 0,
+          "xExpr": "px",
+          "yExpr": "py",
+          "label": "Fixed +p",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "xExpr": "-px",
+          "yExpr": "-py",
+          "label": "Fixed -p",
+          "icon": "star",
+          "color": "#f472b6",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5119,
+          "y": 0.3861,
+          "xExpr": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+          "yExpr": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+          "label": "Zero z_0",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.2452,
+          "y": -0.9391,
+          "xExpr": "pole_x",
+          "yExpr": "pole_y",
+          "label": "Pole z_∞",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [],
+      "texts": [],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "contourMode": false,
+        "showMesh": true,
+        "showLandmarks": true,
+        "showSphere": true,
+        "projection": "sphere",
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        },
+        "showDomain": true,
+        "domainScheme": "ocean",
+        "domainOpacity": 0.45
+      }
+    },
+    {
+      "id": "elliptic_sphere",
+      "name": "Riemann Sphere: Rigid Elliptic Rotation",
+      "startSlider": "tau",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Möbius Flow T_τ(z) = exp(τA)·z",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Conformal Derivative T_τ'(z) = (cz + d)^(-2)",
+          "code": "double complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex den = ch - k * z;\ndouble complex den2 = den * den;\nif (cabs(den2) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / den2;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Lie Algebra Generator V(z) = β(z² - p²)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\nreturn beta * (z * z - p * p);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Argument Principle (1 / 2πi) · T_τ'(z) / T_τ(z)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\ndouble complex prod = num * den;\nif (cabs(prod) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / (c_make(0.0, 2.0 * M_PI) * prod);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        }
+      ],
+      "sliders": [
+        {
+          "name": "tau",
+          "label": "Flow Time τ",
+          "value": -3.141593,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.6
+        },
+        {
+          "name": "regime",
+          "label": "Regime ψ (0=Hyp, π/2=Ell)",
+          "value": 1.5708,
+          "min": 0,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sep",
+          "label": "Fixed-Point Half-Sep d (0=Par)",
+          "value": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.02,
+          "speed": 0.45
+        },
+        {
+          "name": "axis",
+          "label": "Axis Angle φ",
+          "value": 0,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "Sphere Yaw",
+          "value": 0.65,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sphere_pitch",
+          "label": "Sphere Pitch",
+          "value": 0.35,
+          "min": -1.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "px",
+          "label": "",
+          "expr": "sep * cos(axis)"
+        },
+        {
+          "name": "py",
+          "label": "",
+          "expr": "sep * sin(axis)"
+        },
+        {
+          "name": "s_eff",
+          "label": "",
+          "expr": "max(sep, 0.0001)"
+        },
+        {
+          "name": "ur",
+          "label": "",
+          "expr": "tau * s_eff * cos(regime)"
+        },
+        {
+          "name": "ui",
+          "label": "",
+          "expr": "tau * s_eff * sin(regime)"
+        },
+        {
+          "name": "den_p",
+          "label": "",
+          "expr": "cosh(2 * ur) - cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "den_z",
+          "label": "",
+          "expr": "cosh(2 * ur) + cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "pole_x",
+          "label": "",
+          "expr": "s_eff * (cos(axis) * sinh(2 * ur) + sin(axis) * sin(2 * ui)) / den_p"
+        },
+        {
+          "name": "pole_y",
+          "label": "",
+          "expr": "s_eff * (sin(axis) * sinh(2 * ur) - cos(axis) * sin(2 * ui)) / den_p"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p inner)",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 0.55) * cos(axis)",
+            "cy": "hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p outer)",
+          "color": "#0ea5e9",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 1.15) * cos(axis)",
+            "cy": "hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p inner)",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 0.55) * cos(axis)",
+            "cy": "-hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p outer)",
+          "color": "#ec4899",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 1.15) * cos(axis)",
+            "cy": "-hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (upper)",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-0.75 * sin(axis)",
+            "cy": "0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (lower)",
+          "color": "#f59e0b",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0.75 * sin(axis)",
+            "cy": "-0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (wide)",
+          "color": "#fde047",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-1.8 * sin(axis)",
+            "cy": "1.8 * cos(axis)",
+            "r": "hypot(sep, 1.8)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Isometric Circle |T'(z)| = 1",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dashed",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "pole_x",
+            "cy": "pole_y",
+            "r": "min(25, s_eff * sqrt(2 / den_p))"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Unit Circle (Sphere Equator)",
+          "color": "#94a3b8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dotted",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "1"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 1,
+          "y": 0,
+          "xExpr": "px",
+          "yExpr": "py",
+          "label": "Fixed +p",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "xExpr": "-px",
+          "yExpr": "-py",
+          "label": "Fixed -p",
+          "icon": "star",
+          "color": "#f472b6",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5119,
+          "y": 0.3861,
+          "xExpr": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+          "yExpr": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+          "label": "Zero z_0",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.2452,
+          "y": -0.9391,
+          "xExpr": "pole_x",
+          "yExpr": "pole_y",
+          "label": "Pole z_∞",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [],
+      "texts": [],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "contourMode": false,
+        "showMesh": true,
+        "showLandmarks": true,
+        "showSphere": true,
+        "projection": "sphere",
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        },
+        "showDomain": true,
+        "domainScheme": "classic",
+        "domainOpacity": 0.45
+      }
+    },
+    {
+      "id": "hyperbolic_planar",
+      "name": "Planar: Hyperbolic Source → Sink",
+      "startSlider": "tau",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Möbius Flow T_τ(z) = exp(τA)·z",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Conformal Derivative T_τ'(z) = (cz + d)^(-2)",
+          "code": "double complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex den = ch - k * z;\ndouble complex den2 = den * den;\nif (cabs(den2) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / den2;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Lie Algebra Generator V(z) = β(z² - p²)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\nreturn beta * (z * z - p * p);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Argument Principle (1 / 2πi) · T_τ'(z) / T_τ(z)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\ndouble complex prod = num * den;\nif (cabs(prod) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / (c_make(0.0, 2.0 * M_PI) * prod);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        }
+      ],
+      "sliders": [
+        {
+          "name": "tau",
+          "label": "Flow Time τ",
+          "value": -3.141593,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.6
+        },
+        {
+          "name": "regime",
+          "label": "Regime ψ (0=Hyp, π/2=Ell)",
+          "value": 0,
+          "min": 0,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sep",
+          "label": "Fixed-Point Half-Sep d (0=Par)",
+          "value": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.02,
+          "speed": 0.45
+        },
+        {
+          "name": "axis",
+          "label": "Axis Angle φ",
+          "value": 0,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "Sphere Yaw",
+          "value": 0.55,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sphere_pitch",
+          "label": "Sphere Pitch",
+          "value": 0.38,
+          "min": -1.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "px",
+          "label": "",
+          "expr": "sep * cos(axis)"
+        },
+        {
+          "name": "py",
+          "label": "",
+          "expr": "sep * sin(axis)"
+        },
+        {
+          "name": "s_eff",
+          "label": "",
+          "expr": "max(sep, 0.0001)"
+        },
+        {
+          "name": "ur",
+          "label": "",
+          "expr": "tau * s_eff * cos(regime)"
+        },
+        {
+          "name": "ui",
+          "label": "",
+          "expr": "tau * s_eff * sin(regime)"
+        },
+        {
+          "name": "den_p",
+          "label": "",
+          "expr": "cosh(2 * ur) - cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "den_z",
+          "label": "",
+          "expr": "cosh(2 * ur) + cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "pole_x",
+          "label": "",
+          "expr": "s_eff * (cos(axis) * sinh(2 * ur) + sin(axis) * sin(2 * ui)) / den_p"
+        },
+        {
+          "name": "pole_y",
+          "label": "",
+          "expr": "s_eff * (sin(axis) * sinh(2 * ur) - cos(axis) * sin(2 * ui)) / den_p"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p inner)",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 0.55) * cos(axis)",
+            "cy": "hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p outer)",
+          "color": "#0ea5e9",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 1.15) * cos(axis)",
+            "cy": "hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p inner)",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 0.55) * cos(axis)",
+            "cy": "-hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p outer)",
+          "color": "#ec4899",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 1.15) * cos(axis)",
+            "cy": "-hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (upper)",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-0.75 * sin(axis)",
+            "cy": "0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (lower)",
+          "color": "#f59e0b",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0.75 * sin(axis)",
+            "cy": "-0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (wide)",
+          "color": "#fde047",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-1.8 * sin(axis)",
+            "cy": "1.8 * cos(axis)",
+            "r": "hypot(sep, 1.8)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Isometric Circle |T'(z)| = 1",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dashed",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "pole_x",
+            "cy": "pole_y",
+            "r": "min(25, s_eff * sqrt(2 / den_p))"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Unit Circle (Sphere Equator)",
+          "color": "#94a3b8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dotted",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "1"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 1,
+          "y": 0,
+          "xExpr": "px",
+          "yExpr": "py",
+          "label": "Fixed +p",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "xExpr": "-px",
+          "yExpr": "-py",
+          "label": "Fixed -p",
+          "icon": "star",
+          "color": "#f472b6",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5119,
+          "y": 0.3861,
+          "xExpr": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+          "yExpr": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+          "label": "Zero z_0",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.2452,
+          "y": -0.9391,
+          "xExpr": "pole_x",
+          "yExpr": "pole_y",
+          "label": "Pole z_∞",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [],
+      "texts": [],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "contourMode": false,
+        "showMesh": true,
+        "showLandmarks": true,
+        "showSphere": false,
+        "projection": "planar",
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        }
+      }
+    },
+    {
+      "id": "parabolic_collision",
+      "name": "Parabolic Collision (d → 0 Horocycles)",
+      "startSlider": "sep",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Möbius Flow T_τ(z) = exp(τA)·z",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Conformal Derivative T_τ'(z) = (cz + d)^(-2)",
+          "code": "double complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex den = ch - k * z;\ndouble complex den2 = den * den;\nif (cabs(den2) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / den2;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Lie Algebra Generator V(z) = β(z² - p²)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\nreturn beta * (z * z - p * p);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Argument Principle (1 / 2πi) · T_τ'(z) / T_τ(z)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\ndouble complex prod = num * den;\nif (cabs(prod) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / (c_make(0.0, 2.0 * M_PI) * prod);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        }
+      ],
+      "sliders": [
+        {
+          "name": "tau",
+          "label": "Flow Time τ",
+          "value": 0.75,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.6
+        },
+        {
+          "name": "regime",
+          "label": "Regime ψ (0=Hyp, π/2=Ell)",
+          "value": 0,
+          "min": 0,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sep",
+          "label": "Fixed-Point Half-Sep d (0=Par)",
+          "value": 0,
+          "min": 0,
+          "max": 2,
+          "step": 0.02,
+          "speed": 0.45
+        },
+        {
+          "name": "axis",
+          "label": "Axis Angle φ",
+          "value": 0,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "Sphere Yaw",
+          "value": 0.55,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sphere_pitch",
+          "label": "Sphere Pitch",
+          "value": 0.38,
+          "min": -1.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "px",
+          "label": "",
+          "expr": "sep * cos(axis)"
+        },
+        {
+          "name": "py",
+          "label": "",
+          "expr": "sep * sin(axis)"
+        },
+        {
+          "name": "s_eff",
+          "label": "",
+          "expr": "max(sep, 0.0001)"
+        },
+        {
+          "name": "ur",
+          "label": "",
+          "expr": "tau * s_eff * cos(regime)"
+        },
+        {
+          "name": "ui",
+          "label": "",
+          "expr": "tau * s_eff * sin(regime)"
+        },
+        {
+          "name": "den_p",
+          "label": "",
+          "expr": "cosh(2 * ur) - cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "den_z",
+          "label": "",
+          "expr": "cosh(2 * ur) + cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "pole_x",
+          "label": "",
+          "expr": "s_eff * (cos(axis) * sinh(2 * ur) + sin(axis) * sin(2 * ui)) / den_p"
+        },
+        {
+          "name": "pole_y",
+          "label": "",
+          "expr": "s_eff * (sin(axis) * sinh(2 * ur) - cos(axis) * sin(2 * ui)) / den_p"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p inner)",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 0.55) * cos(axis)",
+            "cy": "hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p outer)",
+          "color": "#0ea5e9",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 1.15) * cos(axis)",
+            "cy": "hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p inner)",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 0.55) * cos(axis)",
+            "cy": "-hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p outer)",
+          "color": "#ec4899",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 1.15) * cos(axis)",
+            "cy": "-hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (upper)",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-0.75 * sin(axis)",
+            "cy": "0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (lower)",
+          "color": "#f59e0b",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0.75 * sin(axis)",
+            "cy": "-0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (wide)",
+          "color": "#fde047",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-1.8 * sin(axis)",
+            "cy": "1.8 * cos(axis)",
+            "r": "hypot(sep, 1.8)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Isometric Circle |T'(z)| = 1",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dashed",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "pole_x",
+            "cy": "pole_y",
+            "r": "min(25, s_eff * sqrt(2 / den_p))"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Unit Circle (Sphere Equator)",
+          "color": "#94a3b8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dotted",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "1"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 1,
+          "y": 0,
+          "xExpr": "px",
+          "yExpr": "py",
+          "label": "Fixed +p",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "xExpr": "-px",
+          "yExpr": "-py",
+          "label": "Fixed -p",
+          "icon": "star",
+          "color": "#f472b6",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5119,
+          "y": 0.3861,
+          "xExpr": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+          "yExpr": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+          "label": "Zero z_0",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.2452,
+          "y": -0.9391,
+          "xExpr": "pole_x",
+          "yExpr": "pole_y",
+          "label": "Pole z_∞",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [],
+      "texts": [],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.6
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.6
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "contourMode": false,
+        "showMesh": true,
+        "showLandmarks": true,
+        "showSphere": false,
+        "projection": "stereographic",
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        },
+        "showDomain": true,
+        "domainScheme": "neon_prism",
+        "domainOpacity": 0.5
+      }
+    },
+    {
+      "id": "isometric_domain",
+      "name": "Conformal Scale |T'(z)| & Isometric Circle",
+      "startSlider": "tau",
+      "mode": "map",
+      "splitPct": 50,
+      "layout": {
+        "sidebarCollapsed": false,
+        "inputHidden": false,
+        "outputHidden": true,
+        "realHidden": false
+      },
+      "cards": [
+        {
+          "title": "Möbius Flow T_τ(z) = exp(τA)·z",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Conformal Derivative T_τ'(z) = (cz + d)^(-2)",
+          "code": "double complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex den = ch - k * z;\ndouble complex den2 = den * den;\nif (cabs(den2) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / den2;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Lie Algebra Generator V(z) = β(z² - p²)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\nreturn beta * (z * z - p * p);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Argument Principle (1 / 2πi) · T_τ'(z) / T_τ(z)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\ndouble complex prod = num * den;\nif (cabs(prod) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / (c_make(0.0, 2.0 * M_PI) * prod);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        }
+      ],
+      "sliders": [
+        {
+          "name": "tau",
+          "label": "Flow Time τ",
+          "value": -3.141593,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.6
+        },
+        {
+          "name": "regime",
+          "label": "Regime ψ (0=Hyp, π/2=Ell)",
+          "value": 0.7854,
+          "min": 0,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sep",
+          "label": "Fixed-Point Half-Sep d (0=Par)",
+          "value": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.02,
+          "speed": 0.45
+        },
+        {
+          "name": "axis",
+          "label": "Axis Angle φ",
+          "value": 0,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "Sphere Yaw",
+          "value": 0.55,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sphere_pitch",
+          "label": "Sphere Pitch",
+          "value": 0.38,
+          "min": -1.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "px",
+          "label": "",
+          "expr": "sep * cos(axis)"
+        },
+        {
+          "name": "py",
+          "label": "",
+          "expr": "sep * sin(axis)"
+        },
+        {
+          "name": "s_eff",
+          "label": "",
+          "expr": "max(sep, 0.0001)"
+        },
+        {
+          "name": "ur",
+          "label": "",
+          "expr": "tau * s_eff * cos(regime)"
+        },
+        {
+          "name": "ui",
+          "label": "",
+          "expr": "tau * s_eff * sin(regime)"
+        },
+        {
+          "name": "den_p",
+          "label": "",
+          "expr": "cosh(2 * ur) - cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "den_z",
+          "label": "",
+          "expr": "cosh(2 * ur) + cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "pole_x",
+          "label": "",
+          "expr": "s_eff * (cos(axis) * sinh(2 * ur) + sin(axis) * sin(2 * ui)) / den_p"
+        },
+        {
+          "name": "pole_y",
+          "label": "",
+          "expr": "s_eff * (sin(axis) * sinh(2 * ur) - cos(axis) * sin(2 * ui)) / den_p"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p inner)",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 0.55) * cos(axis)",
+            "cy": "hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (+p outer)",
+          "color": "#0ea5e9",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "hypot(sep, 1.15) * cos(axis)",
+            "cy": "hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p inner)",
+          "color": "#f472b6",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 0.55) * cos(axis)",
+            "cy": "-hypot(sep, 0.55) * sin(axis)",
+            "r": "0.55"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Apollonian (-p outer)",
+          "color": "#ec4899",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-hypot(sep, 1.15) * cos(axis)",
+            "cy": "-hypot(sep, 1.15) * sin(axis)",
+            "r": "1.15"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (upper)",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-0.75 * sin(axis)",
+            "cy": "0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (lower)",
+          "color": "#f59e0b",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0.75 * sin(axis)",
+            "cy": "-0.75 * cos(axis)",
+            "r": "hypot(sep, 0.75)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Steiner Arc (wide)",
+          "color": "#fde047",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "-1.8 * sin(axis)",
+            "cy": "1.8 * cos(axis)",
+            "r": "hypot(sep, 1.8)"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Isometric Circle |T'(z)| = 1",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dashed",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "pole_x",
+            "cy": "pole_y",
+            "r": "min(25, s_eff * sqrt(2 / den_p))"
+          }
+        },
+        {
+          "kind": "circle",
+          "label": "Unit Circle (Sphere Equator)",
+          "color": "#94a3b8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "dotted",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "0",
+            "cy": "0",
+            "r": "1"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 1,
+          "y": 0,
+          "xExpr": "px",
+          "yExpr": "py",
+          "label": "Fixed +p",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "xExpr": "-px",
+          "yExpr": "-py",
+          "label": "Fixed -p",
+          "icon": "star",
+          "color": "#f472b6",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5119,
+          "y": 0.3861,
+          "xExpr": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+          "yExpr": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+          "label": "Zero z_0",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.2452,
+          "y": -0.9391,
+          "xExpr": "pole_x",
+          "yExpr": "pole_y",
+          "label": "Pole z_∞",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [],
+      "texts": [],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 3
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "contourMode": false,
+        "showMesh": false,
+        "showLandmarks": true,
+        "showSphere": false,
+        "projection": "planar",
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        },
+        "showDomain": true,
+        "domainScheme": "inferno",
+        "domainOpacity": 0.88
+      }
+    },
+    {
+      "id": "contour_arg",
+      "name": "∮ Argument Principle Around z_0 (+1)",
+      "startSlider": "tau",
+      "mode": "map",
+      "splitPct": 50,
+      "cards": [
+        {
+          "title": "Möbius Flow T_τ(z) = exp(τA)·z",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Conformal Derivative T_τ'(z) = (cz + d)^(-2)",
+          "code": "double complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex den = ch - k * z;\ndouble complex den2 = den * den;\nif (cabs(den2) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / den2;",
+          "color": "#34d399",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Lie Algebra Generator V(z) = β(z² - p²)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\nreturn beta * (z * z - p * p);",
+          "color": "#fbbf24",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": false
+        },
+        {
+          "title": "Argument Principle (1 / 2πi) · T_τ'(z) / T_τ(z)",
+          "code": "double complex p = c_make(px, py);\ndouble complex beta = c_make(cos(regime - axis), sin(regime - axis));\ndouble complex u = c_make(tau * sep * cos(regime), tau * sep * sin(regime));\ndouble complex ep = cexp(u);\ndouble complex em = cexp(-u);\ndouble complex ch = 0.5 * (ep + em);\ndouble complex shc;\nif (cabs(u) < 1e-4) {\n  double complex u2 = u * u;\n  shc = c_make(1.0, 0.0) + u2 * (c_make(1.0 / 6.0, 0.0) + u2 * c_make(1.0 / 120.0, 0.0));\n} else {\n  shc = (0.5 * (ep - em)) / u;\n}\ndouble complex k = c_make(tau, 0.0) * beta * shc;\ndouble complex num = ch * z - k * p * p;\ndouble complex den = ch - k * z;\ndouble complex prod = num * den;\nif (cabs(prod) < 1e-12) return c_make(INFINITY, 0.0);\nreturn 1.0 / (c_make(0.0, 2.0 * M_PI) * prod);",
+          "color": "#c084fc",
+          "lineWidth": 2.2,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "tau",
+          "label": "Flow Time τ",
+          "value": -3.141593,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.6
+        },
+        {
+          "name": "regime",
+          "label": "Regime ψ (0=Hyp, π/2=Ell)",
+          "value": 0.7854,
+          "min": 0,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sep",
+          "label": "Fixed-Point Half-Sep d (0=Par)",
+          "value": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.02,
+          "speed": 0.45
+        },
+        {
+          "name": "axis",
+          "label": "Axis Angle φ",
+          "value": 0,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.4
+        },
+        {
+          "name": "sphere_yaw",
+          "label": "Sphere Yaw",
+          "value": 0.55,
+          "min": -3.141593,
+          "max": 3.141593,
+          "step": 0.02,
+          "speed": 0.35
+        },
+        {
+          "name": "sphere_pitch",
+          "label": "Sphere Pitch",
+          "value": 0.38,
+          "min": -1.4,
+          "max": 1.4,
+          "step": 0.02,
+          "speed": 0.2
+        }
+      ],
+      "vars": [
+        {
+          "name": "px",
+          "label": "",
+          "expr": "sep * cos(axis)"
+        },
+        {
+          "name": "py",
+          "label": "",
+          "expr": "sep * sin(axis)"
+        },
+        {
+          "name": "s_eff",
+          "label": "",
+          "expr": "max(sep, 0.0001)"
+        },
+        {
+          "name": "ur",
+          "label": "",
+          "expr": "tau * s_eff * cos(regime)"
+        },
+        {
+          "name": "ui",
+          "label": "",
+          "expr": "tau * s_eff * sin(regime)"
+        },
+        {
+          "name": "den_p",
+          "label": "",
+          "expr": "cosh(2 * ur) - cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "den_z",
+          "label": "",
+          "expr": "cosh(2 * ur) + cos(2 * ui) + 1e-12"
+        },
+        {
+          "name": "pole_x",
+          "label": "",
+          "expr": "s_eff * (cos(axis) * sinh(2 * ur) + sin(axis) * sin(2 * ui)) / den_p"
+        },
+        {
+          "name": "pole_y",
+          "label": "",
+          "expr": "s_eff * (sin(axis) * sinh(2 * ur) - cos(axis) * sin(2 * ui)) / den_p"
+        }
+      ],
+      "shapes": [
+        {
+          "kind": "circle",
+          "label": "Tracking Loop Around z_0",
+          "color": "#38bdf8",
+          "lineWidth": 2.2,
+          "opacity": 0.22,
+          "lineStyle": "solid",
+          "locked": true,
+          "closed": true,
+          "visible": true,
+          "formula": {
+            "kind": "circle",
+            "cx": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+            "cy": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+            "r": "0.45"
+          }
+        }
+      ],
+      "points": [
+        {
+          "x": 1,
+          "y": 0,
+          "xExpr": "px",
+          "yExpr": "py",
+          "label": "Fixed +p",
+          "icon": "star",
+          "color": "#fbbf24",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "xExpr": "-px",
+          "yExpr": "-py",
+          "label": "Fixed -p",
+          "icon": "star",
+          "color": "#f472b6",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 0.5119,
+          "y": 0.3861,
+          "xExpr": "(px * sinh(2 * ur) - py * sin(2 * ui)) / den_z",
+          "yExpr": "(py * sinh(2 * ur) + px * sin(2 * ui)) / den_z",
+          "label": "Zero z_0",
+          "icon": "dot",
+          "color": "#38bdf8",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        },
+        {
+          "x": 1.2452,
+          "y": -0.9391,
+          "xExpr": "pole_x",
+          "yExpr": "pole_y",
+          "label": "Pole z_∞",
+          "icon": "cross",
+          "color": "#fb7185",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [],
+      "texts": [],
+      "viewport": {
+        "inView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "outView": {
+          "cx": 0,
+          "cy": 0,
+          "r": 2.8
+        },
+        "inSquare": true,
+        "outSquare": true,
+        "contourMode": true,
+        "showMesh": false,
+        "showLandmarks": true,
+        "showSphere": false,
+        "projection": "planar",
+        "sphereView": {
+          "yaw": -0.58,
+          "pitch": 0.22,
+          "zoom": 1
+        },
+        "showDomain": true,
+        "domainScheme": "classic",
+        "domainOpacity": 0.45
+      }
+    }
+  ]
+}

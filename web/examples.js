@@ -67,9 +67,12 @@
     for (let i = 0; i < lonLatPairs.length; i++) {
       const a = lonLatPairs[i];
       const b = lonLatPairs[(i + 1) % lonLatPairs.length];
+      let dLon = b[0] - a[0];
+      if (dLon > 180) dLon -= 360;
+      else if (dLon < -180) dLon += 360;
       for (let s = 0; s < subdiv; s++) {
         const t = s / subdiv;
-        const lon = a[0] + (b[0] - a[0]) * t;
+        const lon = a[0] + dLon * t;
         const lat = Math.max(-82, Math.min(82, a[1] + (b[1] - a[1]) * t));
         const phi = (lat * Math.PI) / 180;
         const lam = (lon * Math.PI) / 180;
@@ -1018,28 +1021,323 @@
     pt(0.5, 32.935062, "Zero #5 (32.935i)", "ring", "#34d399", 5, true),
   ];
 
+  /* Full-Color Earth Atlas (Built directly on the high-detail original Earth with 100% solid opacities,
+   * deep sapphire Global Ocean, biome layers, 16 extra islands across every ocean, and cerulean lakes!) */
+  function buildEarthAtlasShapes() {
+    const oceanBase = {
+      kind: "circle",
+      label: "Global Ocean",
+      color: "#0b4f8c",
+      lineWidth: 0,
+      opacity: 1.0,
+      closed: true,
+      isOcean: true,
+      rawPts: circlePts(0, 0, 58.0, 96),
+    };
+
+    const lakes = [];
+    const land = [];
+    for (const s of WORLD_MAP_SHAPES) {
+      const lbl = s.label || "";
+      if (/Easter Egg|Null Island/i.test(lbl)) continue;
+
+      if (/Lake|Caspian/i.test(lbl)) {
+        lakes.push({
+          ...s,
+          color: "#1573ba",
+          lineWidth: 0.7,
+          opacity: 1.0,
+          closed: true,
+        });
+        continue;
+      }
+
+      let color = "#3d9458"; /* default lush temperate green */
+      if (/Antarctica|Greenland|Ellesmere|Devon|Svalbard|Severnaya|New Siberian/i.test(lbl)) {
+        color = "#edf5fc"; /* crisp polar ice & snow */
+      } else if (/Iceland|Baffin|Victoria Island|Banks Island|Novaya Zemlya|Southampton/i.test(lbl)) {
+        color = "#a8d5b3"; /* sub-arctic tundra */
+      } else if (/South America|Tierra|Chiloé|Galápagos/i.test(lbl)) {
+        color = "#228b52"; /* lush South American forest */
+      } else if (/North America|Newfoundland|Vancouver|Kodiak|Cuba|Hispaniola/i.test(lbl)) {
+        color = "#2e965a"; /* North American boreal & temperate green */
+      } else if (/Europe|Britain|Ireland|Corsica|Sicily|Crete|Balearic|Azores/i.test(lbl)) {
+        color = "#4ea860"; /* European verdant meadow */
+      } else if (/Africa|Canary|Cape Verde/i.test(lbl)) {
+        color = "#8db558"; /* African savanna base (Sahara desert layered on top!) */
+      } else if (/Madagascar|Mauritius|Socotra/i.test(lbl)) {
+        color = "#52a358";
+      } else if (/Australia|Tasmania/i.test(lbl)) {
+        color = "#d47d45"; /* Australian outback ochre */
+      } else if (/New Zealand|Fiji|Hawaii|Sumatra|Java|Borneo|Sulawesi|New Guinea|Luzon|Mindanao|Sri Lanka|Taiwan|Hainan/i.test(lbl)) {
+        color = "#24965b"; /* tropical archipelago emerald */
+      } else if (/Asia|Honshu|Hokkaido|Kyushu|Sakhalin/i.test(lbl)) {
+        color = "#5ca356"; /* Eurasian forest & steppe */
+      }
+
+      land.push({
+        ...s,
+        color,
+        lineWidth: Math.max(1.0, Number(s.lineWidth) ? Number(s.lineWidth) * 0.7 : 1.1),
+        opacity: 1.0,
+        closed: true,
+      });
+    }
+
+    /* 16 Additional Real-World Islands Across Every Ocean (100% Solid Opacity!) */
+    const extraIslands = [
+      { label: "Sardinia", color: "#52a862", pts: [[8.2, 41.2], [9.5, 41.2], [9.8, 39.2], [8.4, 38.9], [8.1, 40.2]] },
+      { label: "Cyprus", color: "#68ad60", pts: [[32.3, 35.1], [33.8, 35.4], [34.5, 35.6], [33.9, 34.9], [32.9, 34.6]] },
+      { label: "Faroe Islands", color: "#8ec79b", pts: [[-7.4, 62.3], [-6.4, 62.3], [-6.6, 61.5], [-7.2, 61.6]] },
+      { label: "Falkland Islands", color: "#70a878", pts: [[-61.3, -51.4], [-57.8, -51.4], [-58.4, -52.3], [-60.9, -52.2]] },
+      { label: "South Georgia", color: "#d7e8f5", pts: [[-38.0, -54.0], [-36.0, -54.8], [-36.5, -55.1], [-38.3, -54.3]] },
+      { label: "Jamaica", color: "#289c5e", pts: [[-78.4, 18.3], [-76.2, 18.1], [-76.4, 17.8], [-78.2, 18.0]] },
+      { label: "Puerto Rico", color: "#289c5e", pts: [[-67.2, 18.5], [-65.6, 18.4], [-65.8, 18.0], [-67.1, 18.0]] },
+      { label: "Bahamas Archipelago", color: "#34b06f", pts: [[-78.8, 26.6], [-77.1, 26.5], [-76.5, 24.4], [-77.9, 24.0], [-78.5, 25.2]] },
+      { label: "Bermuda", color: "#34b06f", pts: [[-65.0, 32.4], [-64.5, 32.5], [-64.6, 32.2], [-64.9, 32.2]] },
+      { label: "Lesser Antilles Arc", color: "#289c5e", pts: [[-61.8, 17.2], [-61.0, 15.8], [-60.8, 13.8], [-61.4, 12.1], [-61.7, 13.9], [-61.5, 16.0]] },
+      { label: "Zanzibar & Comoros", color: "#4da35a", pts: [[39.1, -5.8], [39.6, -6.4], [43.5, -11.5], [44.5, -12.3], [43.2, -11.8], [39.2, -6.3]] },
+      { label: "Seychelles", color: "#2ca364", pts: [[55.1, -4.4], [55.9, -4.6], [55.7, -5.0], [55.0, -4.8]] },
+      { label: "Maldives Atolls", color: "#2ca364", pts: [[72.7, 6.8], [73.6, 6.2], [73.6, 0.2], [72.8, 0.4]] },
+      { label: "Okinawa & Ryukyu Arc", color: "#3fa362", pts: [[127.4, 26.8], [128.4, 26.9], [127.9, 25.9], [124.2, 24.4], [123.8, 24.8], [127.0, 26.1]] },
+      { label: "Tahiti & Society Islands", color: "#2ca364", pts: [[-150.2, -17.3], [-149.0, -17.6], [-149.2, -18.1], [-150.0, -17.8]] },
+      { label: "Easter Island (Rapa Nui)", color: "#76b064", pts: [[-109.6, -27.0], [-109.1, -27.1], [-109.4, -27.4]] },
+    ].map((isl) => ({
+      kind: "polygon",
+      label: isl.label,
+      color: isl.color,
+      lineWidth: 1.1,
+      opacity: 1.0,
+      closed: true,
+      rawPts: geoPts(isl.pts, 1),
+    }));
+
+    /* Authentic Biome Overlays (100% Solid Opacity, fill-only, layered on top of continents!) */
+    const biomes = [
+      {
+        kind: "polygon",
+        label: "Sahara Desert",
+        color: "#e6c173",
+        lineWidth: 0,
+        opacity: 1.0,
+        closed: true,
+        rawPts: geoPts([
+          [-16.2, 21.5], [-14.0, 27.5], [-9.0, 30.8], [0.0, 33.5], [10.0, 32.8],
+          [20.0, 30.5], [31.5, 30.0], [34.0, 24.5], [36.5, 19.0], [32.0, 15.5],
+          [22.0, 14.5], [10.0, 14.8], [-2.0, 15.2], [-12.0, 16.0], [-15.8, 18.2],
+        ], 2),
+      },
+      {
+        kind: "polygon",
+        label: "Arabian Desert",
+        color: "#e2b96a",
+        lineWidth: 0,
+        opacity: 1.0,
+        closed: true,
+        rawPts: geoPts([
+          [35.8, 28.5], [40.5, 31.5], [47.0, 29.2], [53.5, 24.0], [57.5, 21.5],
+          [53.0, 16.5], [45.0, 13.8], [42.5, 17.5], [39.5, 22.0], [36.5, 26.0],
+        ], 2),
+      },
+      {
+        kind: "polygon",
+        label: "Amazon Rainforest",
+        color: "#146e3f",
+        lineWidth: 0,
+        opacity: 1.0,
+        closed: true,
+        rawPts: geoPts([
+          [-75.5, 2.0], [-68.0, 4.5], [-59.0, 2.5], [-50.5, -1.0], [-49.5, -7.5],
+          [-56.0, -12.0], [-66.5, -12.5], [-74.5, -8.5], [-76.5, -3.5],
+        ], 2),
+      },
+      {
+        kind: "polygon",
+        label: "Gobi & Tibetan Plateau",
+        color: "#ccb98e",
+        lineWidth: 0,
+        opacity: 1.0,
+        closed: true,
+        rawPts: geoPts([
+          [76.0, 36.0], [86.0, 42.5], [100.0, 43.5], [110.0, 41.5], [104.0, 34.0],
+          [97.0, 29.5], [87.0, 29.0], [79.0, 31.5],
+        ], 2),
+      },
+      {
+        kind: "polygon",
+        label: "Australian Red Center",
+        color: "#bf5830",
+        lineWidth: 0,
+        opacity: 1.0,
+        closed: true,
+        rawPts: geoPts([
+          [120.0, -21.5], [130.0, -20.0], [139.0, -23.0], [138.0, -29.5],
+          [129.0, -30.5], [120.5, -28.0], [118.5, -24.5],
+        ], 2),
+      },
+    ];
+
+    return [oceanBase, ...land, ...extraIslands, ...biomes, ...lakes];
+  }
+
+  const EARTH_ATLAS_SHAPES = buildEarthAtlasShapes();
+
+  /* Mercator Projection Converter: maps (lon°, lat°) onto the familiar flat rectangular
+   * Mercator plane [-π, π] × [-2.65, 2.65] so the holomorphic inverse Mercator map
+   * w = i·exp(−i·z) wraps the flat 2D Mercator Earth conformally onto the 3D Riemann Sphere! */
+  function mercPt(lon, lat, label, icon = "dot", color = "#fbbf24", size = 4.5, locked = false) {
+    const phi = (Math.max(-82, Math.min(82, lat)) * Math.PI) / 180;
+    const x = (lon * Math.PI) / 180;
+    const y = Math.log(Math.tan(Math.PI / 4 + phi / 2));
+    return pt(Number(x.toFixed(4)), Number(y.toFixed(4)), label, icon, color, size, locked);
+  }
+
+  function buildMercatorEarthShapes() {
+    const out = [];
+    /* Full Mercator Ocean Rectangle [-π, π] × [-2.65, 2.65] (isOcean fills 100% of 3D Sphere, Stereographic & Poincaré Disks!) */
+    out.push({
+      kind: "rect",
+      label: "Global Ocean (Mercator)",
+      color: "#0b4f8c",
+      lineWidth: 1.0,
+      opacity: 1.0,
+      closed: true,
+      isOcean: true,
+      rawPts: rectPts(-Math.PI, -2.65, Math.PI, 2.65),
+    });
+
+    for (const s of EARTH_ATLAS_SHAPES) {
+      if (s.isOcean) continue;
+      if (/^Antarctica$/i.test(s.label || "")) {
+        /* Build clean continuous Mercator southern ice shelf spanning [-π, π] down to y = -2.65 */
+        const coast = (s.rawPts || []).map((p) => ({
+          x: Math.atan2(p.x, p.y),
+          y: Math.max(-2.6, Math.min(2.6, Math.log(Math.max(1e-4, Math.hypot(p.x, p.y))))),
+        })).sort((a, b) => a.x - b.x);
+        const shelf = [{ x: -Math.PI, y: -2.65 }];
+        if (coast.length > 0) shelf.push({ x: -Math.PI, y: coast[0].y });
+        for (const q of coast) shelf.push(q);
+        if (coast.length > 0) shelf.push({ x: Math.PI, y: coast[coast.length - 1].y });
+        shelf.push({ x: Math.PI, y: -2.65 });
+        out.push({ ...s, rawPts: shelf });
+        continue;
+      }
+
+      const mPts = [];
+      let prevX = null;
+      for (const p of s.rawPts || []) {
+        let x = Math.atan2(p.x, p.y);
+        const y = Math.max(-2.6, Math.min(2.6, Math.log(Math.max(1e-4, Math.hypot(p.x, p.y)))));
+        if (prevX !== null) {
+          while (x - prevX > Math.PI) x -= Math.PI * 2;
+          while (x - prevX < -Math.PI) x += Math.PI * 2;
+        }
+        prevX = x;
+        mPts.push({ x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) });
+      }
+      out.push({ ...s, rawPts: mPts });
+    }
+    return out;
+  }
+
+  const MERCATOR_EARTH_SHAPES = buildMercatorEarthShapes();
+
+  /* Stained-Glass Jewel Orb & Hyperbolic Rose Mandala (Solid 100% Opacity + Translucent Layers!) */
+  function buildStainedGlassShapes() {
+    const shapes = [
+      {
+        kind: "circle",
+        label: "Celestial Midnight Ocean",
+        color: "#0b1938",
+        lineWidth: 0,
+        opacity: 1.0,
+        closed: true,
+        isOcean: true,
+        rawPts: circlePts(0, 0, 56.0, 96),
+      },
+    ];
+    const petalPts = (r0, r1, ang, spread, steps = 22) => {
+      const pts = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const r = r0 + (r1 - r0) * t;
+        const a = ang + Math.sin(t * Math.PI) * spread;
+        pts.push({ x: r * Math.cos(a), y: r * Math.sin(a) });
+      }
+      for (let i = steps; i >= 0; i--) {
+        const t = i / steps;
+        const r = r0 + (r1 - r0) * t;
+        const a = ang - Math.sin(t * Math.PI) * spread;
+        pts.push({ x: r * Math.cos(a), y: r * Math.sin(a) });
+      }
+      return pts;
+    };
+    const outerJewels = ["#e11d48", "#f59e0b", "#10b981", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899", "#eab308"];
+    for (let k = 0; k < 8; k++) {
+      const ang = (k / 8) * Math.PI * 2;
+      shapes.push({
+        kind: "polygon",
+        label: `Outer Petal ${k + 1}`,
+        color: outerJewels[k],
+        lineWidth: 1.5,
+        opacity: 1.0,
+        closed: true,
+        rawPts: petalPts(0.55, 2.25, ang, 0.34, 18),
+      });
+    }
+    const midJewels = ["#f43f5e", "#fbbf24", "#34d399", "#38bdf8", "#a78bfa", "#fb7185", "#2dd4bf", "#f97316"];
+    for (let k = 0; k < 8; k++) {
+      const ang = ((k + 0.5) / 8) * Math.PI * 2;
+      shapes.push({
+        kind: "polygon",
+        label: `Mid Petal ${k + 1}`,
+        color: midJewels[k],
+        lineWidth: 1.3,
+        opacity: 0.96,
+        closed: true,
+        rawPts: petalPts(0.28, 1.35, ang, 0.28, 16),
+      });
+    }
+    shapes.push(
+      { kind: "circle", label: "Golden Halo Ring", color: "#fbbf24", lineWidth: 2.2, opacity: 0.24, closed: true, rawPts: circlePts(0, 0, 1.0, 96) },
+      { kind: "circle", label: "Royal Amethyst Core", color: "#6d28d9", lineWidth: 1.6, opacity: 1.0, closed: true, rawPts: circlePts(0, 0, 0.38, 64) },
+      { kind: "circle", label: "Sunburst Center", color: "#fde047", lineWidth: 0, opacity: 1.0, closed: true, rawPts: circlePts(0, 0, 0.19, 48) }
+    );
+    return shapes;
+  }
+
+  const STAINED_GLASS_SHAPES = buildStainedGlassShapes();
+
   const EXAMPLES = [
     /* =====================================================================
-     * COMPLEX MAP EXAMPLES
+     * COMPLEX MODE — FOLDER 1: COMPLEX ANALYSIS & CONFORMAL MAPS
      * ===================================================================== */
     {
       id: "map_zeta",
       mode: "map",
-      category: "Complex Map",
-      title: "Riemann Zeta ζ(s)",
-      subtitle: "Full analytic continuation across C \\ {1}",
-      description: "Explores the full analytic continuation of Riemann’s zeta function ζ(s) across ℂ \\ {1}, including the critical line Re(s)=1/2, non-trivial zeros, simple pole at s=1 (Res=1), and functional-equation bridge into the left half-plane.",
+      folder: "cat_complex_analysis",
+      category: "Complex Analysis & Conformal Maps",
+      title: "Riemann Zeta ζ(s) — Continuation, Symmetry & Residue",
+      subtitle: "Analytic continuation across ℂ \\ {1}, completed ξ(s), homotopy morph z → ζ(z), Stereographic Disk & live Cauchy Residue ∮ ζ(s) ds = 2πi!",
+      description: "Flagship exploration of Riemann’s zeta function ζ(s): map the critical line Re(s)=1/2 and non-trivial zeros, paint its Classic Domain portrait, project poles onto the Stereographic Disk, switch to Completed ξ(s) to see ξ(s)=ξ(1−s), morph z → ζ(z) continuously, or toggle Contour Integration to verify ∮ ζ(s) ds = 2πi around the simple pole s = 1.",
       showCriticalLine: true,
       fnCards: [
-        { title: "Riemann Zeta ζ(s)", code: "c_zeta(s)", color: "#38bdf8", visible: true, builtin: { fn: 0 } },
+        { title: "Riemann Zeta ζ(s)", code: "c_zeta(s)", color: "#38bdf8", visible: true, active: true, builtin: { fn: 0 } },
+        { title: "Homotopy Morph (1 − t)z + t·ζ(z)", code: "(1.0 - t) * z + t * c_zeta(z)", color: "#a78bfa", visible: false, active: false },
+        { title: "Completed Zeta ξ(s) = ξ(1 − s)", code: "c_xi(s)", color: "#34d399", visible: false, active: false, builtin: { fn: 1 } },
       ],
-      sliders: [],
+      sliders: [
+        { name: "t", label: "Homotopy t (z → ζ)", value: 1.0, min: 0.0, max: 1.0, step: 0.015, speed: 0.5 },
+      ],
       defaultPoints: ZETA_POINTS,
       defaultLines: [CRIT_LINE],
       presets: [
         {
           id: "critical_line",
           name: "Critical Line & 1st Zero",
+          activeFnIndex: 0,
+          contourMode: false,
+          showDomain: false,
           inView: { cx: 0.5, cy: 14.5, r: 15.0 },
           outView: { cx: 0.6, cy: 0.0, r: 3.8 },
           shapes: [
@@ -1048,42 +1346,74 @@
           ],
         },
         {
-          id: "first_zero",
-          name: "Loop: 1st Zero",
-          inView: { cx: 0.5, cy: 14.135, r: 3.0 },
-          outView: { cx: 0.0, cy: 0.0, r: 2.2 },
+          id: "zeta_domain_portrait",
+          name: "Domain Coloring Portrait (ℂ \\ {1})",
+          activeFnIndex: 0,
+          contourMode: false,
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.92,
+          inView: { cx: -2.0, cy: 0.0, r: 7.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.0 },
           shapes: [
-            { kind: "circle", label: "Disk around 1st Zero", color: "#34d399", closed: true, rawPts: circlePts(0.5, 14.13472514, 0.65, 80) },
+            { kind: "circle", label: "Pole s = 1 Loop", color: "#fb7185", closed: true, opacity: 0.16, rawPts: circlePts(1.0, 0.0, 0.55, 72) },
+            { kind: "circle", label: "Trivial Zero s = −2", color: "#fbbf24", closed: true, opacity: 0.16, rawPts: circlePts(-2.0, 0.0, 0.55, 64) },
           ],
         },
         {
-          id: "pole_s1",
-          name: "Loop: Pole (s = 1)",
-          inView: { cx: 0.5, cy: 0.0, r: 3.0 },
-          outView: { cx: 0.5, cy: 0.0, r: 3.8 },
+          id: "zeta_residue_contour",
+          name: "∮ Contour Residue: Pole s=1 (2πi) vs Holo (0)",
+          activeFnIndex: 0,
+          contourMode: true,
+          showDomain: false,
+          inView: { cx: 0.2, cy: 0.4, r: 3.2 },
+          outView: { cx: 0.0, cy: 3.1, r: 5.5 },
           shapes: [
-            { kind: "circle", label: "Disk around Pole s=1", color: "#fb7185", closed: true, rawPts: circlePts(1.0, 0.0, 0.45, 72) },
+            { kind: "circle", label: "Pole s=1 Loop (Res = +1)", color: "#fb7185", closed: true, rawPts: circlePts(1.0, 0.0, 0.55, 72) },
+            { kind: "circle", label: "Holomorphic Loop (0)", color: "#34d399", closed: true, rawPts: circlePts(-1.2, 0.8, 0.65, 72) },
           ],
         },
         {
-          id: "analytic_bridge",
-          name: "Analytic Continuation Bridge",
-          inView: { cx: 0.0, cy: 0.5, r: 4.2 },
-          outView: { cx: 0.2, cy: 0.0, r: 3.0 },
+          id: "zeta_stereo_disk",
+          name: "Stereographic Disk (Pole → ∞ Rim)",
+          activeFnIndex: 0,
+          contourMode: false,
+          projection: "stereographic",
+          showDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.5, cy: 4.0, r: 6.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.25 },
           shapes: [
-            { kind: "rect", label: "Bridge Re ∈ [-2.4, 2.4]", color: "#a78bfa", closed: true, rawPts: rectPts(-2.4, 0.5, 2.4, 2.5) },
-            { kind: "circle", label: "Trivial Zero s = -2", color: "#fbbf24", closed: true, rawPts: circlePts(-2.0, 0.0, 0.55, 64) },
+            { kind: "circle", label: "Pole s = 1 Loop", color: "#fb7185", closed: true, opacity: 0.22, rawPts: circlePts(1.0, 0.0, 0.45, 72) },
+            { kind: "line", label: "Critical Line (t: 0→28)", color: "#38bdf8", closed: false, rawPts: linePts(0.5, 0.0, 0.5, 28.0, 220) },
           ],
         },
         {
-          id: "critical_strip",
-          name: "Critical Strip (σ = 0.25, 0.5, 0.75)",
-          inView: { cx: 0.5, cy: 14.0, r: 16.0 },
-          outView: { cx: 0.6, cy: 0.0, r: 5.5 },
+          id: "zeta_homotopy_morph",
+          name: "▶ Homotopy Morph: z → ζ(z)",
+          activeFnIndex: 1,
+          contourMode: false,
+          showDomain: false,
+          inView: { cx: 0.5, cy: 2.0, r: 4.2 },
+          outView: { cx: 0.5, cy: 0.5, r: 4.5 },
+          sliderValues: { t: 0.0 },
+          startSlider: "t",
           shapes: [
-            { kind: "line", label: "σ = 0.25", color: "#fb7185", closed: false, rawPts: linePts(0.25, 0.5, 0.25, 28.0, 200) },
-            { kind: "line", label: "σ = 0.50 (Critical)", color: "#38bdf8", closed: false, rawPts: linePts(0.5, 0.5, 0.5, 28.0, 200) },
-            { kind: "line", label: "σ = 0.75", color: "#34d399", closed: false, rawPts: linePts(0.75, 0.5, 0.75, 28.0, 200) },
+            { kind: "rect", label: "Conformal Patch", color: "#a78bfa", closed: true, rawPts: rectPts(-2.2, 0.5, 2.2, 3.2) },
+          ],
+        },
+        {
+          id: "zeta_completed_xi",
+          name: "Completed ξ(s): Reflection Symmetry s ↔ 1−s",
+          activeFnIndex: 2,
+          contourMode: false,
+          showDomain: false,
+          inView: { cx: 0.5, cy: 0.0, r: 3.8 },
+          outView: { cx: 0.5, cy: 0.0, r: 1.8 },
+          shapes: [
+            { kind: "circle", label: "Disk at s = 1.8 + 0.8i", color: "#38bdf8", closed: true, rawPts: circlePts(1.8, 0.8, 0.55, 72) },
+            { kind: "circle", label: "Reflected 1 − s", color: "#fbbf24", closed: true, rawPts: circlePts(-0.8, -0.8, 0.55, 72) },
           ],
         },
       ],
@@ -1091,17 +1421,18 @@
     {
       id: "map_dirichlet",
       mode: "map",
-      category: "Complex Map",
+      folder: "cat_complex_analysis",
+      category: "Complex Analysis & Conformal Maps",
       title: "Dirichlet Partial Sums Sₙ(s) vs ζ(s)",
-      subtitle: "Compare naive sum against full analytic continuation across Re(s)=1",
-      description: "Visualizes the truncated Dirichlet series S_N(s) = Σ_{n=1}^N n^(-s) with an interactive N slider, contrasting convergence in Re(s) > 1 with violent divergence across the Re(s) = 1 abscissa wall.",
+      subtitle: "Compare truncated sum Σ n⁻ˢ against analytic continuation across the Re(s) = 1 wall",
+      description: "Visualizes the truncated Dirichlet series S_N(s) = Σ_{n=1}^N n^(−s) with an interactive N slider, contrasting uniform convergence in Re(s) > 1 with violent divergence across the Re(s) = 1 abscissa of convergence.",
       showCriticalLine: true,
       showDirichletWall: true,
       fnCards: [
         { title: "Analytic ζ(s)", code: "c_zeta(s)", color: "#38bdf8", visible: true, active: false, builtin: { fn: 0 } },
         { title: "Dirichlet Sum Sₙ(s)", code: "c_zeta_partial(s, (int)N)", color: "#fb7185", visible: true, active: true, lineStyle: "dashed", builtin: { dirichlet: true } },
       ],
-      sliders: [{ name: "N", label: "Terms", value: 20, min: 2, max: 150, step: 1 }],
+      sliders: [{ name: "N", label: "Terms N", value: 24, min: 2, max: 150, step: 1, speed: 0.6 }],
       defaultPoints: [pt(1.0, 0.0, "Pole s = 1", "cross", "#fb7185", 6, true)],
       defaultLines: [CRIT_LINE, DIRICHLET_WALL],
       presets: [
@@ -1110,6 +1441,18 @@
           name: "Box Crossing Re(s) = 1 Wall",
           inView: { cx: 1.1, cy: 3.8, r: 4.5 },
           outView: { cx: 1.0, cy: 0.0, r: 4.2 },
+          sliderValues: { N: 24 },
+          shapes: [
+            { kind: "rect", label: "Box Re ∈ [0.45, 2.2]", color: "#38bdf8", closed: true, rawPts: rectPts(0.45, 1.5, 2.2, 5.8) },
+          ],
+        },
+        {
+          id: "dirichlet_animate",
+          name: "▶ Watch Divergence Past Re(s)=1 (Animate N)",
+          inView: { cx: 1.1, cy: 3.8, r: 4.5 },
+          outView: { cx: 1.0, cy: 0.0, r: 4.5 },
+          sliderValues: { N: 2 },
+          startSlider: "N",
           shapes: [
             { kind: "rect", label: "Box Re ∈ [0.45, 2.2]", color: "#38bdf8", closed: true, rawPts: rectPts(0.45, 1.5, 2.2, 5.8) },
           ],
@@ -1119,6 +1462,7 @@
           name: "Safe Right Half-Plane (Re > 1.3)",
           inView: { cx: 2.2, cy: 2.5, r: 3.5 },
           outView: { cx: 1.0, cy: 0.0, r: 1.8 },
+          sliderValues: { N: 40 },
           shapes: [
             { kind: "circle", label: "Disk at s = 2.2 + 2i", color: "#34d399", closed: true, rawPts: circlePts(2.2, 2.0, 0.75, 72) },
           ],
@@ -1126,114 +1470,79 @@
       ],
     },
     {
-      id: "map_xi",
-      mode: "map",
-      category: "Complex Map",
-      title: "Completed Zeta ξ(s)",
-      subtitle: "Entire function satisfying ξ(s) = ξ(1 − s), real on Re(s) = 1/2",
-      description: "Demonstrates Riemann’s entire completed zeta function ξ(s) = ½ s(s−1)π^(-s/2)Γ(s/2)ζ(s), highlighting its exact reflection symmetry ξ(s) = ξ(1−s), real values along Re(s) = 1/2, and removable singularity at s = 1.",
-      showCriticalLine: true,
-      fnCards: [
-        { title: "Completed Zeta ξ(s)", code: "c_xi(s)", color: "#a78bfa", visible: true, builtin: { fn: 1 } },
-      ],
-      sliders: [],
-      defaultPoints: [
-        pt(0.5, 0.0, "Symmetry s = ½", "diamond", "#fbbf24", 5, true),
-        pt(1.0, 0.0, "ξ(1) = ½", "dot", "#38bdf8", 5, true),
-        pt(0.0, 0.0, "ξ(0) = ½", "dot", "#38bdf8", 5, true),
-        pt(0.5, 14.134725, "Zero #1", "ring", "#34d399", 5, true),
-      ],
-      defaultLines: [CRIT_LINE],
-      presets: [
-        {
-          id: "symmetry",
-          name: "Symmetry: s vs 1 − s",
-          inView: { cx: 0.5, cy: 0.0, r: 3.8 },
-          outView: { cx: 0.5, cy: 0.0, r: 1.8 },
-          shapes: [
-            { kind: "circle", label: "Disk at s = 1.8 + 0.8i", color: "#38bdf8", closed: true, rawPts: circlePts(1.8, 0.8, 0.55, 72) },
-            { kind: "circle", label: "Reflected 1 − s", color: "#fbbf24", closed: true, rawPts: circlePts(-0.8, -0.8, 0.55, 72) },
-          ],
-        },
-        {
-          id: "crit_real",
-          name: "Critical Line (Maps to Real Axis!)",
-          inView: { cx: 0.5, cy: 0.0, r: 16.0 },
-          outView: { cx: 0.25, cy: 0.0, r: 0.6 },
-          shapes: [
-            { kind: "line", label: "Re(s) = ½, t ∈ [-16, 16]", color: "#38bdf8", closed: false, rawPts: linePts(0.5, -16.0, 0.5, 16.0, 220) },
-          ],
-        },
-        {
-          id: "removable_pole",
-          name: "Smooth Across s = 1",
-          inView: { cx: 0.5, cy: 0.0, r: 3.0 },
-          outView: { cx: 0.5, cy: 0.0, r: 0.6 },
-          shapes: [
-            { kind: "circle", label: "Disk centered at s = 1", color: "#34d399", closed: true, rawPts: circlePts(1.0, 0.0, 0.7, 72) },
-          ],
-        },
-      ],
-    },
-    {
-      id: "map_morph",
-      mode: "map",
-      category: "Complex Map",
-      title: "Homotopy Morph: z → ζ(z)",
-      subtitle: "Press ▶ on slider t to continuously bend the identity plane into ζ(z)",
-      description: "Smoothly morphs between the identity map z and the analytic continuation of ζ(s) via a live homotopy slider t ∈ [0, 1], showing how regions bend around the pole at s = 1.",
-      showCriticalLine: true,
-      fnCards: [
-        { title: "Morph (1 − t)z + t·ζ(z)", code: "(1.0 - t) * z + t * c_zeta(z)", color: "#a78bfa", visible: true, builtin: { fn: 0 } },
-      ],
-      sliders: [{ name: "t", label: "Homotopy", value: 1.0, min: 0.0, max: 1.0, step: 0.02 }],
-      defaultPoints: [pt(1.0, 0.0, "Pole s = 1", "cross", "#fb7185", 6, true)],
-      presets: [
-        {
-          id: "bridge_morph",
-          name: "Morph Box",
-          inView: { cx: 0.5, cy: 2.0, r: 4.2 },
-          outView: { cx: 0.5, cy: 0.5, r: 4.5 },
-          shapes: [
-            { kind: "rect", label: "Conformal Patch", color: "#a78bfa", closed: true, rawPts: rectPts(-2.2, 0.5, 2.2, 3.2) },
-          ],
-        },
-      ],
-    },
-    {
       id: "map_joukowsky",
       mode: "map",
-      category: "Complex Map",
-      title: "Joukowsky Airfoil Map",
-      subtitle: "Conformal aerodynamic transform (z + 1/z) / 2",
-      description: "Classic aerodynamic conformal map w = z + 1/z transforming off-center circles passing through z = −1 into realistic Joukowsky airfoil profiles while preserving orthogonal streamlines.",
+      folder: "cat_complex_analysis",
+      category: "Complex Analysis & Conformal Maps",
+      title: "Joukowsky Airfoil & Conformal Flow",
+      subtitle: "Sculpt live aerodynamic wing camber & thickness via w = ½(z + 1/z)!",
+      description: "Classic conformal aerodynamic transform w = ½(z + 1/z): scrub the center offsets cx0, cy0 to sculpt realistic cambered Joukowsky airfoils in real time, inspect concentric confocal ellipses, or view the domain coloring field around the branch points ±1.",
       fnCards: [
-        { title: "Joukowsky (z + 1/z)/2", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : 0.5 * (z + 1.0 / z)", color: "#38bdf8", visible: true, builtin: { fn: 6 } },
+        { title: "Joukowsky (z + 1/z) / 2", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : 0.5 * (z + 1.0 / z)", color: "#38bdf8", visible: true, active: true, builtin: { fn: 6 } },
       ],
-      sliders: [],
+      sliders: [
+        { name: "cx0", label: "Thickness shift (−x)", value: -0.14, min: -0.45, max: 0.0, step: 0.01, speed: 0.4 },
+        { name: "cy0", label: "Camber shift (y)", value: 0.22, min: -0.45, max: 0.45, step: 0.01, speed: 0.4 },
+      ],
+      vars: [
+        { name: "rad", label: "Trailing-edge radius |1 − c₀|", expr: "hypot(1.0 - cx0, -cy0)" },
+      ],
       defaultPoints: [
         pt(0.0, 0.0, "Pole 0", "cross", "#fb7185", 5, true),
-        pt(1.0, 0.0, "Critical +1", "diamond", "#fbbf24", 5, true),
+        pt(1.0, 0.0, "Trailing Edge +1", "diamond", "#fbbf24", 5, true),
         pt(-1.0, 0.0, "Critical −1", "diamond", "#fbbf24", 5, true),
+        { ...pt(-0.14, 0.22, "Center c₀ (live)", "ring", "#38bdf8", 5.5, true), xExpr: "cx0", yExpr: "cy0" },
       ],
       presets: [
         {
           id: "airfoil",
-          name: "Airfoil Circle",
+          name: "Live Cambered Airfoil (Scrub cx0, cy0)",
+          showDomain: false,
           inView: { cx: 0.0, cy: 0.0, r: 2.6 },
           outView: { cx: 0.0, cy: 0.0, r: 2.0 },
+          sliderValues: { cx0: -0.14, cy0: 0.22 },
           shapes: [
-            { kind: "circle", label: "Joukowsky Airfoil", color: "#38bdf8", closed: true, rawPts: circlePts(-0.14, 0.22, 1.16, 96) },
+            {
+              kind: "circle",
+              label: "Joukowsky Airfoil Circle",
+              color: "#38bdf8",
+              opacity: 0.28,
+              closed: true,
+              formula: { kind: "circle", cx: "cx0", cy: "cy0", r: "rad" },
+              rawPts: circlePts(-0.14, 0.22, 1.161, 96),
+            },
           ],
         },
         {
           id: "concentric",
-          name: "Concentric Rings → Ellipses",
+          name: "Concentric Rings → Confocal Ellipses",
+          showDomain: false,
           inView: { cx: 0.0, cy: 0.0, r: 2.8 },
           outView: { cx: 0.0, cy: 0.0, r: 2.2 },
           shapes: [
-            { kind: "circle", label: "Circle r = 1.4", color: "#38bdf8", closed: true, rawPts: circlePts(0, 0, 1.4, 72) },
-            { kind: "circle", label: "Circle r = 2.0", color: "#a78bfa", closed: true, rawPts: circlePts(0, 0, 2.0, 72) },
+            { kind: "circle", label: "Circle r = 1.35", color: "#38bdf8", opacity: 0.22, closed: true, rawPts: circlePts(0, 0, 1.35, 72) },
+            { kind: "circle", label: "Circle r = 1.95", color: "#a78bfa", opacity: 0.18, closed: true, rawPts: circlePts(0, 0, 1.95, 72) },
+            { kind: "circle", label: "Inner Circle r = 0.72", color: "#34d399", opacity: 0.22, closed: true, rawPts: circlePts(0, 0, 0.72, 72) },
+          ],
+        },
+        {
+          id: "joukowsky_domain",
+          name: "Domain Coloring & Branch Points (±1)",
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.85,
+          inView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.0 },
+          shapes: [
+            {
+              kind: "circle",
+              label: "Joukowsky Airfoil Circle",
+              color: "#fef08a",
+              opacity: 0.14,
+              closed: true,
+              formula: { kind: "circle", cx: "cx0", cy: "cy0", r: "rad" },
+              rawPts: circlePts(-0.14, 0.22, 1.161, 96),
+            },
           ],
         },
       ],
@@ -1241,183 +1550,93 @@
     {
       id: "map_exp_inv",
       mode: "map",
-      category: "Complex Map",
-      title: "Essential Singularity exp(1/z)",
-      subtitle: "Try toggling 3D Sphere on the output plane!",
-      description: "Visualizes the essential singularity of e^(1/z) at the origin, illustrating Picard’s Great Theorem as tiny loops around z = 0 explode across the entire punctured w-plane.",
+      folder: "cat_complex_analysis",
+      category: "Complex Analysis & Conformal Maps",
+      title: "Essential Singularity exp(1/z) & Picard's Theorem",
+      subtitle: "Tiny loops around z = 0 explode across ℂ \\ {0} — inspect with Neon Prism & Riemann Sphere!",
+      description: "Visualizes the essential singularity of e^(1/z) at the origin, illustrating Picard’s Great Theorem: every punctured neighborhood of z = 0 hits every complex value infinitely often (except 0). Scrub loop radius r or inspect on the Riemann Sphere.",
       fnCards: [
-        { title: "exp(1 / z)", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : cexp(1.0 / z)", color: "#fbbf24", visible: true, builtin: { fn: 9 } },
+        { title: "exp(1 / z)", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : cexp(1.0 / z)", color: "#fbbf24", visible: true, active: true, builtin: { fn: 9 } },
       ],
-      sliders: [],
+      sliders: [
+        { name: "r", label: "Loop radius |z|", value: 0.55, min: 0.14, max: 1.4, step: 0.01, speed: 0.4 },
+      ],
       defaultPoints: [pt(0.0, 0.0, "Essential z = 0", "cross", "#fb7185", 6, true)],
       presets: [
         {
           id: "near_origin",
-          name: "Loop Around z = 0",
-          inView: { cx: 0.0, cy: 0.0, r: 2.2 },
+          name: "Shrinking Loop & Classic Domain Coloring",
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.9,
+          inView: { cx: 0.0, cy: 0.0, r: 1.6 },
           outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          sliderValues: { r: 0.55 },
           shapes: [
-            { kind: "circle", label: "Circle r = 0.55", color: "#fbbf24", closed: true, rawPts: circlePts(0, 0, 0.55, 84) },
+            { kind: "circle", label: "Loop |z| = r", color: "#fbbf24", opacity: 0.18, closed: true, formula: { kind: "circle", cx: "0", cy: "0", r: "r" }, rawPts: circlePts(0, 0, 0.55, 84) },
           ],
         },
-      ],
-    },
-    {
-      id: "map_world_sphere",
-      mode: "map",
-      category: "Complex Map",
-      title: "World Map on the Riemann Sphere",
-      subtitle: "70 high-detail landmasses, lakes & secret Easter Eggs + 23 labeled cities/mysteries on S² — driven at 60 FPS by sphere_yaw, sphere_pitch & sphere_zoom!",
-      description: "Maps a detailed vector world map and major cities onto the 3D Riemann Sphere via stereographic projection, with live longitude/latitude Möbius spin and flat stereographic presets.",
-      fnCards: [
         {
-          title: "Identity Globe w = z",
-          code: "z",
-          color: "#38bdf8",
-          visible: true,
-        },
-        {
-          title: "Upside-Down Inversion 1 / z",
-          code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : 1.0 / z",
-          color: "#fb7185",
-          visible: false,
-        },
-        {
-          title: "Double-Cover Earth z²",
-          code: "z * z",
-          color: "#a78bfa",
-          visible: false,
-        },
-      ],
-      sliders: [
-        { name: "spin", label: "Camera Spin", value: 0.0, min: 0.0, max: 6.2832, step: 0.02 },
-        { name: "tilt", label: "Camera Pitch", value: 0.22, min: -1.35, max: 1.35, step: 0.02 },
-        { name: "zoom", label: "Camera Zoom", value: 1.08, min: 0.65, max: 2.2, step: 0.02 },
-      ],
-      vars: [
-        { name: "sphere_yaw", label: "3D Sphere camera yaw (zero-HTTP 60fps)", expr: "-0.58 + spin" },
-        { name: "sphere_pitch", label: "3D Sphere camera pitch", expr: "tilt" },
-        { name: "sphere_zoom", label: "3D Sphere camera zoom", expr: "zoom" },
-      ],
-      defaultPoints: [
-        geoPt(-74.0, 40.7, "New York", "dot", "#34d399", 4.5, false),
-        geoPt(-118.2, 34.1, "Los Angeles", "dot", "#34d399", 4.2, false),
-        geoPt(-99.1, 19.4, "Mexico City", "dot", "#34d399", 4.2, false),
-        geoPt(-43.2, -22.9, "Rio", "dot", "#4ade80", 4.5, false),
-        geoPt(-58.4, -34.6, "Buenos Aires", "dot", "#4ade80", 4.2, false),
-        geoPt(-0.1, 51.5, "London", "dot", "#38bdf8", 4.5, false),
-        geoPt(2.35, 48.85, "Paris", "dot", "#38bdf8", 4.2, false),
-        geoPt(37.6, 55.75, "Moscow", "dot", "#38bdf8", 4.2, false),
-        geoPt(31.2, 30.0, "Cairo", "dot", "#fbbf24", 4.5, false),
-        geoPt(18.4, -33.9, "Cape Town", "dot", "#fbbf24", 4.5, false),
-        geoPt(72.9, 19.1, "Mumbai", "dot", "#a78bfa", 4.2, false),
-        geoPt(116.4, 39.9, "Beijing", "dot", "#a78bfa", 4.5, false),
-        geoPt(139.7, 35.7, "Tokyo", "dot", "#c4b5fd", 4.5, false),
-        geoPt(103.8, 1.35, "Singapore", "dot", "#a78bfa", 4.2, false),
-        geoPt(151.2, -33.9, "Sydney", "dot", "#fb7185", 4.5, false),
-        /* Funny Easter Egg Landmarks mapped onto the 3D Sphere! */
-        geoPt(-30.0, 31.0, "Atlantis (Re=½) 🏛", "diamond", "#fde047", 5.0, false),
-        geoPt(-70.3, 25.5, "Bermuda Δ", "ring", "#f43f5e", 4.5, false),
-        geoPt(-128.0, -22.0, "Kraken 🦑", "diamond", "#fb923c", 4.8, false),
-        geoPt(-4.45, 57.3, "Nessie 🦕", "ring", "#34d399", 4.2, false),
-        geoPt(0.0, 0.0, "Null Island (0°,0°)", "cross", "#38bdf8", 4.5, false),
-        geoPt(-123.4, -48.9, "Point Nemo (404)", "ring", "#94a3b8", 4.2, false),
-        geoPt(-115.8, 37.2, "Area 51 🛸", "diamond", "#a3e635", 4.5, false),
-        geoPt(75.0, -74.0, "Penguin Math Dept 🐧", "dot", "#e2e8f0", 4.5, false),
-      ],
-      presets: [
-        {
-          id: "earth_globe",
-          name: "3D Earth Globe (Atlantic & Atlantis)",
+          id: "exp_inv_sphere",
+          name: "Riemann Sphere Explosion (Neon Prism)",
+          projection: "sphere",
           enableSphere: true,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          outView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          sliderValues: { spin: 0.0, tilt: 0.22, zoom: 1.08 },
-          shapes: WORLD_MAP_SHAPES,
-        },
-        {
-          id: "earth_spin",
-          name: "Spinning Earth (60 FPS Camera)",
-          enableSphere: true,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          outView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          sliderValues: { spin: 0.0, tilt: 0.28, zoom: 1.1 },
-          startSlider: "spin",
-          shapes: WORLD_MAP_SHAPES,
-        },
-        {
-          id: "earth_easter_eggs",
-          name: "Easter Egg Hunt (Kraken & Point Nemo)",
-          enableSphere: true,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          outView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          sliderValues: { spin: 4.95, tilt: -0.38, zoom: 1.25 },
-          shapes: WORLD_MAP_SHAPES,
-        },
-        {
-          id: "earth_pacific",
-          name: "Asia-Pacific & Australia View",
-          enableSphere: true,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          outView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          sliderValues: { spin: 2.85, tilt: 0.05, zoom: 1.15 },
-          shapes: WORLD_MAP_SHAPES,
-        },
-        {
-          id: "earth_flat_stereo",
-          name: "Flat Stereographic Plane (2D)",
-          enableSphere: false,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          outView: { cx: 0.0, cy: 0.0, r: 4.6 },
-          sliderValues: { spin: 0.0, tilt: 0.22, zoom: 1.08 },
-          shapes: WORLD_MAP_SHAPES,
+          showDomain: true,
+          domainScheme: "neon_prism",
+          domainOpacity: 0.92,
+          inView: { cx: 0.0, cy: 0.0, r: 1.4 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.0 },
+          sliderValues: { r: 0.42 },
+          shapes: [
+            { kind: "circle", label: "Loop |z| = r", color: "#fbbf24", opacity: 0.25, closed: true, formula: { kind: "circle", cx: "0", cy: "0", r: "r" }, rawPts: circlePts(0, 0, 0.42, 96) },
+          ],
         },
       ],
     },
     {
       id: "map_blaschke_kaleidoscope",
       mode: "map",
-      category: "Complex Map",
-      title: "Blaschke Product & Hyperbolic Disk Kaleidoscope",
-      subtitle: "3-fold proper holomorphic self-map of the unit disk: f(z) = e^(iθ) z² (z − a) / (1 − a z) with winding number W = +3!",
-      description: "Composes finite Blaschke products (z−a)/(1−āz) to create conformal n-fold branched coverings of the unit disk and 3D Riemann Sphere with live zero-position and rotation sliders.",
+      folder: "cat_complex_analysis",
+      category: "Complex Analysis & Conformal Maps",
+      title: "Blaschke Products & Poincaré Disk Automorphisms",
+      subtitle: "Finite 3-fold conformal branched cover of the unit disk with bounded Poincaré Disk & Riemann Sphere!",
+      description: "Composes finite Blaschke factors (z − a)/(1 − āz) to build a 3-fold conformal covering of the unit disk 𝔻 → 𝔻. Watch concentric rings fold 3 times around the bounded Poincaré Disk or lift onto the Riemann Sphere.",
       fnCards: [
-        {
-          title: "3-Fold Blaschke Product B(z)",
-          code: "double complex num = z * z * (z - c_make(a, 0.0));\ndouble complex den = c_make(1.0, 0.0) - c_make(a, 0.0) * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn cexp(c_make(0.0, theta)) * (num / den);",
-          color: "#38bdf8",
-          visible: true,
-        },
-        {
-          title: "5-Fold Symmetric Rose Blaschke",
-          code: "z * (z*z*z*z - c_make(a, 0.0)) / (c_make(1.0, 0.0) - c_make(a, 0.0) * z*z*z*z)",
-          color: "#a78bfa",
-          visible: false,
-        },
+        { title: "Single Blaschke Factor B₁(z)", code: "double complex p = a * cexp(c_make(0.0, theta));\nreturn (z - p) / (1.0 - conj(p) * z);", color: "#a78bfa", visible: false, active: false },
+        { title: "3-Fold Blaschke Kaleidoscope B₃(z)", code: "double complex p1 = a * cexp(c_make(0.0, theta));\ndouble complex p2 = a * cexp(c_make(0.0, theta + 2.0943951));\ndouble complex p3 = a * cexp(c_make(0.0, theta + 4.1887902));\ndouble complex b1 = (z - p1) / (1.0 - conj(p1) * z);\ndouble complex b2 = (z - p2) / (1.0 - conj(p2) * z);\ndouble complex b3 = (z - p3) / (1.0 - conj(p3) * z);\nreturn b1 * b2 * b3;", color: "#38bdf8", visible: true, active: true },
       ],
       sliders: [
-        { name: "a", label: "Zero offset a ∈ (-1, 1)", value: 0.55, min: -0.92, max: 0.92, step: 0.02 },
-        { name: "theta", label: "Phase rotation θ", value: 0.0, min: 0.0, max: 6.2832, step: 0.04 },
+        { name: "a", label: "Zero Radius |a|", value: 0.55, min: 0.0, max: 0.88, step: 0.01, speed: 0.5 },
+        { name: "theta", label: "Rotation θ (rad)", value: 0.0, min: 0.0, max: 6.2832, step: 0.02, speed: 0.45 },
       ],
-      defaultPoints: [
-        pt(0.0, 0.0, "Double Zero z = 0", "ring", "#34d399", 5, true),
-        pt(0.55, 0.0, "Movable Zero a", "diamond", "#fbbf24", 5, false),
-      ],
+      defaultPoints: [pt(0.0, 0.0, "Disk Center 0", "dot", "#fbbf24", 4.5, true)],
       presets: [
         {
-          id: "unit_disk_web",
-          name: "Unit Disk (W = +3) & Hyperbolic Rings",
-          enableSphere: false,
+          id: "blaschke_poincare",
+          name: "▶ Poincaré Disk Automorphism (Live θ)",
+          activeFnIndex: 1,
+          projection: "poincare",
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.55,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.55 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.25 },
+          sliderValues: { a: 0.58, theta: 0.0 },
+          startSlider: "theta",
+          shapes: [
+            { kind: "circle", label: "Unit Circle |z| = 1 (W=+3)", color: "#38bdf8", closed: true, rawPts: circlePts(0, 0, 1.0, 96) },
+            { kind: "circle", label: "Inner Ring |z| = 0.72", color: "#a78bfa", closed: true, rawPts: circlePts(0, 0, 0.72, 84) },
+            { kind: "circle", label: "Core Ring |z| = 0.42", color: "#34d399", closed: true, rawPts: circlePts(0, 0, 0.42, 72) },
+          ],
+        },
+        {
+          id: "blaschke_disk",
+          name: "3-Fold Unit Disk Cover (Planar)",
+          activeFnIndex: 1,
+          projection: "planar",
+          showDomain: false,
           inSquare: true,
           outSquare: true,
           inView: { cx: 0.0, cy: 0.0, r: 1.55 },
@@ -1431,8 +1650,11 @@
         },
         {
           id: "blaschke_sphere",
-          name: "3D Riemann Sphere Branched Cover",
+          name: "Riemann Sphere Branched Cover",
+          activeFnIndex: 1,
+          projection: "sphere",
           enableSphere: true,
+          showDomain: false,
           inSquare: true,
           outSquare: true,
           inView: { cx: 0.0, cy: 0.0, r: 1.6 },
@@ -1447,186 +1669,23 @@
         },
       ],
     },
-    {
-      id: "map_mandelbrot",
-      mode: "map",
-      category: "Complex Maps",
-      title: "Mandelbrot & Multibrot Set (Smooth C11 Coloring)",
-      subtitle: "4-thread native C11 smooth escape-time fractal with Ultra-Fractal, Inferno & Ocean palettes — zoom into Seahorse or Elephant Valley!",
-      description: "Computes the continuous smooth escape-time potential ν = k + 1 − log₂(log₂|z|) for z_{n+1} = z_n^p + c across 4 native C11 threads. Interior bounded points return Re(w) = −1 (deep black), while exterior points map to silky-smooth cyclic fractal gradients. Try scrubbing the exponent p to morph into Multibrot fractals or switching palettes in Tools!",
-      showDomain: true,
-      domainScheme: "smooth_escape",
-      domainOpacity: 1.0,
-      fnCards: [
-        {
-          title: "Smooth Escape Potential ν(c) for z^p + c",
-          code: "double complex c = z, w = c_make(0.0, 0.0);\nint lim = (int)floor(max_iter + 0.5);\nif (lim < 16) lim = 16;\nif (lim > 600) lim = 600;\ndouble p = power;\nfor (int k = 0; k < lim; k++) {\n  if (fabs(p - 2.0) < 1e-6) {\n    w = w * w + c;\n  } else {\n    double r = cabs(w);\n    w = (r < 1e-15 ? c_make(0.0, 0.0) : cpow(w, c_make(p, 0.0))) + c;\n  }\n  double r2 = creal(w) * creal(w) + cimag(w) * cimag(w);\n  if (r2 > 256.0) {\n    double lp = log(fmax(1.5, p));\n    double nu = (double)k + 1.0 - log(0.5 * log(r2) / log(2.0)) / lp;\n    return c_make(fmax(0.0, nu + shift), 0.0);\n  }\n}\nreturn c_make(-1.0, 0.0);",
-          color: "#38bdf8",
-          visible: true,
-          active: true,
-        },
-      ],
-      sliders: [
-        { name: "max_iter", label: "Max Iterations", value: 180, min: 24, max: 500, step: 8, speed: 0.5 },
-        { name: "power", label: "Exponent p (z^p + c)", value: 2.0, min: 1.5, max: 6.0, step: 0.05, speed: 0.4 },
-        { name: "shift", label: "Palette Phase Shift", value: 0.0, min: 0.0, max: 40.0, step: 0.5, speed: 1.0 },
-      ],
-      defaultPoints: [
-        pt(-0.746, 0.105, "Seahorse Valley", "star", "#fbbf24", 4.5, true),
-        pt(0.285, 0.012, "Elephant Valley", "diamond", "#fb7185", 4.5, true),
-        pt(-1.0, 0.0, "Period-2 Bulb", "ring", "#34d399", 4.5, true),
-      ],
-      presets: [
-        {
-          id: "mandelbrot_full",
-          name: "Full Mandelbrot (Ultra-Fractal)",
-          showDomain: true,
-          domainScheme: "smooth_escape",
-          domainOpacity: 1.0,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: -0.55, cy: 0.0, r: 1.45 },
-          outView: { cx: 12.0, cy: 0.0, r: 18.0 },
-          sliderValues: { max_iter: 180, power: 2.0, shift: 0.0 },
-          shapes: [
-            { kind: "circle", label: "Probe Loop", color: "#fbbf24", lineWidth: 1.6, opacity: 0.85, closed: true, rawPts: circlePts(-0.75, 0.0, 0.25, 72) },
-          ],
-        },
-        {
-          id: "mandelbrot_seahorse",
-          name: "Seahorse Valley Zoom",
-          showDomain: true,
-          domainScheme: "smooth_escape",
-          domainOpacity: 1.0,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: -0.746, cy: 0.105, r: 0.075 },
-          outView: { cx: 25.0, cy: 0.0, r: 30.0 },
-          sliderValues: { max_iter: 300, power: 2.0, shift: 2.0 },
-          shapes: [],
-        },
-        {
-          id: "mandelbrot_elephant",
-          name: "Elephant Valley (Inferno Flame)",
-          showDomain: true,
-          domainScheme: "inferno",
-          domainOpacity: 1.0,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: 0.282, cy: 0.011, r: 0.055 },
-          outView: { cx: 25.0, cy: 0.0, r: 30.0 },
-          sliderValues: { max_iter: 280, power: 2.0, shift: 0.0 },
-          shapes: [],
-        },
-        {
-          id: "multibrot_cubic",
-          name: "Multibrot z³ + c (Electric Ocean)",
-          showDomain: true,
-          domainScheme: "ocean",
-          domainOpacity: 1.0,
-          inSquare: true,
-          outSquare: true,
-          inView: { cx: 0.0, cy: 0.0, r: 1.45 },
-          outView: { cx: 12.0, cy: 0.0, r: 18.0 },
-          sliderValues: { max_iter: 160, power: 3.0, shift: 0.0 },
-          shapes: [],
-        },
-      ],
-    },
 
     /* =====================================================================
-     * CONTOUR INTEGRAL EXAMPLES (Every contour shows its own integral value!)
+     * COMPLEX MODE — FOLDER 2: CONTOUR INTEGRATION & RESIDUES
+     * (Uses Complex mode with toggleable contourMode: true — plus mapping presets!)
      * ===================================================================== */
     {
-      id: "int_zero_counter",
-      mode: "integral",
-      category: "Contour Integrals",
-      title: "Riemann Zero Counter: ζ'(s) / ζ(s)",
-      subtitle: "Argument Principle: (1/2πi) ∮ ζ'/ζ ds = Z − P inside each contour!",
-      description: "Applies Cauchy’s Argument Principle to ζ′(s)/ζ(s): integrating around closed loops returns (1/2πi)∮ ζ′/ζ ds = Z − P, counting exact Riemann zeros minus the pole at s = 1.",
-      showCriticalLine: true,
+      id: "int_cauchy_residues",
+      mode: "map",
+      contourMode: true,
+      folder: "cat_contours",
+      category: "Contour Integration & Residues",
+      title: "Cauchy's Theorem, Path Independence & Residues",
+      subtitle: "Compare residues of 1/(z²+1) at ±i, cancellation when both are enclosed, and path independence of sin(z)!",
+      description: "Unified classroom showcase of Cauchy’s Integral Theorem and Residue Theorem: enclose +i (+π) vs both ±i (cancellation to 0) on 1/(z²+1), compare upper vs lower arcs around a pole, switch to entire sin(z) to verify path independence between straight & wavy paths, or toggle off Contour Mode to inspect the pole landscape via Domain Coloring.",
       fnCards: [
-        { title: "Log-Derivative ζ'(s)/ζ(s)", code: "c_zeta_log_deriv(s)", color: "#34d399", visible: true, builtin: { fn: 2 } },
-      ],
-      sliders: [],
-      defaultPoints: ZETA_POINTS,
-      defaultLines: [CRIT_LINE],
-      presets: [
-        {
-          id: "count_3",
-          name: "Count 3 Riemann Zeros (÷2πi = +3)",
-          inView: { cx: 0.5, cy: 19.0, r: 12.5 },
-          outView: { cx: 0.0, cy: 9.5, r: 14.0 },
-          shapes: [
-            { kind: "rect", label: "Box: 3 Riemann Zeros", color: "#34d399", closed: true, rawPts: rectPts(-0.6, 10.0, 1.6, 27.0) },
-          ],
-        },
-        {
-          id: "zeros_vs_pole",
-          name: "Compare: 1st Zero (+1) vs Pole (−1)",
-          inView: { cx: 0.5, cy: 7.5, r: 11.5 },
-          outView: { cx: 0.0, cy: 0.0, r: 8.5 },
-          shapes: [
-            { kind: "circle", label: "1st Zero (÷2πi = +1)", color: "#34d399", closed: true, rawPts: circlePts(0.5, 14.134725, 1.1, 72) },
-            { kind: "circle", label: "Pole s=1 (÷2πi = −1)", color: "#fb7185", closed: true, rawPts: circlePts(1.0, 0.0, 0.6, 72) },
-          ],
-        },
-        {
-          id: "trivial_zero",
-          name: "Trivial Zero s = −2 (÷2πi = +1)",
-          inView: { cx: -2.0, cy: 0.0, r: 3.0 },
-          outView: { cx: 0.0, cy: 3.1, r: 5.5 },
-          shapes: [
-            { kind: "circle", label: "Loop around s = −2", color: "#fbbf24", closed: true, rawPts: circlePts(-2.0, 0.0, 0.55, 72) },
-          ],
-        },
-      ],
-    },
-    {
-      id: "int_zeta",
-      mode: "integral",
-      category: "Contour Integrals",
-      title: "Riemann Zeta Residue ∮ ζ(s) ds",
-      subtitle: "Pole at s = 1 has residue 1 (2πi); holomorphic loops integrate to 0",
-      description: "Evaluates complex contour integrals of ζ(s) via adaptive C11 Gauss-Legendre quadrature, contrasting ∮ ζ(s) ds = 2πi around the pole at s = 1 against 0 on holomorphic loops.",
-      showCriticalLine: true,
-      fnCards: [
-        { title: "Riemann Zeta ζ(s)", code: "c_zeta(s)", color: "#38bdf8", visible: true, builtin: { fn: 0 } },
-      ],
-      sliders: [],
-      defaultPoints: ZETA_POINTS,
-      defaultLines: [CRIT_LINE],
-      presets: [
-        {
-          id: "pole_vs_holo",
-          name: "Pole s=1 (2πi) vs Holomorphic (0)",
-          inView: { cx: 0.2, cy: 0.4, r: 3.2 },
-          outView: { cx: 0.0, cy: 3.1, r: 5.5 },
-          shapes: [
-            { kind: "circle", label: "Pole s=1 Loop", color: "#fb7185", closed: true, rawPts: circlePts(1.0, 0.0, 0.55, 72) },
-            { kind: "circle", label: "Holomorphic Loop", color: "#34d399", closed: true, rawPts: circlePts(-1.2, 0.8, 0.65, 72) },
-          ],
-        },
-        {
-          id: "single_pole",
-          name: "Single Pole Loop (2πi)",
-          inView: { cx: 1.0, cy: 0.0, r: 2.8 },
-          outView: { cx: 0.0, cy: 3.1, r: 5.2 },
-          shapes: [
-            { kind: "circle", label: "Loop around s = 1", color: "#38bdf8", closed: true, rawPts: circlePts(1.0, 0.0, 0.55, 72) },
-          ],
-        },
-      ],
-    },
-    {
-      id: "int_two_poles",
-      mode: "integral",
-      category: "Contour Integrals",
-      title: "Two Poles: 1 / (z² + 1)",
-      subtitle: "Residues at +i (+π) and −i (−π) cancel when both are enclosed!",
-      description: "Demonstrates Cauchy’s Residue Theorem on 1/(z²+1) with simple poles at +i and −i, showing individual non-zero residues that cancel to zero when both poles are enclosed together.",
-      fnCards: [
-        { title: "1 / (z² + 1)", code: "1.0 / (z * z + 1.0)", color: "#38bdf8", visible: true, builtin: { fn: 4 } },
+        { title: "Rational 1 / (z² + 1)  [Poles ±i]", code: "1.0 / (z * z + 1.0)", color: "#38bdf8", visible: true, active: true, builtin: { fn: 4 } },
+        { title: "Entire Function sin(z)  [No Poles]", code: "csin(z)", color: "#34d399", visible: false, active: false, builtin: { fn: 8 } },
       ],
       sliders: [],
       defaultPoints: [
@@ -1636,17 +1695,23 @@
       presets: [
         {
           id: "cancelling",
-          name: "Pole +i (+π) vs Both ±i (0)",
+          name: "Residues: Pole +i (+π) vs Both ±i (0)",
+          activeFnIndex: 0,
+          contourMode: true,
+          showDomain: false,
           inView: { cx: 0.0, cy: 0.0, r: 3.0 },
           outView: { cx: 1.5, cy: 0.0, r: 3.2 },
           shapes: [
-            { kind: "circle", label: "Loop around +i", color: "#38bdf8", closed: true, rawPts: circlePts(0.0, 1.0, 0.55, 72) },
-            { kind: "circle", label: "Loop around ±i", color: "#a78bfa", closed: true, rawPts: circlePts(0.0, 0.0, 1.85, 84) },
+            { kind: "circle", label: "Loop around +i (+π)", color: "#38bdf8", closed: true, rawPts: circlePts(0.0, 1.0, 0.55, 72) },
+            { kind: "circle", label: "Loop around ±i (0)", color: "#a78bfa", closed: true, rawPts: circlePts(0.0, 0.0, 1.85, 84) },
           ],
         },
         {
           id: "upper_lower",
-          name: "Upper vs Lower Arc (Δ = π)",
+          name: "Upper vs Lower Arc Around +i (Δ = π)",
+          activeFnIndex: 0,
+          contourMode: true,
+          showDomain: false,
           inView: { cx: 0.0, cy: 0.8, r: 3.0 },
           outView: { cx: 0.0, cy: 0.0, r: 3.5 },
           shapes: [
@@ -1654,17 +1719,116 @@
             { kind: "freehand", label: "Lower arc (below +i)", color: "#fbbf24", closed: false, rawPts: arcPts(0.0, 1.0, 1.4, Math.PI, Math.PI * 2, 64) },
           ],
         },
+        {
+          id: "path_independence",
+          name: "Path Independence: Entire sin(z)",
+          activeFnIndex: 1,
+          contourMode: true,
+          showDomain: false,
+          inView: { cx: 0.1, cy: 0.2, r: 2.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.0 },
+          points: [
+            pt(-1.0, -0.5, "Start A", "dot", "#f8fafc", 5, true),
+            pt(1.2, 1.0, "End B", "star", "#34d399", 6, true),
+          ],
+          shapes: [
+            { kind: "line", label: "Straight Path A → B", color: "#38bdf8", closed: false, rawPts: linePts(-1.0, -0.5, 1.2, 1.0, 48) },
+            { kind: "freehand", label: "Wavy Path A → B", color: "#fbbf24", closed: false, rawPts: wavyPts(-1.0, -0.5, 1.2, 1.0, 0.85, 72) },
+          ],
+        },
+        {
+          id: "poles_domain_view",
+          name: "Mapping Mode: Pole Domain Coloring",
+          activeFnIndex: 0,
+          contourMode: false,
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.9,
+          inView: { cx: 0.0, cy: 0.0, r: 2.8 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.0 },
+          shapes: [
+            { kind: "circle", label: "Loop around +i", color: "#38bdf8", opacity: 0.16, closed: true, rawPts: circlePts(0.0, 1.0, 0.55, 72) },
+          ],
+        },
+      ],
+    },
+    {
+      id: "int_zero_counter",
+      mode: "map",
+      contourMode: true,
+      folder: "cat_contours",
+      category: "Contour Integration & Residues",
+      title: "Argument Principle: Riemann Zero Counter",
+      subtitle: "(1 / 2πi) ∮ ζ'(s)/ζ(s) ds = Z − P counts exact zeros minus poles inside any loop!",
+      description: "Applies Cauchy’s Argument Principle to the logarithmic derivative ζ′(s)/ζ(s): integrating around any closed contour returns (1/2πi)∮ ζ′/ζ ds = Z − P, counting exact Riemann zeros (+1 each) minus the pole at s = 1 (−1).",
+      showCriticalLine: true,
+      fnCards: [
+        { title: "Log-Derivative ζ'(s) / ζ(s)", code: "c_zeta_log_deriv(s)", color: "#34d399", visible: true, active: true, builtin: { fn: 2 } },
+      ],
+      sliders: [],
+      defaultPoints: ZETA_POINTS,
+      defaultLines: [CRIT_LINE],
+      presets: [
+        {
+          id: "count_3",
+          name: "Count 3 Riemann Zeros (Res = +3)",
+          contourMode: true,
+          showDomain: false,
+          inView: { cx: 0.5, cy: 19.0, r: 12.5 },
+          outView: { cx: 0.0, cy: 9.5, r: 14.0 },
+          shapes: [
+            { kind: "rect", label: "Box: 3 Riemann Zeros", color: "#34d399", closed: true, rawPts: rectPts(-0.6, 10.0, 1.6, 27.0) },
+          ],
+        },
+        {
+          id: "zeros_vs_pole",
+          name: "Compare: 1st Zero (+1) vs Pole (−1)",
+          contourMode: true,
+          showDomain: false,
+          inView: { cx: 0.5, cy: 7.5, r: 11.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 8.5 },
+          shapes: [
+            { kind: "circle", label: "1st Zero (Res = +1)", color: "#34d399", closed: true, rawPts: circlePts(0.5, 14.134725, 1.1, 72) },
+            { kind: "circle", label: "Pole s=1 (Res = −1)", color: "#fb7185", closed: true, rawPts: circlePts(1.0, 0.0, 0.6, 72) },
+          ],
+        },
+        {
+          id: "trivial_zero",
+          name: "Trivial Zero s = −2 (Res = +1)",
+          contourMode: true,
+          showDomain: false,
+          inView: { cx: -2.0, cy: 0.0, r: 3.0 },
+          outView: { cx: 0.0, cy: 3.1, r: 5.5 },
+          shapes: [
+            { kind: "circle", label: "Loop around s = −2", color: "#fbbf24", closed: true, rawPts: circlePts(-2.0, 0.0, 0.55, 72) },
+          ],
+        },
+        {
+          id: "logderiv_domain",
+          name: "Domain Coloring: Phase Winding Around Zeros",
+          contourMode: false,
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.9,
+          inView: { cx: 0.5, cy: 18.0, r: 10.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          shapes: [
+            { kind: "circle", label: "1st Zero Loop", color: "#34d399", opacity: 0.14, closed: true, rawPts: circlePts(0.5, 14.134725, 1.1, 72) },
+          ],
+        },
       ],
     },
     {
       id: "int_gamma",
-      mode: "integral",
-      category: "Contour Integrals",
-      title: "Euler Gamma Residue Ladder Γ(z)",
-      subtitle: "Poles at z = 0, −1, −2, … with alternating residues (−1)ⁿ / n!",
-      description: "Integrates Euler’s meromorphic Gamma function Γ(z) around its negative integer poles z = 0, −1, −2, … verifying the exact residue ladder Res(Γ, −n) = (−1)^n / n!.",
+      mode: "map",
+      contourMode: true,
+      folder: "cat_contours",
+      category: "Contour Integration & Residues",
+      title: "Euler Gamma Γ(z) — Residue Ladder & Portrait",
+      subtitle: "Poles at z = 0, −1, −2, … with exact alternating residues (−1)ⁿ / n!",
+      description: "Integrates Euler’s meromorphic Gamma function Γ(z) around its negative integer poles z = 0, −1, −2, … verifying Res(Γ, −n) = (−1)^n / n!, and pairs it with a Classic Domain Coloring portrait showing the pole ladder along the negative real axis.",
       fnCards: [
-        { title: "Euler Gamma Γ(z)", code: "c_gamma(z)", color: "#38bdf8", visible: true, builtin: { fn: 5 } },
+        { title: "Euler Gamma Γ(z)", code: "c_gamma(z)", color: "#38bdf8", visible: true, active: true, builtin: { fn: 5 } },
       ],
       sliders: [],
       defaultPoints: [
@@ -1677,6 +1841,8 @@
         {
           id: "ladder",
           name: "3 Poles Side-by-Side (0, −1, −2)",
+          contourMode: true,
+          showDomain: false,
           inView: { cx: -1.0, cy: 0.0, r: 2.6 },
           outView: { cx: 0.0, cy: 0.0, r: 7.5 },
           shapes: [
@@ -1685,46 +1851,31 @@
             { kind: "circle", label: "z = −2 (Res +½)", color: "#34d399", closed: true, rawPts: circlePts(-2.0, 0.0, 0.32, 64) },
           ],
         },
-      ],
-    },
-    {
-      id: "int_path_indep",
-      mode: "integral",
-      category: "Contour Integrals",
-      title: "Path Independence (Entire sin z)",
-      subtitle: "Two completely different paths from A to B land on the EXACT same integral!",
-      description: "Illustrates Cauchy’s Integral Theorem by comparing two different open paths with the same endpoints through an entire function, producing identical net contour integrals.",
-      fnCards: [
-        { title: "Complex Sine sin(z)", code: "csin(z)", color: "#38bdf8", visible: true, builtin: { fn: 8 } },
-      ],
-      sliders: [],
-      defaultPoints: [
-        pt(-1.0, -0.5, "Start A", "dot", "#f8fafc", 5, true),
-        pt(1.2, 1.0, "End B", "star", "#34d399", 6, true),
-      ],
-      presets: [
         {
-          id: "two_paths",
-          name: "Straight vs Wavy Path (Same Value!)",
-          inView: { cx: 0.1, cy: 0.2, r: 2.5 },
-          outView: { cx: 0.0, cy: 0.0, r: 3.0 },
-          shapes: [
-            { kind: "line", label: "Straight Path A → B", color: "#38bdf8", closed: false, rawPts: linePts(-1.0, -0.5, 1.2, 1.0, 48) },
-            { kind: "freehand", label: "Wavy Path A → B", color: "#fbbf24", closed: false, rawPts: wavyPts(-1.0, -0.5, 1.2, 1.0, 0.85, 72) },
-          ],
+          id: "gamma_domain",
+          name: "Mapping Mode: Γ(z) Domain Coloring Portrait",
+          contourMode: false,
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.92,
+          inView: { cx: -1.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          shapes: [],
         },
       ],
     },
     {
       id: "int_keyhole",
-      mode: "integral",
-      category: "Contour Integrals",
-      title: "Keyhole (Pac-Man) Contour · Branch Cut",
-      subtitle: "1 master slider t drives R → ∞, r → 0, and ε → 0 simultaneously across 4 variable pieces!",
-      description: "Interactive variable Pac-Man keyhole contour around a branch cut on [0, ∞) with a master slider t that simultaneously drives outer radius R → ∞, inner radius r → 0, and slit gap ε → 0.",
+      mode: "map",
+      contourMode: true,
+      folder: "cat_contours",
+      category: "Contour Integration & Residues",
+      title: "Keyhole (Pac-Man) Contour & Branch Cuts",
+      subtitle: "Master limit slider t drives R → ∞, r → 0, and mouth gap ε → 0 simultaneously across 4 linked pieces!",
+      description: "Classic graduate complex analysis contour around the branch cut [0, ∞) of z^(a−1)/(z+1): one master slider t drives outer radius R → ∞, inner radius r → 0, and slit angle ε → 0 simultaneously, plus a Domain Coloring preset revealing the exact branch-cut color discontinuity.",
       fnCards: [
         {
-          title: "z^(a−1) / (z + 1)  [cut on ℝ⁺]",
+          title: "z^(a−1) / (z + 1)  [branch cut on ℝ⁺]",
           code: "double complex d = z + c_make(1.0, 0.0);\nif (cabs(d) < 1e-12 || cabs(z) < 1e-12) return c_make(INFINITY, 0.0);\nreturn cexp((a - 1.0) * (clog(-z) + c_make(0.0, M_PI))) / d;",
           color: "#38bdf8",
           visible: true,
@@ -1732,8 +1883,8 @@
         },
       ],
       sliders: [
-        { name: "t", label: "Keyhole Limit (0 → 1)", value: 0.35, min: 0.0, max: 1.0, step: 0.01 },
-        { name: "a", label: "Exponent a", value: 0.5, min: 0.15, max: 0.85, step: 0.05 },
+        { name: "t", label: "Keyhole Limit (0 → 1)", value: 0.35, min: 0.0, max: 1.0, step: 0.01, speed: 0.4 },
+        { name: "a", label: "Exponent a", value: 0.5, min: 0.15, max: 0.85, step: 0.05, speed: 0.4 },
       ],
       vars: [
         { name: "R", expr: "2.2 + 18*t*t", label: "Outer radius" },
@@ -1750,146 +1901,67 @@
       presets: [
         {
           id: "pacman_4pieces",
-          name: "Pac-Man (Drag t: 0 → 1)",
+          name: "Pac-Man Contour (Drag t: 0 → 1)",
+          contourMode: true,
+          showDomain: false,
           inView: { cx: 0.0, cy: 0.0, r: 5.8 },
           outView: { cx: 3.1, cy: 0.0, r: 4.5 },
           sliderValues: { t: 0.35, a: 0.5 },
           shapes: [
-            {
-              kind: "line",
-              label: "1. Top Cut (r → R)",
-              color: "#34d399",
-              closed: false,
-              formula: { kind: "line", x0: "r*cos(eps)", y0: "r*sin(eps)", x1: "R*cos(eps)", y1: "R*sin(eps)" },
-              rawPts: linePts(0.35, 0.05, 4.4, 0.63, 60),
-            },
-            {
-              kind: "arc",
-              label: "2. Outer Arc γ_R",
-              color: "#38bdf8",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "eps", a1: "2*pi - eps" },
-              rawPts: arcPts(0, 0, 4.4, 0.23, Math.PI * 2 - 0.23, 96),
-            },
-            {
-              kind: "line",
-              label: "3. Bottom Cut (R → r)",
-              color: "#a78bfa",
-              closed: false,
-              formula: { kind: "line", x0: "R*cos(eps)", y0: "-R*sin(eps)", x1: "r*cos(eps)", y1: "-r*sin(eps)" },
-              rawPts: linePts(4.4, -0.63, 0.35, -0.05, 60),
-            },
-            {
-              kind: "arc",
-              label: "4. Inner Arc γ_r (CW)",
-              color: "#fbbf24",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "r", a0: "2*pi - eps", a1: "eps" },
-              rawPts: arcPts(0, 0, 0.36, Math.PI * 2 - 0.23, 0.23, 48),
-            },
-          ],
-        },
-        {
-          id: "pacman_shoot_inf",
-          name: "Shoot to ∞ (t = 0.92)",
-          inView: { cx: 0.0, cy: 0.0, r: 19.5 },
-          outView: { cx: 3.1, cy: 0.0, r: 4.5 },
-          sliderValues: { t: 0.92, a: 0.5 },
-          shapes: [
-            {
-              kind: "line",
-              label: "1. Top Cut (r → R)",
-              color: "#34d399",
-              closed: false,
-              formula: { kind: "line", x0: "r*cos(eps)", y0: "r*sin(eps)", x1: "R*cos(eps)", y1: "R*sin(eps)" },
-              rawPts: linePts(0.1, 0.01, 17.4, 1.0, 60),
-            },
-            {
-              kind: "arc",
-              label: "2. Outer Arc γ_R",
-              color: "#38bdf8",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "eps", a1: "2*pi - eps" },
-              rawPts: arcPts(0, 0, 17.4, 0.06, Math.PI * 2 - 0.06, 96),
-            },
-            {
-              kind: "line",
-              label: "3. Bottom Cut (R → r)",
-              color: "#a78bfa",
-              closed: false,
-              formula: { kind: "line", x0: "R*cos(eps)", y0: "-R*sin(eps)", x1: "r*cos(eps)", y1: "-r*sin(eps)" },
-              rawPts: linePts(17.4, -1.0, 0.1, -0.01, 60),
-            },
-            {
-              kind: "arc",
-              label: "4. Inner Arc γ_r (CW)",
-              color: "#fbbf24",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "r", a0: "2*pi - eps", a1: "eps" },
-              rawPts: arcPts(0, 0, 0.1, Math.PI * 2 - 0.06, 0.06, 48),
-            },
+            { kind: "line", label: "1. Top Cut (r → R)", color: "#34d399", closed: false, formula: { kind: "line", x0: "r*cos(eps)", y0: "r*sin(eps)", x1: "R*cos(eps)", y1: "R*sin(eps)" }, rawPts: linePts(0.35, 0.05, 4.4, 0.63, 60) },
+            { kind: "arc", label: "2. Outer Arc γ_R", color: "#38bdf8", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "eps", a1: "2*pi - eps" }, rawPts: arcPts(0, 0, 4.4, 0.23, Math.PI * 2 - 0.23, 96) },
+            { kind: "line", label: "3. Bottom Cut (R → r)", color: "#a78bfa", closed: false, formula: { kind: "line", x0: "R*cos(eps)", y0: "-R*sin(eps)", x1: "r*cos(eps)", y1: "-r*sin(eps)" }, rawPts: linePts(4.4, -0.63, 0.35, -0.05, 60) },
+            { kind: "arc", label: "4. Inner Arc γ_r (CW)", color: "#fbbf24", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "r", a0: "2*pi - eps", a1: "eps" }, rawPts: arcPts(0, 0, 0.36, Math.PI * 2 - 0.23, 0.23, 48) },
           ],
         },
         {
           id: "pacman_animate",
-          name: "Animate Limit (t: 0 → 1)",
+          name: "▶ Animate Limit (t: 0 → 1)",
+          contourMode: true,
+          showDomain: false,
           inView: { cx: 0.0, cy: 0.0, r: 14.0 },
           outView: { cx: 3.1, cy: 0.0, r: 4.5 },
           startSlider: "t",
           shapes: [
-            {
-              kind: "line",
-              label: "1. Top Cut (r → R)",
-              color: "#34d399",
-              closed: false,
-              formula: { kind: "line", x0: "r*cos(eps)", y0: "r*sin(eps)", x1: "R*cos(eps)", y1: "R*sin(eps)" },
-              rawPts: linePts(0.5, 0.1, 2.2, 0.5, 60),
-            },
-            {
-              kind: "arc",
-              label: "2. Outer Arc γ_R",
-              color: "#38bdf8",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "eps", a1: "2*pi - eps" },
-              rawPts: arcPts(0, 0, 2.2, 0.34, Math.PI * 2 - 0.34, 96),
-            },
-            {
-              kind: "line",
-              label: "3. Bottom Cut (R → r)",
-              color: "#a78bfa",
-              closed: false,
-              formula: { kind: "line", x0: "R*cos(eps)", y0: "-R*sin(eps)", x1: "r*cos(eps)", y1: "-r*sin(eps)" },
-              rawPts: linePts(2.2, -0.5, 0.5, -0.1, 60),
-            },
-            {
-              kind: "arc",
-              label: "4. Inner Arc γ_r (CW)",
-              color: "#fbbf24",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "r", a0: "2*pi - eps", a1: "eps" },
-              rawPts: arcPts(0, 0, 0.5, Math.PI * 2 - 0.34, 0.34, 48),
-            },
+            { kind: "line", label: "1. Top Cut (r → R)", color: "#34d399", closed: false, formula: { kind: "line", x0: "r*cos(eps)", y0: "r*sin(eps)", x1: "R*cos(eps)", y1: "R*sin(eps)" }, rawPts: linePts(0.5, 0.1, 2.2, 0.5, 60) },
+            { kind: "arc", label: "2. Outer Arc γ_R", color: "#38bdf8", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "eps", a1: "2*pi - eps" }, rawPts: arcPts(0, 0, 2.2, 0.34, Math.PI * 2 - 0.34, 96) },
+            { kind: "line", label: "3. Bottom Cut (R → r)", color: "#a78bfa", closed: false, formula: { kind: "line", x0: "R*cos(eps)", y0: "-R*sin(eps)", x1: "r*cos(eps)", y1: "-r*sin(eps)" }, rawPts: linePts(2.2, -0.5, 0.5, -0.1, 60) },
+            { kind: "arc", label: "4. Inner Arc γ_r (CW)", color: "#fbbf24", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "r", a0: "2*pi - eps", a1: "eps" }, rawPts: arcPts(0, 0, 0.5, Math.PI * 2 - 0.34, 0.34, 48) },
+          ],
+        },
+        {
+          id: "pacman_branch_domain",
+          name: "Branch Cut Domain Coloring (Contour + Field)",
+          contourMode: true,
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.72,
+          inView: { cx: 0.0, cy: 0.0, r: 4.8 },
+          outView: { cx: 3.1, cy: 0.0, r: 4.5 },
+          sliderValues: { t: 0.25, a: 0.5 },
+          shapes: [
+            { kind: "line", label: "1. Top Cut (r → R)", color: "#34d399", closed: false, formula: { kind: "line", x0: "r*cos(eps)", y0: "r*sin(eps)", x1: "R*cos(eps)", y1: "R*sin(eps)" }, rawPts: linePts(0.4, 0.08, 3.3, 0.6, 60) },
+            { kind: "arc", label: "2. Outer Arc γ_R", color: "#38bdf8", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "eps", a1: "2*pi - eps" }, rawPts: arcPts(0, 0, 3.3, 0.26, Math.PI * 2 - 0.26, 96) },
+            { kind: "line", label: "3. Bottom Cut (R → r)", color: "#a78bfa", closed: false, formula: { kind: "line", x0: "R*cos(eps)", y0: "-R*sin(eps)", x1: "r*cos(eps)", y1: "-r*sin(eps)" }, rawPts: linePts(3.3, -0.6, 0.4, -0.08, 60) },
+            { kind: "arc", label: "4. Inner Arc γ_r (CW)", color: "#fbbf24", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "r", a0: "2*pi - eps", a1: "eps" }, rawPts: arcPts(0, 0, 0.4, Math.PI * 2 - 0.26, 0.26, 48) },
           ],
         },
       ],
     },
     {
       id: "int_fresnel_sector",
-      mode: "integral",
-      category: "Contour Integrals",
-      title: "Fresnel & Gaussian 45° Sector: ∮ exp(−z²) dz = 0",
-      subtitle: "Deforming the Gaussian integral [0, R] onto the 45° ray z = r·e^(iπ/4) proves ∫₀^∞ cos(x²) dx = ∫₀^∞ sin(x²) dx = √(2π)/4!",
-      description: "Wedge-sector contour for evaluating the classic Fresnel integral ∫₀^∞ e^(ix²) dx via a 45° pie-slice contour split into real-axis, arc, and diagonal return pieces.",
+      mode: "map",
+      contourMode: true,
+      folder: "cat_contours",
+      category: "Contour Integration & Residues",
+      title: "Fresnel 45° Pie-Slice: ∮ exp(−z²) dz = 0",
+      subtitle: "Deforming the Gaussian integral [0, R] onto z = r·e^(iπ/4) proves ∫₀^∞ cos(x²) dx = √(2π)/4!",
+      description: "Wedge-sector contour proving the Fresnel integral ∫₀^∞ e^(ix²) dx via a 45° pie-slice split into the real-axis leg, vanishing circular arc, and 45° Fresnel return ray.",
       fnCards: [
-        {
-          title: "Gaussian Kernel exp(−z²)",
-          code: "cexp(-z * z)",
-          color: "#38bdf8",
-          visible: true,
-        },
+        { title: "Gaussian Kernel exp(−z²)", code: "cexp(-z * z)", color: "#38bdf8", visible: true, active: true },
       ],
       sliders: [
-        { name: "R", label: "Sector radius R", value: 2.6, min: 0.8, max: 5.0, step: 0.05 },
+        { name: "R", label: "Sector radius R", value: 2.6, min: 0.8, max: 5.0, step: 0.05, speed: 0.4 },
       ],
       defaultPoints: [
         pt(0.0, 0.0, "Origin 0", "dot", "#34d399", 5, true),
@@ -1898,44 +1970,25 @@
       presets: [
         {
           id: "sector_3_pieces",
-          name: "45° Pizza-Slice Sector (Sum = 0)",
-          enableSphere: false,
+          name: "45° Pie-Slice Sector (Sum = 0)",
+          contourMode: true,
+          showDomain: false,
           inSquare: true,
           outSquare: true,
           inView: { cx: 0.0, cy: 0.0, r: 3.4 },
           outView: { cx: 0.0, cy: 0.0, r: 1.35 },
           sliderValues: { R: 2.6 },
           shapes: [
-            {
-              kind: "line",
-              label: "1. Real Leg [0 → R] (→ √π/2)",
-              color: "#34d399",
-              closed: false,
-              formula: { kind: "line", x0: "0", y0: "0", x1: "R", y1: "0" },
-              rawPts: linePts(0, 0, 2.6, 0, 64),
-            },
-            {
-              kind: "arc",
-              label: "2. Outer Arc R·e^(iθ) (→ 0 as R→∞)",
-              color: "#fbbf24",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "0", a1: "pi/4" },
-              rawPts: arcPts(0, 0, 2.6, 0, Math.PI / 4, 64),
-            },
-            {
-              kind: "line",
-              label: "3. Fresnel Ray [R·e^(iπ/4) → 0]",
-              color: "#fb7185",
-              closed: false,
-              formula: { kind: "line", x0: "R*cos(pi/4)", y0: "R*sin(pi/4)", x1: "0", y1: "0" },
-              rawPts: linePts(2.6 * Math.SQRT1_2, 2.6 * Math.SQRT1_2, 0, 0, 64),
-            },
+            { kind: "line", label: "1. Real Leg [0 → R] (→ √π/2)", color: "#34d399", closed: false, formula: { kind: "line", x0: "0", y0: "0", x1: "R", y1: "0" }, rawPts: linePts(0, 0, 2.6, 0, 64) },
+            { kind: "arc", label: "2. Outer Arc R·e^(iθ) (→ 0)", color: "#fbbf24", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "0", a1: "pi/4" }, rawPts: arcPts(0, 0, 2.6, 0, Math.PI / 4, 64) },
+            { kind: "line", label: "3. Fresnel Ray [R·e^(iπ/4) → 0]", color: "#fb7185", closed: false, formula: { kind: "line", x0: "R*cos(pi/4)", y0: "R*sin(pi/4)", x1: "0", y1: "0" }, rawPts: linePts(2.6 * Math.SQRT1_2, 2.6 * Math.SQRT1_2, 0, 0, 64) },
           ],
         },
         {
           id: "sector_sweep",
-          name: "Expand Sector R → ∞ (Watch Arc Vanish!)",
-          enableSphere: false,
+          name: "▶ Expand Sector R → ∞ (Watch Arc Vanish!)",
+          contourMode: true,
+          showDomain: false,
           inSquare: true,
           outSquare: true,
           inView: { cx: 0.0, cy: 0.0, r: 4.5 },
@@ -1943,44 +1996,1410 @@
           sliderValues: { R: 0.8 },
           startSlider: "R",
           shapes: [
-            {
-              kind: "line",
-              label: "1. Real Leg [0 → R]",
-              color: "#34d399",
-              closed: false,
-              formula: { kind: "line", x0: "0", y0: "0", x1: "R", y1: "0" },
-              rawPts: linePts(0, 0, 2.6, 0, 64),
-            },
-            {
-              kind: "arc",
-              label: "2. Outer Arc R·e^(iθ)",
-              color: "#fbbf24",
-              closed: false,
-              formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "0", a1: "pi/4" },
-              rawPts: arcPts(0, 0, 2.6, 0, Math.PI / 4, 64),
-            },
-            {
-              kind: "line",
-              label: "3. Fresnel Ray [R·e^(iπ/4) → 0]",
-              color: "#fb7185",
-              closed: false,
-              formula: { kind: "line", x0: "R*cos(pi/4)", y0: "R*sin(pi/4)", x1: "0", y1: "0" },
-              rawPts: linePts(2.6 * Math.SQRT1_2, 2.6 * Math.SQRT1_2, 0, 0, 64),
-            },
+            { kind: "line", label: "1. Real Leg [0 → R]", color: "#34d399", closed: false, formula: { kind: "line", x0: "0", y0: "0", x1: "R", y1: "0" }, rawPts: linePts(0, 0, 2.6, 0, 64) },
+            { kind: "arc", label: "2. Outer Arc R·e^(iθ)", color: "#fbbf24", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "0", a1: "pi/4" }, rawPts: arcPts(0, 0, 2.6, 0, Math.PI / 4, 64) },
+            { kind: "line", label: "3. Fresnel Ray [R·e^(iπ/4) → 0]", color: "#fb7185", closed: false, formula: { kind: "line", x0: "R*cos(pi/4)", y0: "R*sin(pi/4)", x1: "0", y1: "0" }, rawPts: linePts(2.6 * Math.SQRT1_2, 2.6 * Math.SQRT1_2, 0, 0, 64) },
+          ],
+        },
+        {
+          id: "fresnel_saddle",
+          name: "Domain Coloring: Gaussian Saddle Landscape",
+          contourMode: true,
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 0.65,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 3.4 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.35 },
+          sliderValues: { R: 2.6 },
+          shapes: [
+            { kind: "line", label: "1. Real Leg [0 → R]", color: "#34d399", closed: false, formula: { kind: "line", x0: "0", y0: "0", x1: "R", y1: "0" }, rawPts: linePts(0, 0, 2.6, 0, 64) },
+            { kind: "arc", label: "2. Outer Arc R·e^(iθ)", color: "#fbbf24", closed: false, formula: { kind: "arc", cx: "0", cy: "0", r: "R", a0: "0", a1: "pi/4" }, rawPts: arcPts(0, 0, 2.6, 0, Math.PI / 4, 64) },
+            { kind: "line", label: "3. Fresnel Ray [R·e^(iπ/4) → 0]", color: "#fb7185", closed: false, formula: { kind: "line", x0: "R*cos(pi/4)", y0: "R*sin(pi/4)", x1: "0", y1: "0" }, rawPts: linePts(2.6 * Math.SQRT1_2, 2.6 * Math.SQRT1_2, 0, 0, 64) },
           ],
         },
       ],
     },
 
     /* =====================================================================
-     * 2D REAL EXAMPLES (Desmos Cards + Preset Showcases + Landmark Points!)
+     * COMPLEX MODE — FOLDER 3: FRACTALS & COMPLEX DYNAMICS
+     * ===================================================================== */
+    {
+      id: "map_mandelbrot",
+      mode: "map",
+      folder: "cat_fractals",
+      category: "Fractals & Complex Dynamics",
+      title: "Mandelbrot & Multibrot Set (Live Deep Zoom)",
+      subtitle: "Multi-threaded native C11 smooth escape-time fractal with crisp native-res rendering up to 100,000×!",
+      description: "Computes continuous smooth escape-time potential ν = k + 1 − log₂(log₂|z|) for z_{n+1} = z_n^p + c across interleaved native C11 threads with cardioid/bulb bailout and adaptive iteration depth. Play the zoom slider for a smooth logarithmic dive into Double Spiral or Mini-Mandelbrot.",
+      showDomain: true,
+      domainScheme: "smooth_escape",
+      domainOpacity: 1.0,
+      fnCards: [
+        {
+          title: "Smooth Escape Potential ν(c) for z^p + c",
+          code: "double cr = creal(z), ci = cimag(z);\ndouble p = power;\nint lim = (int)floor(max_iter + zoom * 120.0 + 0.5);\nif (lim < 24) lim = 24;\nif (lim > 2200) lim = 2200;\nif (fabs(p - 2.0) < 1e-6) {\n  double q = (cr - 0.25) * (cr - 0.25) + ci * ci;\n  if (q * (q + (cr - 0.25)) <= 0.25 * ci * ci) return c_make(-1.0, 0.0);\n  if ((cr + 1.0) * (cr + 1.0) + ci * ci <= 0.0625) return c_make(-1.0, 0.0);\n  double wr = 0.0, wi = 0.0, ox = 0.0, oy = 0.0;\n  int period = 0;\n  for (int k = 0; k < lim; k++) {\n    double wr2 = wr * wr, wi2 = wi * wi;\n    if (wr2 + wi2 > 256.0) {\n      double nu = (double)k + 1.0 - log(0.5 * log(wr2 + wi2) / log(2.0)) / log(2.0);\n      return c_make(fmax(0.0, nu + shift), 0.0);\n    }\n    wi = 2.0 * wr * wi + ci;\n    wr = wr2 - wi2 + cr;\n    if (fabs(wr - ox) < 1e-13 && fabs(wi - oy) < 1e-13) return c_make(-1.0, 0.0);\n    period++;\n    if (period > 20) { period = 0; ox = wr; oy = wi; }\n  }\n  return c_make(-1.0, 0.0);\n}\ndouble complex c = z, w = c_make(0.0, 0.0);\nfor (int k = 0; k < lim; k++) {\n  double r = cabs(w);\n  w = (r < 1e-15 ? c_make(0.0, 0.0) : cpow(w, c_make(p, 0.0))) + c;\n  double r2 = creal(w) * creal(w) + cimag(w) * cimag(w);\n  if (r2 > 256.0) {\n    double lp = log(fmax(1.5, p));\n    double nu = (double)k + 1.0 - log(0.5 * log(r2) / log(2.0)) / lp;\n    return c_make(fmax(0.0, nu + shift), 0.0);\n  }\n}\nreturn c_make(-1.0, 0.0);",
+          color: "#38bdf8",
+          visible: true,
+          active: true,
+        },
+      ],
+      sliders: [
+        { name: "zoom", label: "Log₁₀ Zoom (10^zoom ×)", value: 0.0, min: 0.0, max: 5.0, step: 0.01, speed: 0.35 },
+        { name: "max_iter", label: "Base Iterations", value: 240, min: 40, max: 1200, step: 10, speed: 0.5 },
+        { name: "power", label: "Exponent p (z^p + c)", value: 2.0, min: 1.5, max: 6.0, step: 0.05, speed: 0.4 },
+        { name: "shift", label: "Palette Phase Shift", value: 0.0, min: 0.0, max: 40.0, step: 0.5, speed: 1.0 },
+      ],
+      vars: [
+        { name: "in_r", expr: "1.65 * pow(10, -zoom)", label: "Viewport radius (live zoom!)" },
+      ],
+      defaultPoints: [
+        pt(-0.743643887037151, 0.131825904205330, "Double Spiral", "star", "#fbbf24", 4.5, true),
+        pt(-1.7499576837060935, 0.0, "Mini-Mandelbrot", "diamond", "#fb7185", 4.5, true),
+        pt(-1.0, 0.0, "Period-2 Bulb", "ring", "#34d399", 4.5, true),
+      ],
+      presets: [
+        {
+          id: "mandelbrot_full",
+          name: "Full Mandelbrot (Ultra-Fractal)",
+          showDomain: true,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -0.55, cy: 0.0, r: 1.65 },
+          outView: { cx: 12.0, cy: 0.0, r: 18.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { zoom: 0.0, max_iter: 240, power: 2.0, shift: 0.0 },
+          shapes: [],
+        },
+        {
+          id: "mandelbrot_deep_spiral",
+          name: "▶ Live Zoom Dive: Double Spiral (10,000×+)",
+          showDomain: true,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -0.743643887037151, cy: 0.131825904205330, r: 1.65 },
+          outView: { cx: 120.0, cy: 0.0, r: 140.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { zoom: 0.0, max_iter: 480, power: 2.0, shift: 5.0 },
+          startSlider: "zoom",
+          shapes: [],
+        },
+        {
+          id: "mandelbrot_deep_minibrot",
+          name: "▶ Live Zoom Dive: Mini-Mandelbrot (100,000×)",
+          showDomain: true,
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -1.7499576837060935, cy: 0.0, r: 1.65 },
+          outView: { cx: 150.0, cy: 0.0, r: 180.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { zoom: 0.0, max_iter: 540, power: 2.0, shift: 3.0 },
+          startSlider: "zoom",
+          shapes: [],
+        },
+        {
+          id: "mandelbrot_deep_spiral_static",
+          name: "Double Spiral (10,000× Crisp Static)",
+          showDomain: true,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -0.743643887037151, cy: 0.131825904205330, r: 0.00018 },
+          outView: { cx: 120.0, cy: 0.0, r: 140.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { zoom: 3.96, max_iter: 620, power: 2.0, shift: 6.0 },
+          shapes: [],
+        },
+        {
+          id: "mandelbrot_elephant",
+          name: "Elephant Valley (Inferno Flame)",
+          showDomain: true,
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.282, cy: 0.011, r: 0.055 },
+          outView: { cx: 25.0, cy: 0.0, r: 30.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { zoom: 1.48, max_iter: 300, power: 2.0, shift: 0.0 },
+          shapes: [],
+        },
+        {
+          id: "multibrot_cubic",
+          name: "Multibrot z³ + c (Electric Ocean)",
+          showDomain: true,
+          domainScheme: "ocean",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.65 },
+          outView: { cx: 12.0, cy: 0.0, r: 18.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { zoom: 0.0, max_iter: 200, power: 3.0, shift: 0.0 },
+          shapes: [],
+        },
+      ],
+    },
+    {
+      id: "map_julia_sculptor",
+      mode: "map",
+      folder: "cat_fractals",
+      category: "Fractals & Complex Dynamics",
+      title: "Julia Set & Fatou Dust Sculptor",
+      subtitle: "Morph z² + c along the Mandelbrot boundary with Electric Ocean, Inferno Flame & Neon Prism themes!",
+      description: "Computes smooth continuous escape-time Julia sets for f(z) = z² + c (c = r·e^(iθ)) across interleaved C11 threads. Hit ▶ on θ to watch connected Douady Rabbits and San Marco Dragons shatter into shimmering Fatou dust, or play zoom to dive deep into spiral filaments.",
+      showDomain: true,
+      domainScheme: "ocean",
+      domainOpacity: 1.0,
+      fnCards: [
+        {
+          title: "Smooth Julia Potential ν(z) for z² + c",
+          code: "double cr = r_c * cos(theta_c);\ndouble ci = r_c * sin(theta_c);\ndouble wr = creal(z), wi = cimag(z);\nint lim = (int)floor(max_iter + zoom * 100.0 + 0.5);\nif (lim < 24) lim = 24;\nif (lim > 1400) lim = 1400;\nfor (int k = 0; k < lim; k++) {\n  double wr2 = wr * wr, wi2 = wi * wi;\n  if (wr2 + wi2 > 256.0) {\n    double nu = (double)k + 1.0 - log(0.5 * log(wr2 + wi2) / log(2.0)) / log(2.0);\n    return c_make(fmax(0.0, nu + shift), 0.0);\n  }\n  wi = 2.0 * wr * wi + ci;\n  wr = wr2 - wi2 + cr;\n}\nreturn c_make(-1.0, 0.0);",
+          color: "#38bdf8",
+          visible: true,
+          active: true,
+        },
+      ],
+      sliders: [
+        { name: "r_c", label: "Parameter |c|", value: 0.7885, min: 0.0, max: 1.25, step: 0.005, speed: 0.35 },
+        { name: "theta_c", label: "Angle arg(c)", value: 2.38, min: 0.0, max: 6.2832, step: 0.01, speed: 0.25 },
+        { name: "zoom", label: "Log₁₀ Zoom", value: 0.0, min: 0.0, max: 3.8, step: 0.01, speed: 0.35 },
+        { name: "max_iter", label: "Base Iterations", value: 240, min: 40, max: 900, step: 10, speed: 0.5 },
+        { name: "shift", label: "Palette Phase", value: 2.0, min: 0.0, max: 40.0, step: 0.5, speed: 1.0 },
+      ],
+      vars: [
+        { name: "in_r", expr: "1.75 * pow(10, -zoom)", label: "Viewport radius (live zoom)" },
+      ],
+      defaultPoints: [pt(0.0, 0.0, "Origin 0", "dot", "#fbbf24", 4.0, true)],
+      presets: [
+        {
+          id: "julia_ocean_spiral",
+          name: "Electric Ocean Spiral (|c| = 0.7885)",
+          showDomain: true,
+          domainScheme: "ocean",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.75 },
+          outView: { cx: 14.0, cy: 0.0, r: 22.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { r_c: 0.7885, theta_c: 2.38, zoom: 0.0, max_iter: 240, shift: 2.0 },
+          shapes: [],
+        },
+        {
+          id: "julia_orbit_morph",
+          name: "▶ Live Orbit Morph (|c| = 0.7885)",
+          showDomain: true,
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.75 },
+          outView: { cx: 14.0, cy: 0.0, r: 22.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { r_c: 0.7885, theta_c: 0.0, zoom: 0.0, max_iter: 220, shift: 1.0 },
+          startSlider: "theta_c",
+          shapes: [],
+        },
+        {
+          id: "julia_dendrite",
+          name: "Lightning Dendrite (c = i · Neon Prism)",
+          showDomain: true,
+          domainScheme: "neon_prism",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.7 },
+          outView: { cx: 12.0, cy: 0.0, r: 20.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { r_c: 1.0, theta_c: 1.5708, zoom: 0.0, max_iter: 260, shift: 6.0 },
+          shapes: [],
+        },
+        {
+          id: "julia_rabbit",
+          name: "Douady Rabbit (Ultra-Fractal)",
+          showDomain: true,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.65 },
+          outView: { cx: 12.0, cy: 0.0, r: 20.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { r_c: 0.755, theta_c: 1.735, zoom: 0.0, max_iter: 260, shift: 0.0 },
+          shapes: [],
+        },
+        {
+          id: "julia_live_zoom",
+          name: "▶ Live Zoom Dive into Spiral",
+          showDomain: true,
+          domainScheme: "ocean",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.75 },
+          outView: { cx: 18.0, cy: 0.0, r: 26.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { r_c: 0.7885, theta_c: 2.38, zoom: 0.0, max_iter: 380, shift: 2.0 },
+          startSlider: "zoom",
+          shapes: [],
+        },
+      ],
+    },
+    {
+      id: "map_newton_kaleidoscope",
+      mode: "map",
+      folder: "cat_fractals",
+      category: "Fractals & Complex Dynamics",
+      title: "Newton's Method Stained-Glass Basins",
+      subtitle: "Fractal basins of attraction for zⁿ − 1 = 0 with Classic Domain, Neon Prism & Nova relaxation!",
+      description: "Runs native C11 Newton-Raphson iterations z_{k+1} = z_k − a·(z_k^n − 1)/(n·z_k^(n−1)) and encodes both the winning root angle and convergence speed into w, painting stained-glass fractal Voronoi basins across Classic Domain, Neon Prism, and Inferno themes.",
+      showDomain: true,
+      domainScheme: "classic",
+      domainOpacity: 1.0,
+      fnCards: [
+        {
+          title: "Newton Basin Map for z^n − 1 = 0",
+          code: "int deg = (int)floor(n + 0.5);\nif (deg < 3) deg = 3;\nif (deg > 8) deg = 8;\ndouble complex w = z;\nint k = 0;\nfor (; k < 46; k++) {\n  double complex pnm1 = c_make(1.0, 0.0);\n  for (int j = 0; j < deg - 1; j++) pnm1 *= w;\n  double complex pn = pnm1 * w;\n  double complex f = pn - c_make(1.0, 0.0);\n  if (cabs(f) < 1e-6) break;\n  double complex df = (double)deg * pnm1;\n  if (cabs(df) < 1e-12) break;\n  w = w - c_make(relax, 0.0) * (f / df);\n}\ndouble shade = 0.25 + 2.4 * exp(-0.11 * (double)k);\ndouble ang = carg(w);\nreturn c_make(shade * cos(ang), shade * sin(ang));",
+          color: "#a78bfa",
+          visible: true,
+          active: true,
+        },
+      ],
+      sliders: [
+        { name: "n", label: "Degree n (zⁿ − 1)", value: 3, min: 3, max: 8, step: 1, speed: 0.5 },
+        { name: "relax", label: "Relaxation a (Nova)", value: 1.0, min: 0.4, max: 1.85, step: 0.02, speed: 0.4 },
+        { name: "zoom", label: "Log₁₀ Zoom", value: 0.0, min: 0.0, max: 3.5, step: 0.01, speed: 0.35 },
+      ],
+      vars: [
+        { name: "in_r", expr: "1.95 * pow(10, -zoom)", label: "Viewport radius (live zoom)" },
+      ],
+      defaultPoints: [
+        pt(1.0, 0.0, "Root 1", "star", "#fbbf24", 5.0, true),
+        pt(-0.5, 0.866025, "Root ω", "star", "#34d399", 5.0, true),
+        pt(-0.5, -0.866025, "Root ω²", "star", "#38bdf8", 5.0, true),
+      ],
+      presets: [
+        {
+          id: "newton_cubic_classic",
+          name: "Cubic z³ − 1 (Classic Stained Glass)",
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.95 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { n: 3, relax: 1.0, zoom: 0.0 },
+          shapes: [],
+        },
+        {
+          id: "newton_quintic_neon",
+          name: "Quintic z⁵ − 1 (Neon Prism)",
+          showDomain: true,
+          domainScheme: "neon_prism",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.95 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { n: 5, relax: 1.0, zoom: 0.0 },
+          shapes: [],
+        },
+        {
+          id: "newton_nova_inferno",
+          name: "Nova Relaxation (a = 1.55 · Inferno)",
+          showDomain: true,
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.95 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { n: 4, relax: 1.55, zoom: 0.0 },
+          shapes: [],
+        },
+        {
+          id: "newton_live_zoom",
+          name: "▶ Live Zoom into Basin Seam",
+          showDomain: true,
+          domainScheme: "classic",
+          domainOpacity: 1.0,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -0.5, cy: 0.0, r: 1.95 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { n: 3, relax: 1.0, zoom: 0.0 },
+          startSlider: "zoom",
+          shapes: [],
+        },
+      ],
+    },
+
+    /* =====================================================================
+     * COMPLEX MODE — FOLDER 4: SPHERES, ATLASES & CONFORMAL ART
+     * ===================================================================== */
+    {
+      id: "map_magnum_opus",
+      mode: "map",
+      folder: "cat_art_atlas",
+      category: "Spheres, Atlases & Conformal Art",
+      title: "★ Magnum Opus: The Conformal Cosmos",
+      subtitle: "Klein Modular j(τ) Hyperbolic Tessellation, Relativistic Kerr Black-Hole Sphere, Orbiting Residues & Burning Ship!",
+      description: "Full-capacity showcase of the C11 Complex Studio: exact SL(2,ℤ)-reduced Klein modular j-invariant tiling the Poincaré Disk, a 60 FPS relativistic Kerr Black-Hole & Doppler Accretion Riemann Sphere, live orbiting poles with exact 2πi Cauchy residue jumps (∮ Contour), a Burning Ship fractal deep zoom, and conformal dual-plane art.",
+      showMesh: false,
+      showDomain: true,
+      domainScheme: "classic",
+      domainOpacity: 1.0,
+      fnCards: [
+        {
+          title: "Klein Modular j(τ) on Poincaré Disk (SL(2,ℤ) Exact)",
+          code: "double r2 = creal(z)*creal(z) + cimag(z)*cimag(z);\nif (r2 >= 0.994) return c_make(NAN, NAN);\ndouble complex rot = c_make(cos(-spin), sin(-spin));\ndouble complex u = rot * z;\ndouble complex tau = I * (1.0 + u) / (1.0 - u);\nif (cimag(tau) <= 1e-6) return c_make(0.0, 0.0);\nfor (int k = 0; k < 24; k++) {\n  double tr = creal(tau);\n  tau -= floor(tr + 0.5);\n  double n2 = creal(tau)*creal(tau) + cimag(tau)*cimag(tau);\n  if (n2 >= 0.999999) break;\n  tau = -1.0 / tau;\n}\ndouble complex q = cexp(I * M_PI * tau);\ndouble complex q2 = q * q;\ndouble complex q4 = q2 * q2;\ndouble complex q6 = q4 * q2;\ndouble complex q9 = q6 * q2 * q;\ndouble complex t3 = 1.0 + 2.0 * (q + q4 + q9);\ndouble complex t2 = 2.0 * csqrt(csqrt(q)) * (1.0 + q2 + q6);\ndouble complex ratio = t2 / t3;\ndouble complex rsq = ratio * ratio;\ndouble complex lam = rsq * rsq;\ndouble complex num = lam * lam - lam + 1.0;\ndouble complex den = lam * (1.0 - lam);\ndouble complex jn = (256.0 / 1728.0) * (num * num * num) / (den * den + 1e-12);\nreturn cpow(jn, 0.36 * twist);",
+          color: "#a78bfa",
+          visible: true,
+          active: true,
+        },
+        {
+          title: "Relativistic Kerr Black-Hole & Accretion Shader (60 FPS)",
+          code: "double lon = creal(z);\ndouble lat = 2.0 * atan(exp(cimag(z))) - 0.5 * M_PI;\ndouble cl = cos(lat);\ndouble sx = cl * sin(lon), sy = cl * cos(lon), sz = sin(lat);\ndouble tilt = 0.28 + 0.45 * a;\ndouble ct = cos(tilt), st = sin(tilt);\ndouble ty = sy * ct - sz * st;\ndouble tz = sy * st + sz * ct;\ndouble dFront = sqrt(sx*sx + (ty - 1.0)*(ty - 1.0) + tz*tz);\ndouble dBack = sqrt(sx*sx + (ty + 1.0)*(ty + 1.0) + tz*tz);\ndouble dHole = fmin(dFront, dBack);\nif (dHole < 0.48) return c_make(-1.0, 0.0);\ndouble photon = 38.0 * exp(-pow((dHole - 0.51) / 0.042, 2.0));\ndouble phi = atan2(sx, ty);\ndouble disk = 24.0 * exp(-pow(tz / 0.16, 2.0)) * (0.65 + 0.35 * sin(5.0 * phi + 12.0 * tz));\ndouble doppler = 1.0 + 0.45 * sx;\ndouble halo = 7.5 * exp(-pow((dHole - 0.70) / 0.22, 2.0));\ndouble jets = 18.0 * exp(-pow((1.0 - fabs(tz)) / 0.055, 2.0));\ndouble glow = (photon + disk * doppler + halo + jets) * twist;\nreturn c_make(fmax(0.05, glow), 0.0);",
+          color: "#fbbf24",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Orbiting Tri-Pole Residue Observatory",
+          code: "double complex p1 = c_make(cos(spin), sin(spin));\ndouble complex p2 = c_make(cos(spin + 2.0943951), sin(spin + 2.0943951));\ndouble complex p3 = c_make(cos(spin + 4.1887902), sin(spin + 4.1887902));\nreturn 1.0 / (z - p1) - 2.0 / (z - p2) + 1.0 / (z - p3);",
+          color: "#34d399",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Burning Ship Fractal Armada (Smooth Escape)",
+          code: "double cr = creal(z), ci = -cimag(z);\ndouble wr = 0.0, wi = 0.0;\nint lim = (int)floor(180.0 + zoom * 110.0);\nif (lim > 900) lim = 900;\nfor (int k = 0; k < lim; k++) {\n  double ax = fabs(wr), ay = fabs(wi);\n  double nwr = ax * ax - ay * ay + cr;\n  double nwi = 2.0 * ax * ay + ci;\n  wr = nwr; wi = nwi;\n  double m2 = wr * wr + wi * wi;\n  if (m2 > 256.0) {\n    double nu = (double)k + 1.0 - log(0.5 * log(m2) / log(2.0)) / log(2.0);\n    return c_make(fmax(0.0, nu + twist * 4.0), 0.0);\n  }\n}\nreturn c_make(-1.0, 0.0);",
+          color: "#fb7185",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Möbius Automorphism (z − a) / (1 − a·z)",
+          code: "double complex den = 1.0 - c_make(a, 0.0) * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0);\nreturn (z - c_make(a, 0.0)) / den;",
+          color: "#38bdf8",
+          visible: false,
+          active: false,
+        },
+      ],
+      sliders: [
+        { name: "spin", label: "Cosmos Spin / Orbit", value: 0.0, min: 0.0, max: 6.2832, step: 0.02, speed: 0.45 },
+        { name: "a", label: "Lensing / Möbius Warp a", value: 0.25, min: -0.8, max: 0.8, step: 0.02, speed: 0.4 },
+        { name: "twist", label: "Harmonic Contrast", value: 1.0, min: 0.4, max: 2.6, step: 0.05, speed: 0.4 },
+        { name: "zoom", label: "Log₁₀ Zoom", value: 0.0, min: -0.45, max: 3.8, step: 0.01, speed: 0.35 },
+      ],
+      vars: [
+        { name: "sphere_yaw", label: "Riemann Sphere camera yaw (60 FPS)", expr: "-0.35 + spin" },
+        { name: "sphere_pitch", label: "Riemann Sphere camera pitch", expr: "0.26" },
+        { name: "in_r", label: "Live logarithmic zoom radius", expr: "1.12 * pow(10, -zoom)" },
+      ],
+      defaultPoints: [
+        pt(0.0, 0.0, "i (Order-2 Elliptic)", "star", "#fbbf24", 5.0, true),
+        { ...pt(1.0, 0.0, "Cusp ∞", "diamond", "#38bdf8", 4.8, true), xExpr: "cos(spin)", yExpr: "sin(spin)" },
+        { ...pt(-1.0, 0.0, "Cusp 0", "diamond", "#34d399", 4.8, true), xExpr: "-cos(spin)", yExpr: "-sin(spin)" },
+      ],
+      presets: [
+        {
+          id: "cosmos_modular_poincare",
+          name: "★ Klein Modular j(τ) Hyperbolic Tessellation",
+          activeFnIndex: 0,
+          showDomain: true,
+          showOutDomain: false,
+          domainScheme: "classic",
+          domainOpacity: 1.0,
+          contourMode: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.12 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.5 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { spin: 0.0, a: 0.28, twist: 1.0, zoom: 0.0 },
+          shapes: [
+            { kind: "circle", label: "Poincaré Disk Boundary |z| = 1", color: "#e2e8f0", lineWidth: 1.8, opacity: 0.0, closed: true, locked: true, rawPts: circlePts(0, 0, 1.0, 128) },
+          ],
+          texts: [
+            {
+              kind: "text", title: "★ Klein's Modular $j$-Invariant on the Poincaré Disk",
+              text: "Exact $\\mathrm{SL}(2,\\mathbb{Z})$ reduction maps every pixel inside $|z| < 1$ into the fundamental domain in $4$ native C11 theta terms, tiling hyperbolic space with infinitely many congruent Escher triangles!\n• Scrub $\\text{spin}$ to rotate hyperbolic symmetry live, or $\\text{twist}$ to sculpt phase contrast.",
+              color: "#a78bfa", anchor: "bottom-left", plane: "in", width: 340, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "cosmos_blackhole_sphere",
+          name: "▶ Relativistic Kerr Black-Hole Sphere (60 FPS)",
+          activeFnIndex: 1,
+          showDomain: false,
+          showOutDomain: true,
+          outDomainMapping: "mercator",
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          contourMode: false,
+          enableSphere: true,
+          projection: "sphere",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          layout: { inputHidden: true, outputHidden: false },
+          sliderValues: { spin: 0.0, a: 0.18, twist: 1.15, zoom: -0.35 },
+          startSlider: "spin",
+          points: [],
+          shapes: [],
+          texts: [
+            {
+              kind: "text", title: "Relativistic Kerr Black-Hole Riemann Sphere",
+              text: "Native C11 gravitational-lensing & Doppler-beamed accretion shader mapped onto the Riemann Sphere — zero spin inside $f(z)$, rotating purely via $\\text{sphere\\_yaw}$ at rock-solid 60 FPS!\n• Drag to orbit freely, scrub $a$ to tilt the accretion plane, or $\\text{twist}$ to tune plasma intensity.",
+              color: "#fbbf24", anchor: "bottom-left", plane: "out", width: 340, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "cosmos_residue_orbit",
+          name: "∮ Orbiting Poles & Exact 2πi Residue Jumps",
+          activeFnIndex: 2,
+          showDomain: true,
+          showOutDomain: false,
+          domainScheme: "classic",
+          domainOpacity: 0.52,
+          contourMode: true,
+          enableSphere: false,
+          projection: "planar",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 10.0 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 52 },
+          sliderValues: { spin: 0.35, a: 0.28, twist: 1.0, zoom: -0.35 },
+          points: [
+            { ...pt(0.94, 0.34, "Pole p₁ (Res = +1)", "cross", "#34d399", 5.5, true), xExpr: "cos(spin)", yExpr: "sin(spin)" },
+            { ...pt(-0.77, 0.64, "Pole p₂ (Res = −2)", "cross", "#fb7185", 5.5, true), xExpr: "cos(spin + 2.0943951)", yExpr: "sin(spin + 2.0943951)" },
+            { ...pt(-0.17, -0.98, "Pole p₃ (Res = +1)", "cross", "#38bdf8", 5.5, true), xExpr: "cos(spin + 4.1887902)", yExpr: "sin(spin + 4.1887902)" },
+          ],
+          shapes: [
+            { kind: "circle", label: "Movable Residue Probe Loop", color: "#fbbf24", lineWidth: 2.4, opacity: 0.20, closed: true, rawPts: circlePts(0.85, 0.25, 0.72, 72) },
+          ],
+          texts: [
+            {
+              kind: "text", title: "∮ Live Orbiting Cauchy Residue Observatory",
+              text: "Three locked poles orbit the unit circle $|z| = 1$ with residues $+1,\\; -2,\\; +1$ (total sum $= 0$).\n• Scrub $\\text{spin}$ or drag the yellow loop: watch $\\oint f(z)\\,dz$ in the Contour panel snap by exact multiples of $\\pm 2\\pi i$ whenever a pole crosses the loop!",
+              color: "#34d399", anchor: "bottom-left", plane: "in", width: 340, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "cosmos_burning_ship_dive",
+          name: "▶ Burning Ship Fractal Armada (Live Deep Zoom)",
+          activeFnIndex: 3,
+          showDomain: true,
+          showOutDomain: false,
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          contourMode: false,
+          enableSphere: false,
+          projection: "planar",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: -1.762, cy: 0.028, r: 1.12 },
+          outView: { cx: 20.0, cy: 0.0, r: 30.0 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { spin: 0.0, a: 0.28, twist: 1.0, zoom: 0.0 },
+          startSlider: "zoom",
+          points: [pt(-1.762, 0.028, "Burning Ship Mast", "star", "#fbbf24", 4.5, true)],
+          shapes: [],
+          texts: [
+            {
+              kind: "text", title: "Burning Ship Fractal Armada",
+              text: "Non-analytic escape dynamics $z \\mapsto (|\\Re z| + i|\\Im z|)^2 + c$ reveal glowing ghost-ships and rigging along the negative real antenna.\n• Watch $\\text{zoom}$ dive $5{,}000\\times$ into the armada in Inferno Flame, or drag this note anywhere!",
+              color: "#fb7185", anchor: "bottom-left", plane: "in", width: 330, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "cosmos_conformal_web",
+          name: "Dual-Plane Conformal Star-Web (Side-by-Side)",
+          activeFnIndex: 4,
+          showDomain: false,
+          showOutDomain: false,
+          contourMode: false,
+          enableSphere: false,
+          projection: "poincare",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 1.85 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.22 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 50 },
+          sliderValues: { spin: 0.45, a: 0.42, twist: 1.0, zoom: -0.22 },
+          points: [],
+          shapes: STAINED_GLASS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Conformal Möbius Automorphism",
+              text: "Left: flat complex geometry. Right: hyperbolic Poincaré Disk compactification of all of $\\mathbb{C} \\cup \\{\\infty\\}$.\n• Scrub Möbius Warp $a$ to see circles map strictly to circles while angles stay exact!",
+              color: "#38bdf8", anchor: "bottom-left", plane: "in", width: 320, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "map_earth_atlas",
+      mode: "map",
+      folder: "cat_art_atlas",
+      category: "Spheres, Atlases & Conformal Art",
+      title: "Earth Atlas — Riemann Sphere & Cartography Projections",
+      subtitle: "Textured 3D Earth projected live to Mercator, Mollweide Equal-Area, Azimuthal Equidistant (UN), Stereographic & Poincaré!",
+      description: "Full Cartography Showcase powered by Input + Output Projections: Earth lives canonically on the Input Riemann Sphere (87 solid layers, biomes, lakes, islands, 43 cities, ZERO South Pole hole!) over a live C11 Ocean Bathymetry texture, and projects cleanly onto Mercator, 60 FPS Spinning Textured Earth, Azimuthal Equidistant (UN Emblem), Mollweide Equal-Area Oval, Oblique Atlantic Stereographic, Poincaré Disk, and Antipodal Inversion!",
+      showMesh: false,
+      fnCards: [
+        { title: "Identity Spherical Earth: z", code: "z", color: "#38bdf8", visible: true, active: true },
+        { title: "Antipodal Earth Inversion: 1 / z", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : 1.0 / z", color: "#fb7185", visible: false, active: false },
+        {
+          title: "C11 Textured Ocean Bathymetry & Currents (60 FPS)",
+          code: "double lon = creal(z);\ndouble lat = 2.0 * atan(exp(cimag(z))) - 0.5 * M_PI;\ndouble ridge = 3.4 * exp(-pow(sin(lon + 0.35 * sin(2.5 * lat)) / 0.22, 2.0));\ndouble gyres = 2.8 * sin(3.0 * lon + 1.4 * cos(2.0 * lat)) * cos(lat) + 1.9 * cos(6.0 * lon - 5.0 * lat) * cos(lat);\ndouble shelf = 12.2 + 7.4 * cos(2.0 * lat) + ridge + gyres;\nreturn c_make(fmax(0.25, shelf), 0.0);",
+          color: "#0ea5e9",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Azimuthal Equidistant (UN Flag North-Pole Map)",
+          code: "double x = creal(z), y = cimag(z);\ndouble r2 = x*x + y*y;\ndouble Z = (r2 - 1.0) / (r2 + 1.0);\ndouble lat = asin(fmax(-1.0, fmin(1.0, Z)));\ndouble lon = atan2(x, y);\ndouble rho = 0.5 * M_PI - lat;\nreturn c_make(rho * sin(lon), -rho * cos(lon));",
+          color: "#34d399",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Mollweide Equal-Area Oval Projection (Newton C11)",
+          code: "double x = creal(z), y = cimag(z);\ndouble r2 = x*x + y*y;\ndouble Z = (r2 - 1.0) / (r2 + 1.0);\ndouble lat = asin(fmax(-1.0, fmin(1.0, Z)));\ndouble lon = atan2(x, y);\ndouble rhs = M_PI * sin(lat);\ndouble th = lat;\nfor (int k = 0; k < 6; k++) {\n  double d = 2.0 + 2.0 * cos(2.0 * th);\n  if (fabs(d) < 1e-6) break;\n  th -= (2.0 * th + sin(2.0 * th) - rhs) / d;\n}\ndouble xm = (2.0 * 1.41421356 / M_PI) * lon * cos(th);\ndouble ym = 1.41421356 * sin(th);\nreturn c_make(xm, ym);",
+          color: "#fbbf24",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Oblique Atlantic Möbius Projection (Europe & Americas)",
+          code: "double complex num = z - c_make(0.0, 0.72);\ndouble complex den = c_make(1.0, 0.0) + c_make(0.0, 0.72) * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          color: "#a78bfa",
+          visible: false,
+          active: false,
+        },
+      ],
+      sliders: [
+        { name: "spin", label: "Globe Spin", value: 0.0, min: 0.0, max: 6.2832, step: 0.02, speed: 0.5 },
+        { name: "tilt", label: "Globe Pitch", value: 0.24, min: -1.35, max: 1.35, step: 0.02, speed: 0.5 },
+        { name: "zoom", label: "Globe Zoom", value: 1.12, min: 0.65, max: 2.2, step: 0.02, speed: 0.5 },
+      ],
+      vars: [
+        { name: "sphere_yaw", label: "Riemann Sphere camera yaw (60 FPS)", expr: "-0.45 + spin" },
+        { name: "sphere_pitch", label: "Riemann Sphere camera pitch", expr: "tilt" },
+        { name: "sphere_zoom", label: "Riemann Sphere camera zoom", expr: "zoom" },
+      ],
+      defaultPoints: [
+        geoPt(-74.0, 40.7, "New York", "dot", "#f8fafc", 4.2, false),
+        geoPt(-118.2, 34.1, "Los Angeles", "dot", "#f8fafc", 4.0, false),
+        geoPt(-87.6, 41.9, "Chicago", "dot", "#f8fafc", 3.6, false),
+        geoPt(-79.4, 43.7, "Toronto", "dot", "#f8fafc", 3.6, false),
+        geoPt(-123.1, 49.3, "Vancouver", "dot", "#f8fafc", 3.5, false),
+        geoPt(-149.9, 61.2, "Anchorage", "dot", "#e0f2fe", 3.4, false),
+        geoPt(-99.1, 19.4, "Mexico City", "dot", "#f8fafc", 4.0, false),
+        geoPt(-82.4, 23.1, "Havana", "dot", "#bae6fd", 3.5, false),
+        geoPt(-74.1, 4.7, "Bogotá", "dot", "#f8fafc", 3.6, false),
+        geoPt(-77.0, -12.0, "Lima", "dot", "#f8fafc", 3.6, false),
+        geoPt(-46.6, -23.5, "São Paulo", "dot", "#f8fafc", 3.8, false),
+        geoPt(-43.2, -22.9, "Rio de Janeiro", "dot", "#f8fafc", 4.2, false),
+        geoPt(-70.7, -33.4, "Santiago", "dot", "#f8fafc", 3.6, false),
+        geoPt(-58.4, -34.6, "Buenos Aires", "dot", "#f8fafc", 4.2, false),
+        geoPt(-21.9, 64.1, "Reykjavik", "dot", "#e0f2fe", 3.7, false),
+        geoPt(-0.1, 51.5, "London", "dot", "#fef08a", 4.2, false),
+        geoPt(2.35, 48.85, "Paris", "dot", "#fef08a", 4.0, false),
+        geoPt(-3.7, 40.4, "Madrid", "dot", "#fef08a", 3.6, false),
+        geoPt(12.5, 41.9, "Rome", "dot", "#fef08a", 3.8, false),
+        geoPt(13.4, 52.5, "Berlin", "dot", "#fef08a", 3.7, false),
+        geoPt(18.1, 59.3, "Stockholm", "dot", "#fef08a", 3.6, false),
+        geoPt(23.7, 38.0, "Athens", "dot", "#fef08a", 3.6, false),
+        geoPt(29.0, 41.0, "Istanbul", "dot", "#fef08a", 3.9, false),
+        geoPt(37.6, 55.75, "Moscow", "dot", "#fef08a", 4.2, false),
+        geoPt(-7.6, 33.6, "Casablanca", "dot", "#fde68a", 3.6, false),
+        geoPt(31.2, 30.0, "Cairo", "dot", "#fde68a", 4.2, false),
+        geoPt(3.4, 6.5, "Lagos", "dot", "#fde68a", 3.8, false),
+        geoPt(36.8, -1.3, "Nairobi", "dot", "#fde68a", 3.8, false),
+        geoPt(18.4, -33.9, "Cape Town", "dot", "#fde68a", 4.2, false),
+        geoPt(55.3, 25.2, "Dubai", "dot", "#fde68a", 3.9, false),
+        geoPt(72.9, 19.1, "Mumbai", "dot", "#e2e8f0", 4.0, false),
+        geoPt(77.2, 28.6, "New Delhi", "dot", "#e2e8f0", 3.9, false),
+        geoPt(100.5, 13.75, "Bangkok", "dot", "#e2e8f0", 3.8, false),
+        geoPt(103.8, 1.35, "Singapore", "dot", "#e2e8f0", 4.0, false),
+        geoPt(106.8, -6.2, "Jakarta", "dot", "#e2e8f0", 3.8, false),
+        geoPt(121.5, 31.2, "Shanghai", "dot", "#e2e8f0", 3.9, false),
+        geoPt(116.4, 39.9, "Beijing", "dot", "#e2e8f0", 4.2, false),
+        geoPt(127.0, 37.6, "Seoul", "dot", "#e2e8f0", 3.9, false),
+        geoPt(139.7, 35.7, "Tokyo", "dot", "#e2e8f0", 4.2, false),
+        geoPt(151.2, -33.9, "Sydney", "dot", "#fed7aa", 4.2, false),
+        geoPt(174.8, -36.85, "Auckland", "dot", "#fed7aa", 3.8, false),
+        geoPt(-157.8, 21.3, "Honolulu", "dot", "#bae6fd", 3.8, false),
+        geoPt(-149.5, -17.5, "Tahiti", "dot", "#bae6fd", 3.5, false),
+      ],
+      presets: [
+        {
+          id: "atlas_atlantic",
+          name: "Riemann Sphere Earth → Mercator Map (Dual View)",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "mercator",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.35 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.0, tilt: 0.24, zoom: 1.12 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Riemann Sphere Earth → Mercator Cartography",
+              text: "Left: canonical 3D Earth on the Input Riemann Sphere $S^2$ (solid Antarctica with ZERO South Pole hole!). Right: conformal Mercator map $[-\\pi, \\pi] \\times [-2.65, 2.65]$ via the Output Projection menu!\n• Drag the left globe to orbit, or switch presets to explore Stereographic, Poincaré, Mollweide & C11 Bathymetry!",
+              color: "#38bdf8", anchor: "bottom-left", plane: "out", width: 345, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_spin",
+          name: "▶ Spinning Textured Earth (60 FPS Bathymetry Globe)",
+          activeFnIndex: 2,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "sphere",
+          showDomain: true,
+          showOutDomain: false,
+          outDomainMapping: "mercator",
+          domainScheme: "ocean",
+          domainOpacity: 0.96,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          layout: { inputHidden: false, outputHidden: true, sidebarCollapsed: true },
+          sliderValues: { spin: 0.0, tilt: 0.22, zoom: 1.12 },
+          startSlider: "spin",
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Textured Bathymetry Earth — 60 FPS Riemann Sphere",
+              text: "C11 ocean bathymetry ridges & equatorial currents wrap uniformly under all 87 solid continental/biome layers and 43 cities with sunlit 3D spherical shading!\n• Zero spin inside $f(z)$: rotates smoothly at 60 FPS via $\\text{sphere\\_yaw}$.",
+              color: "#0ea5e9", anchor: "bottom-left", plane: "in", width: 345, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_eurasia",
+          name: "Riemann Sphere Focus: Europe, Africa & Asia",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: true,
+          projection: "sphere",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          layout: { inputHidden: true, outputHidden: false },
+          sliderValues: { spin: 2.35, tilt: 0.28, zoom: 1.16 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Eastern Hemisphere — Biomes & Relief",
+              text: "Focused on Europe, Africa, Asia, the Sahara, Arabian Desert, Gobi/Tibetan Plateau, and island arcs with sunlit 3D spherical lighting.\n• Drag the globe freely or scrub Globe Pitch & Zoom!",
+              color: "#fbbf24", anchor: "bottom-left", plane: "out", width: 325, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_stereographic",
+          name: "Riemann Sphere → Stereographic Disk",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "stereographic",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.24 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.0, tilt: -0.45, zoom: 1.12 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Bounded Stereographic Disk Projection",
+              text: "Left: 3D Earth on the Input Riemann Sphere $S^2$. Right: bounded Stereographic Disk where solid Antarctica sits cleanly at the center (ZERO South Pole hole!) and the North Pole wraps onto $|W| = 1$.",
+              color: "#38bdf8", anchor: "bottom-left", plane: "out", width: 335, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_poincare",
+          name: "Riemann Sphere → Poincaré Hyperbolic Disk",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "poincare",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.24 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.0, tilt: 0.24, zoom: 1.12 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Poincaré Disk Earth Compactification",
+              text: "Maps Earth through $W = \\frac{w}{1 + \\sqrt{1 + |w|^2}}$ into the hyperbolic Poincaré Disk — preserving local angles while compressing northern latitudes smoothly toward $|W| = 1$!",
+              color: "#34d399", anchor: "bottom-left", plane: "out", width: 335, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_azimuthal_un",
+          name: "Azimuthal Equidistant (UN Emblem Map)",
+          activeFnIndex: 3,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "planar",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.35 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.0, tilt: 0.55, zoom: 1.12 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Azimuthal Equidistant Projection (UN Emblem)",
+              text: "Maps every point at exact geodesic distance $\\rho = \\frac{\\pi}{2} - \\varphi$ from the North Pole: $(x, y) = (\\rho \\sin\\lambda, -\\rho \\cos\\lambda)$.\n• Every radial ray from the center is a true great-circle flight path!",
+              color: "#34d399", anchor: "bottom-left", plane: "out", width: 340, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_mollweide",
+          name: "Mollweide Equal-Area Oval World Map",
+          activeFnIndex: 4,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "planar",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.05 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.0, tilt: 0.22, zoom: 1.12 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Mollweide Equal-Area Oval Projection",
+              text: "Solves $2\\theta + \\sin(2\\theta) = \\pi \\sin\\varphi$ via 6 native C11 Newton iterations: $x = \\frac{2\\sqrt{2}}{\\pi}\\lambda\\cos\\theta$, $y = \\sqrt{2}\\sin\\theta$.\n• Unlike Mercator, Greenland and Africa appear at their true relative land areas!",
+              color: "#fbbf24", anchor: "bottom-left", plane: "out", width: 345, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_oblique_atlantic",
+          name: "Oblique Atlantic Hemisphere (Möbius Stereographic)",
+          activeFnIndex: 5,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "stereographic",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.24 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.0, tilt: 0.28, zoom: 1.12 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Oblique Atlantic Stereographic Hemisphere",
+              text: "Applies the conformal Möbius shift $w = \\frac{z - 0.72i}{1 + 0.72iz}$ before projecting into the Stereographic Disk — centering Europe, Africa & the Americas inside the disk!",
+              color: "#a78bfa", anchor: "bottom-left", plane: "out", width: 340, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "atlas_antipodal",
+          name: "Riemann Sphere → Antipodal Inversion (1/z)",
+          activeFnIndex: 1,
+          inProjection: "sphere",
+          enableSphere: true,
+          projection: "sphere",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.4, tilt: -0.25, zoom: 1.12 },
+          shapes: EARTH_ATLAS_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Antipodal Sphere Inversion $w = 1/z$",
+              text: "On the Riemann Sphere $S^2$, complex inversion $w = \\frac{1}{z}$ flips North $\\leftrightarrow$ South poles ($180^\\circ$ rotation about the real axis) while preserving every local angle and circle!",
+              color: "#fb7185", anchor: "bottom-left", plane: "out", width: 335, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "map_stained_glass_sphere",
+      mode: "map",
+      folder: "cat_art_atlas",
+      category: "Spheres, Atlases & Conformal Art",
+      title: "Conformal Stained-Glass Orb & Poincaré Mandala",
+      subtitle: "100%-solid jewel petals layered over a Celestial Ocean on the Riemann Sphere & bounded Poincaré Disk!",
+      description: "Showcases solid 100%-opacity layering, fill-only highlights, translucent halos, and conformal transformations (Möbius Warp and Squaring) across both the Riemann Sphere and the bounded Poincaré & Stereographic Disks.",
+      showMesh: false,
+      fnCards: [
+        {
+          title: "Möbius Jewel Warp (z − a) / (1 − a·z)",
+          code: "double complex num = z - c_make(a, 0.0);\ndouble complex den = c_make(1.0, 0.0) - c_make(a, 0.0) * z;\nif (cabs(den) < 1e-12) return c_make(INFINITY, 0.0);\nreturn num / den;",
+          color: "#fbbf24",
+          visible: true,
+          active: true,
+        },
+        {
+          title: "Double-Rose Kaleidoscope z²",
+          code: "z * z",
+          color: "#ec4899",
+          visible: false,
+          active: false,
+        },
+      ],
+      sliders: [
+        { name: "spin", label: "3D Orb Spin", value: 0.0, min: 0.0, max: 6.2832, step: 0.02, speed: 0.45 },
+        { name: "tilt", label: "3D Orb Tilt", value: 0.35, min: -1.35, max: 1.35, step: 0.02, speed: 0.5 },
+        { name: "a", label: "Möbius Shift a", value: 0.0, min: -0.78, max: 0.78, step: 0.02, speed: 0.4 },
+      ],
+      vars: [
+        { name: "sphere_yaw", expr: "-0.4 + spin", label: "Riemann Sphere camera yaw (60 FPS)" },
+        { name: "sphere_pitch", expr: "tilt", label: "Riemann Sphere camera pitch" },
+      ],
+      defaultPoints: [],
+      presets: [
+        {
+          id: "glass_3d_spin",
+          name: "▶ Stained-Glass Riemann Sphere (60 FPS Spin)",
+          activeFnIndex: 0,
+          enableSphere: true,
+          projection: "sphere",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          layout: { inputHidden: true, outputHidden: false },
+          sliderValues: { spin: 0.0, tilt: 0.35, a: 0.0 },
+          startSlider: "spin",
+          shapes: STAINED_GLASS_SHAPES,
+        },
+        {
+          id: "glass_poincare_mandala",
+          name: "Poincaré Disk Hyperbolic Mandala",
+          activeFnIndex: 0,
+          enableSphere: false,
+          projection: "poincare",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.24 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 45 },
+          sliderValues: { spin: 0.0, tilt: 0.35, a: 0.25 },
+          shapes: STAINED_GLASS_SHAPES,
+        },
+        {
+          id: "glass_stereo_jewel",
+          name: "Stereographic Jewel Disk",
+          activeFnIndex: 0,
+          enableSphere: false,
+          projection: "stereographic",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          outView: { cx: 0.0, cy: 0.0, r: 1.24 },
+          sliderValues: { spin: 0.0, tilt: 0.35, a: 0.0 },
+          shapes: STAINED_GLASS_SHAPES,
+        },
+        {
+          id: "glass_double_rose",
+          name: "Double-Rose Kaleidoscope (w = z²)",
+          activeFnIndex: 1,
+          enableSphere: true,
+          projection: "sphere",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.6 },
+          sliderValues: { spin: 0.0, tilt: 0.35, a: 0.0 },
+          shapes: STAINED_GLASS_SHAPES,
+        },
+      ],
+    },
+
+    /* =====================================================================
+     * 2D REAL MODE — FOLDER 1: CALCULUS & CLASSROOM THEOREMS
+     * ===================================================================== */
+    {
+      id: "real_mvt_rolle",
+      mode: "real",
+      folder: "cat_calculus",
+      category: "Calculus & Classroom Theorems",
+      title: "Mean Value Theorem & Rolle's Theorem",
+      subtitle: "Live secant on [a, b], movable tangent at c, exact parallel tangent at c* ∈ (a, b), plus a cusp counterexample!",
+      description: "Classroom interactive demonstrating Lagrange’s Mean Value Theorem and Rolle’s Theorem: adjust interval endpoints a and b, sweep the tangent point c until it snaps parallel to the secant at c*, verify Rolle’s horizontal tangent when f(a) = f(b), or switch to |x| to see why differentiability on (a, b) is essential.",
+      fnCards: [
+        { title: "Smooth Curve f(x) = ¼x³ − x + 1", code: "0.25*x*x*x - x + 1.0", color: "#38bdf8", lineWidth: 2.6, visible: true },
+        { title: "Secant Line on [a, b]", code: "double fa = 0.25*a*a*a - a + 1.0;\ndouble fb = 0.25*b*b*b - b + 1.0;\ndouble m = fabs(b - a) < 1e-6 ? (0.75*a*a - 1.0) : (fb - fa) / (b - a);\nreturn fa + m * (x - a);", color: "#fbbf24", lineWidth: 2.0, lineStyle: "dashed", visible: true },
+        { title: "Movable Tangent at x = c", code: "double fc = 0.25*c*c*c - c + 1.0;\ndouble mc = 0.75*c*c - 1.0;\nreturn fc + mc * (x - c);", color: "#a78bfa", lineWidth: 2.0, visible: true },
+        { title: "Guaranteed MVT Parallel Tangent (c*)", code: "double fa = 0.25*a*a*a - a + 1.0;\ndouble fb = 0.25*b*b*b - b + 1.0;\ndouble m = fabs(b - a) < 1e-6 ? (0.75*a*a - 1.0) : (fb - fa) / (b - a);\ndouble u = (m + 1.0) / 0.75;\nif (u < 0.0) return NAN;\ndouble r = sqrt(u);\ndouble lo = fmin(a, b), hi = fmax(a, b);\ndouble cs = (r > lo && r < hi) ? r : -r;\ndouble fcs = 0.25*cs*cs*cs - cs + 1.0;\nreturn fcs + m * (x - cs);", color: "#34d399", lineWidth: 2.2, lineStyle: "dotted", visible: true },
+        { title: "Cusp Counterexample |x| (Not Diff. at 0)", code: "fabs(x)", color: "#fb7185", lineWidth: 2.6, visible: false },
+        { title: "Secant on |x| for [a, b]", code: "double fa = fabs(a), fb = fabs(b);\ndouble m = fabs(b - a) < 1e-6 ? 0.0 : (fb - fa) / (b - a);\nreturn fa + m * (x - a);", color: "#fbbf24", lineWidth: 2.0, lineStyle: "dashed", visible: false },
+      ],
+      sliders: [
+        { name: "a", label: "Left endpoint a", value: -1.5, min: -2.8, max: 0.5, step: 0.05, speed: 0.4 },
+        { name: "b", label: "Right endpoint b", value: 2.5, min: 0.5, max: 3.0, step: 0.05, speed: 0.4 },
+        { name: "c", label: "Probe tangent x = c", value: 0.4, min: -2.5, max: 2.5, step: 0.02, speed: 0.45 },
+      ],
+      defaultPoints: [
+        { ...pt(-1.5, 1.65625, "(a, f(a))", "dot", "#fbbf24", 5.5, true), xExpr: "a", yExpr: "0.25*a*a*a - a + 1.0" },
+        { ...pt(2.5, 2.40625, "(b, f(b))", "dot", "#fbbf24", 5.5, true), xExpr: "b", yExpr: "0.25*b*b*b - b + 1.0" },
+        { ...pt(0.4, 0.616, "Tangent (c, f(c))", "ring", "#a78bfa", 5.5, true), xExpr: "c", yExpr: "0.25*c*c*c - c + 1.0" },
+      ],
+      defaultLines: [
+        { ...ln("vertical", -1.5, "x = a", "#fbbf24", "dotted", true), valExpr: "a" },
+        { ...ln("vertical", 2.5, "x = b", "#fbbf24", "dotted", true), valExpr: "b" },
+      ],
+      presets: [
+        {
+          id: "mvt_classic",
+          name: "Mean Value Theorem on [−1.5, 2.5]",
+          squareAspect: true,
+          view: { xmin: -3.2, xmax: 3.6, ymin: -1.6, ymax: 3.6 },
+          sliderValues: { a: -1.5, b: 2.5, c: 0.4 },
+          visibleFnIndices: [0, 1, 2, 3],
+        },
+        {
+          id: "mvt_sweep_c",
+          name: "▶ Sweep Tangent c to Match Secant Slope",
+          squareAspect: true,
+          view: { xmin: -3.2, xmax: 3.6, ymin: -1.6, ymax: 3.6 },
+          sliderValues: { a: -1.5, b: 2.5, c: -1.5 },
+          visibleFnIndices: [0, 1, 2, 3],
+          startSlider: "c",
+        },
+        {
+          id: "rolle_theorem",
+          name: "Rolle's Theorem: f(−2) = f(2) = 1 → f'(c*) = 0",
+          squareAspect: true,
+          view: { xmin: -3.2, xmax: 3.2, ymin: -1.4, ymax: 3.2 },
+          sliderValues: { a: -2.0, b: 2.0, c: -1.1547 },
+          visibleFnIndices: [0, 1, 2, 3],
+          points: [
+            pt(-2.0, 1.0, "f(−2) = 1", "dot", "#fbbf24", 5, true),
+            pt(2.0, 1.0, "f(2) = 1", "dot", "#fbbf24", 5, true),
+            pt(-1.1547, 1.7698, "c₁* = −2/√3 (f'=0)", "star", "#a78bfa", 5.5, true),
+            pt(1.1547, 0.2302, "c₂* = +2/√3 (f'=0)", "star", "#34d399", 5.5, true),
+          ],
+          lines: [
+            ln("vertical", -2.0, "a = −2", "#fbbf24", "dotted", true),
+            ln("vertical", 2.0, "b = 2", "#fbbf24", "dotted", true),
+          ],
+        },
+        {
+          id: "mvt_fails_cusp",
+          name: "Why Differentiability Matters: Cusp |x|",
+          squareAspect: true,
+          view: { xmin: -3.2, xmax: 3.2, ymin: -0.6, ymax: 3.2 },
+          sliderValues: { a: -2.0, b: 2.0, c: 0.0 },
+          visibleFnIndices: [4, 5],
+          points: [
+            pt(-2.0, 2.0, "f(−2) = 2", "dot", "#fbbf24", 5, true),
+            pt(2.0, 2.0, "f(2) = 2", "dot", "#fbbf24", 5, true),
+            pt(0.0, 0.0, "Corner: f'(0) DNE (No horizontal tangent!)", "cross", "#fb7185", 6, true),
+          ],
+          lines: [
+            ln("vertical", 0.0, "Non-differentiable at x = 0", "#fb7185", "dotted", true),
+          ],
+        },
+      ],
+    },
+    {
+      id: "real_riemann_ftc",
+      mode: "real",
+      folder: "cat_calculus",
+      category: "Calculus & Classroom Theorems",
+      title: "Riemann Sums, Darboux Bounds & FTC",
+      subtitle: "Refine partition N to squeeze Upper & Lower Darboux sums onto f(x) and watch F(x) = ∫₀ˣ f(t) dt grow!",
+      description: "Interactive Calculus classroom module: compare Upper & Lower Darboux step sums and Midpoint Riemann bars on [0, b] as partition count N increases from 4 to 80, alongside the Fundamental Theorem of Calculus accumulation function F(x) = ∫₀ˣ f(t) dt.",
+      fnCards: [
+        { title: "Integrand f(x) = 0.6·sin(x) + 1.15", code: "0.6*sin(x) + 1.15", color: "#38bdf8", lineWidth: 2.6, visible: true },
+        { title: "Upper Darboux Sum (N bars)", code: "if (x < 0.0 || x > b) return NAN;\ndouble n = fmax(1.0, floor(N + 0.5));\ndouble dx = b / n;\ndouble xl = floor(x / dx) * dx;\ndouble best = -1e9;\nfor (int j = 0; j <= 8; j++) {\n  double t = xl + dx * (j / 8.0);\n  double v = 0.6*sin(t) + 1.15;\n  if (v > best) best = v;\n}\nreturn best;", color: "#fb7185", lineWidth: 1.8, step: true, visible: true },
+        { title: "Lower Darboux Sum (N bars)", code: "if (x < 0.0 || x > b) return NAN;\ndouble n = fmax(1.0, floor(N + 0.5));\ndouble dx = b / n;\ndouble xl = floor(x / dx) * dx;\ndouble best = 1e9;\nfor (int j = 0; j <= 8; j++) {\n  double t = xl + dx * (j / 8.0);\n  double v = 0.6*sin(t) + 1.15;\n  if (v < best) best = v;\n}\nreturn best;", color: "#34d399", lineWidth: 1.8, step: true, visible: true },
+        { title: "Midpoint Riemann Sum (N bars)", code: "if (x < 0.0 || x > b) return NAN;\ndouble n = fmax(1.0, floor(N + 0.5));\ndouble dx = b / n;\ndouble xm = (floor(x / dx) + 0.5) * dx;\nreturn 0.6*sin(xm) + 1.15;", color: "#fbbf24", lineWidth: 2.0, step: true, visible: false },
+        { title: "FTC Accumulation F(x) = ∫₀ˣ f(t) dt", code: "x < 0.0 ? NAN : (0.6*(1.0 - cos(x)) + 1.15*x)", color: "#a78bfa", lineWidth: 2.4, lineStyle: "dashed", visible: false },
+      ],
+      sliders: [
+        { name: "N", label: "Subintervals N", value: 10, min: 3, max: 80, step: 1, speed: 0.6 },
+        { name: "b", label: "Upper limit b", value: 6.2832, min: 1.0, max: 9.42, step: 0.1, speed: 0.4 },
+      ],
+      defaultPoints: [
+        { ...pt(6.2832, 1.15, "Upper bound b", "dot", "#fbbf24", 5.0, true), xExpr: "b", yExpr: "0.6*sin(b) + 1.15" },
+      ],
+      defaultLines: [
+        ln("vertical", 0.0, "x = 0", "#94a3b8", "dotted", true),
+        { ...ln("vertical", 6.2832, "x = b", "#fbbf24", "dashed", true), valExpr: "b" },
+      ],
+      presets: [
+        {
+          id: "darboux_squeeze",
+          name: "Upper vs Lower Darboux Squeeze (N = 10)",
+          squareAspect: false,
+          view: { xmin: -0.6, xmax: 7.2, ymin: -0.2, ymax: 2.4 },
+          sliderValues: { N: 10, b: 6.2832 },
+          visibleFnIndices: [0, 1, 2],
+        },
+        {
+          id: "darboux_refine",
+          name: "▶ Refine Partition N: 3 → 80 (Convergence!)",
+          squareAspect: false,
+          view: { xmin: -0.6, xmax: 7.2, ymin: -0.2, ymax: 2.4 },
+          sliderValues: { N: 3, b: 6.2832 },
+          visibleFnIndices: [0, 1, 2],
+          startSlider: "N",
+        },
+        {
+          id: "ftc_accumulation",
+          name: "FTC: f(x) vs Area Function F(x) = ∫₀ˣ f",
+          squareAspect: false,
+          view: { xmin: -0.6, xmax: 7.2, ymin: -0.4, ymax: 8.2 },
+          sliderValues: { N: 24, b: 6.2832 },
+          visibleFnIndices: [0, 3, 4],
+        },
+      ],
+    },
+    {
+      id: "real_taylor_approx",
+      mode: "real",
+      folder: "cat_calculus",
+      category: "Calculus & Classroom Theorems",
+      title: "Taylor Polynomials & Radius of Convergence",
+      subtitle: "Watch Pₙ(x) hug sin(x) everywhere, then hit the hard convergence wall |x| = 1 for 1/(1+x²)!",
+      description: "Classic Calculus II & Complex-origin classroom demo: sweep Taylor degree N to watch sin(x) converge globally (R = ∞), whereas 1/(1+x²) — smooth everywhere on ℝ — explodes outside |x| < 1 because of its hidden complex poles at z = ±i!",
+      fnCards: [
+        { title: "Exact sin(x)  [R = ∞]", code: "sin(x)", color: "#f8fafc", lineWidth: 2.0, lineStyle: "dashed", visible: true },
+        { title: "Taylor Pₙ(x) for sin(x)", code: "double sum = 0.0, term = x;\nint lim = (int)floor(N + 0.5);\nfor (int k = 0; 2*k + 1 <= lim; k++) {\n  if (k > 0) term *= -x * x / ((2.0*k) * (2.0*k + 1.0));\n  sum += term;\n}\nreturn sum;", color: "#38bdf8", lineWidth: 2.6, visible: true },
+        { title: "Exact 1 / (1 + x²)  [Complex poles ±i → R = 1]", code: "1.0 / (1.0 + x*x)", color: "#f8fafc", lineWidth: 2.0, lineStyle: "dashed", visible: false },
+        { title: "Taylor Σ (−1)ᵏ x^(2k) for 1/(1+x²)", code: "double sum = 0.0, p = 1.0, x2 = -x * x;\nint lim = (int)floor(N + 0.5);\nfor (int k = 0; 2*k <= lim; k++) {\n  sum += p;\n  p *= x2;\n  if (fabs(sum) > 1e4) return NAN;\n}\nreturn sum;", color: "#fb7185", lineWidth: 2.6, visible: false },
+        { title: "Exact ln(1 + x)  [R = 1, cut at −1]", code: "x <= -1.0 ? NAN : log(1.0 + x)", color: "#f8fafc", lineWidth: 2.0, lineStyle: "dashed", visible: false },
+        { title: "Mercator Series Σ (−1)^(k−1) xᵏ / k", code: "double sum = 0.0, p = x;\nint lim = (int)floor(N + 0.5);\nfor (int k = 1; k <= lim; k++) {\n  sum += ((k & 1) ? 1.0 : -1.0) * p / (double)k;\n  p *= x;\n  if (fabs(sum) > 1e4) return NAN;\n}\nreturn sum;", color: "#34d399", lineWidth: 2.6, visible: false },
+      ],
+      sliders: [
+        { name: "N", label: "Polynomial Degree N", value: 7, min: 1, max: 25, step: 1, speed: 0.5 },
+      ],
+      defaultLines: [],
+      presets: [
+        {
+          id: "taylor_sin_sweep",
+          name: "▶ sin(x) Global Convergence (Animate N)",
+          squareAspect: false,
+          view: { xmin: -9.5, xmax: 9.5, ymin: -2.6, ymax: 2.6 },
+          sliderValues: { N: 1 },
+          visibleFnIndices: [0, 1],
+          startSlider: "N",
+          lines: [],
+        },
+        {
+          id: "taylor_runge_wall",
+          name: "1/(1+x²) Convergence Wall |x| = 1 (Poles ±i!)",
+          squareAspect: false,
+          view: { xmin: -2.4, xmax: 2.4, ymin: -1.4, ymax: 2.4 },
+          sliderValues: { N: 16 },
+          visibleFnIndices: [2, 3],
+          lines: [
+            ln("vertical", -1.0, "x = −1 (R = 1 wall)", "#fb7185", "dashed", true),
+            ln("vertical", 1.0, "x = +1 (R = 1 wall)", "#fb7185", "dashed", true),
+          ],
+        },
+        {
+          id: "taylor_log",
+          name: "ln(1 + x) on (−1, 1] (Animate N)",
+          squareAspect: false,
+          view: { xmin: -1.4, xmax: 2.2, ymin: -2.8, ymax: 1.8 },
+          sliderValues: { N: 1 },
+          visibleFnIndices: [4, 5],
+          startSlider: "N",
+          lines: [
+            ln("vertical", -1.0, "Asymptote x = −1", "#fb7185", "dashed", true),
+            ln("vertical", 1.0, "x = +1 (Alternating harmonic ln 2)", "#34d399", "dotted", true),
+          ],
+        },
+      ],
+    },
+    {
+      id: "real_fourier",
+      mode: "real",
+      folder: "cat_calculus",
+      category: "Calculus & Classroom Theorems",
+      title: "Fourier Series & Gibbs Phenomenon",
+      subtitle: "Synthesize square & sawtooth waves from K harmonics and zoom into the persistent ~9% Gibbs overshoot!",
+      description: "Synthesizes discontinuous square and sawtooth waves from K Fourier harmonics in native C11, revealing how pointwise convergence breaks at jumps and leaves a permanent ~8.95% Gibbs overshoot.",
+      fnCards: [
+        { title: "Exact Square Wave", code: "sin(x) >= 0.0 ? 1.0 : -1.0", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 5, kind: "exact" } },
+        { title: "Fourier Square Sum (K odd terms)", code: "double sum = 0.0;\nfor (int k = 1; k <= (int)K; k++) {\n    double n = 2.0 * k - 1.0;\n    sum += sin(n * x) / n;\n}\nreturn (4.0 / M_PI) * sum;", color: "#38bdf8", visible: true, builtin: { fn: 5, kind: "approx", paramName: "K" } },
+        { title: "Fourier Sawtooth Sum (K terms)", code: "double sum = 0.0;\nfor (int k = 1; k <= (int)K; k++) {\n    sum += ((k & 1) ? 1.0 : -1.0) * sin(k * x) / (double)k;\n}\nreturn (2.0 / M_PI) * sum;", color: "#a78bfa", visible: false },
+      ],
+      sliders: [{ name: "K", label: "Harmonics K", value: 11, min: 1, max: 80, step: 1, speed: 0.6 }],
+      defaultPoints: [],
+      defaultLines: [
+        ln("horizontal", 1.17898, "Gibbs Overshoot ≈ 1.179 (+9%)", "#fbbf24", "dotted", true),
+      ],
+      presets: [
+        { id: "full", name: "Square Wave [-2π, 2π]", view: { xmin: -6.5, xmax: 6.5, ymin: -1.5, ymax: 1.5 }, sliderValues: { K: 11 }, visibleFnIndices: [0, 1] },
+        { id: "gibbs", name: "▶ Sweep K: Zoom Gibbs Overshoot [0, π]", view: { xmin: -0.35, xmax: 3.5, ymin: -0.15, ymax: 1.38 }, sliderValues: { K: 1 }, visibleFnIndices: [0, 1], startSlider: "K" },
+        { id: "sawtooth", name: "Sawtooth Wave Harmonics", view: { xmin: -6.5, xmax: 6.5, ymin: -1.4, ymax: 1.4 }, sliderValues: { K: 16 }, visibleFnIndices: [2] },
+      ],
+    },
+
+    /* =====================================================================
+     * 2D REAL MODE — FOLDER 2: MEASURE THEORY & REAL ANALYSIS
+     * ===================================================================== */
+    {
+      id: "real_lebesgue_vs_riemann",
+      mode: "real",
+      folder: "cat_measure_analysis",
+      category: "Measure Theory & Real Analysis",
+      title: "Lebesgue Simple Functions & Fatou's Lemma",
+      subtitle: "Slice the CODOMAIN into 2ⁿ levels sₙ(x) = ⌊2ⁿ f(x)⌋/2ⁿ ↗ f(x) vs Riemann domain slicing + Fatou escaping bump!",
+      description: "Graduate real analysis & measure theory visualization: contrasts Lebesgue’s codomain slicing via monotone simple functions 0 ≤ s₁ ≤ s₂ ≤ … ↗ f(x) (Monotone Convergence Theorem) against Riemann’s domain partition, and demonstrates Fatou’s Lemma with an escaping spike fₘ = m·1_[1/m, 2/m] whose integral stays 1 even though lim fₘ(x) = 0 everywhere!",
+      fnCards: [
+        { title: "Measurable f(x) = 1.1 + 0.85·sin(1.4x)e^(−0.06x²)", code: "1.1 + 0.85*sin(1.4*x)*exp(-0.06*x*x)", color: "#f8fafc", lineWidth: 2.2, visible: true },
+        { title: "Lebesgue Simple sₙ(x) = ⌊2ⁿ f(x)⌋ / 2ⁿ (MCT ↗ f)", code: "double fx = 1.1 + 0.85*sin(1.4*x)*exp(-0.06*x*x);\ndouble sc = pow(2.0, floor(n + 0.5));\nreturn floor(fx * sc) / sc;", color: "#34d399", lineWidth: 2.4, step: true, visible: true },
+        { title: "Lebesgue Upper Slice ⌈2ⁿ f(x)⌉ / 2ⁿ", code: "double fx = 1.1 + 0.85*sin(1.4*x)*exp(-0.06*x*x);\ndouble sc = pow(2.0, floor(n + 0.5));\nreturn ceil(fx * sc) / sc;", color: "#38bdf8", lineWidth: 1.6, lineStyle: "dashed", step: true, visible: false },
+        { title: "Riemann Domain Partition (2^(n+1) x-bars)", code: "if (x < -4.0 || x > 4.0) return NAN;\ndouble bars = pow(2.0, floor(n + 0.5) + 1.0);\ndouble dx = 8.0 / bars;\ndouble xk = -4.0 + floor((x + 4.0) / dx) * dx;\nreturn 1.1 + 0.85*sin(1.4*xk)*exp(-0.06*xk*xk);", color: "#fbbf24", lineWidth: 1.8, step: true, visible: false },
+        { title: "Fatou Spike fₘ(x) = m·1_[1/m, 2/m]  (∫=1, lim=0)", code: "double m = pow(2.0, floor(n + 0.5));\nreturn (x >= 1.0/m && x <= 2.0/m) ? m : 0.0;", color: "#fb7185", lineWidth: 2.6, step: true, visible: false },
+      ],
+      sliders: [
+        { name: "n", label: "Dyadic Level n (2ⁿ)", value: 2, min: 0, max: 6, step: 1, speed: 0.4 },
+      ],
+      defaultLines: [
+        ln("horizontal", 0.5, "y = 1/2", "#34d399", "dotted", true),
+        ln("horizontal", 1.0, "y = 1", "#34d399", "dotted", true),
+        ln("horizontal", 1.5, "y = 3/2", "#34d399", "dotted", true),
+      ],
+      presets: [
+        {
+          id: "lebesgue_mct",
+          name: "Lebesgue Simple Functions sₙ ↗ f (MCT)",
+          squareAspect: false,
+          view: { xmin: -4.5, xmax: 4.5, ymin: -0.15, ymax: 2.25 },
+          sliderValues: { n: 2 },
+          visibleFnIndices: [0, 1, 2],
+        },
+        {
+          id: "lebesgue_vs_riemann",
+          name: "Compare: Lebesgue (Range) vs Riemann (Domain)",
+          squareAspect: false,
+          view: { xmin: -4.2, xmax: 4.2, ymin: -0.15, ymax: 2.25 },
+          sliderValues: { n: 1 },
+          visibleFnIndices: [0, 1, 3],
+        },
+        {
+          id: "lebesgue_animate",
+          name: "▶ Animate Monotone Convergence (n: 0 → 6)",
+          squareAspect: false,
+          view: { xmin: -4.5, xmax: 4.5, ymin: -0.15, ymax: 2.25 },
+          sliderValues: { n: 0 },
+          visibleFnIndices: [0, 1],
+          startSlider: "n",
+        },
+        {
+          id: "fatou_escaping_bump",
+          name: "▶ Fatou's Lemma: 0 = ∫lim fₙ < lim inf ∫fₙ = 1",
+          squareAspect: false,
+          view: { xmin: -0.15, xmax: 2.2, ymin: -0.3, ymax: 18.0 },
+          sliderValues: { n: 0 },
+          visibleFnIndices: [4],
+          startSlider: "n",
+          lines: [
+            ln("vertical", 0.0, "x = 0 (mass escapes to +∞!)", "#fb7185", "dashed", true),
+          ],
+        },
+      ],
+    },
+    {
+      id: "real_cantor_staircase",
+      mode: "real",
+      folder: "cat_measure_analysis",
+      category: "Measure Theory & Real Analysis",
+      title: "Cantor Function (Devil's Staircase) & Measure Zero",
+      subtitle: "Continuous & increasing with C'(x) = 0 almost everywhere, yet C(1) − C(0) = 1 ≠ ∫₀¹ C'(x) dx = 0!",
+      description: "Computes the exact ternary Cantor–Lebesgue function C_k(x) and the k-th middle-thirds Cantor set survival indicator (Lebesgue measure μ(C_k) = (2/3)^k → 0). Classic measure-theory counterexample of a continuous singular function that is NOT absolutely continuous.",
+      fnCards: [
+        {
+          title: "Cantor–Lebesgue Staircase C_k(x)",
+          code: "if (x <= 0.0) return 0.0;\nif (x >= 1.0) return 1.0;\nint depth = (int)floor(k + 0.5);\nif (depth < 1) depth = 1;\nif (depth > 24) depth = 24;\ndouble u = x, val = 0.0, w = 0.5;\nfor (int i = 0; i < depth; i++) {\n  u *= 3.0;\n  if (u < 1.0) {\n    w *= 0.5;\n  } else if (u < 2.0) {\n    return val + w;\n  } else {\n    val += w;\n    u -= 2.0;\n    w *= 0.5;\n  }\n}\nreturn val + w * u;",
+          color: "#38bdf8",
+          lineWidth: 2.6,
+          visible: true,
+        },
+        {
+          title: "Cantor Set C_k Support (μ = (2/3)^k → 0)",
+          code: "if (x < 0.0 || x > 1.0) return NAN;\nint depth = (int)floor(k + 0.5);\nif (depth > 9) depth = 9;\ndouble u = x;\nfor (int i = 0; i < depth; i++) {\n  u *= 3.0;\n  if (u >= 1.0 && u < 2.0) return 0.0;\n  if (u >= 2.0) u -= 2.0;\n}\nreturn 0.14;",
+          color: "#fb7185",
+          lineWidth: 2.0,
+          step: true,
+          visible: true,
+        },
+        { title: "Diagonal y = x (Comparison)", code: "(x >= 0.0 && x <= 1.0) ? x : NAN", color: "#64748b", lineWidth: 1.4, lineStyle: "dashed", visible: true },
+      ],
+      sliders: [
+        { name: "k", label: "Ternary Depth k", value: 7, min: 1, max: 14, step: 1, speed: 0.4 },
+      ],
+      defaultPoints: [
+        pt(0.5, 0.5, "Plateau [⅓, ⅔] → ½ (C'=0)", "diamond", "#fbbf24", 5, true),
+        pt(1.0, 1.0, "C(1) = 1", "dot", "#34d399", 5, true),
+      ],
+      defaultLines: [
+        ln("vertical", 0.333333, "x = 1/3", "#fbbf24", "dotted", true),
+        ln("vertical", 0.666667, "x = 2/3", "#fbbf24", "dotted", true),
+      ],
+      presets: [
+        {
+          id: "cantor_full",
+          name: "Devil's Staircase C(x) & Cantor Set C_k",
+          squareAspect: true,
+          view: { xmin: -0.1, xmax: 1.1, ymin: -0.08, ymax: 1.12 },
+          sliderValues: { k: 7 },
+          visibleFnIndices: [0, 1, 2],
+        },
+        {
+          id: "cantor_construct",
+          name: "▶ Watch Cantor Set Measure (2/3)^k → 0",
+          squareAspect: true,
+          view: { xmin: -0.08, xmax: 1.08, ymin: -0.08, ymax: 1.1 },
+          sliderValues: { k: 1 },
+          visibleFnIndices: [0, 1],
+          startSlider: "k",
+        },
+        {
+          id: "cantor_zoom_third",
+          name: "Self-Similar Zoom on [0, 1/3] × [0, 1/2]",
+          squareAspect: false,
+          view: { xmin: -0.02, xmax: 0.36, ymin: -0.04, ymax: 0.56 },
+          sliderValues: { k: 10 },
+          visibleFnIndices: [0, 1],
+        },
+      ],
+    },
+    {
+      id: "real_weierstrass_takagi",
+      mode: "real",
+      folder: "cat_measure_analysis",
+      category: "Measure Theory & Real Analysis",
+      title: "Nowhere-Differentiable Curves: Weierstrass & Takagi",
+      subtitle: "Continuous everywhere, differentiable nowhere — zoom in infinitely on both classical analysis monsters!",
+      description: "Consolidates the two most famous continuous-yet-nowhere-differentiable functions in real analysis: Weierstrass’s Σ aⁿ cos(bⁿ π x) and Takagi’s Blancmange dyadic triangle wave Σ 2⁻ⁿ dist(2ⁿ x, ℤ), with deep self-similar zoom presets and live depth animation.",
+      fnCards: [
+        {
+          title: "Weierstrass W(x) = Σ aⁿ cos(bⁿ π x)",
+          code: "double sum = 0.0, an = 1.0, bn = 1.0;\nint lim = (int)N;\nfor (int n = 0; n <= lim; n++) {\n    sum += an * cos(bn * M_PI * x);\n    an *= a;\n    bn *= b;\n}\nreturn sum;",
+          color: "#38bdf8",
+          visible: true,
+        },
+        {
+          title: "Takagi Blancmange T(x) = Σ 2⁻ⁿ dist(2ⁿx, ℤ)",
+          code: "double sum = 0.0, scale = 1.0;\nint lim = (int)N;\nfor (int n = 0; n <= lim; n++) {\n    double u = scale * x;\n    double frac = u - floor(u);\n    double tri = frac < 0.5 ? frac : (1.0 - frac);\n    sum += tri / scale;\n    scale *= 2.0;\n}\nreturn sum;",
+          color: "#34d399",
+          visible: false,
+        },
+      ],
+      sliders: [
+        { name: "a", label: "Weierstrass decay a", value: 0.5, min: 0.1, max: 0.9, step: 0.02, speed: 0.4 },
+        { name: "b", label: "Frequency jump b", value: 7, min: 3, max: 15, step: 2, speed: 0.4 },
+        { name: "N", label: "Series Depth N", value: 14, min: 0, max: 26, step: 1, speed: 0.5 },
+      ],
+      defaultPoints: [pt(0.0, 2.0, "W(0) = 1/(1−a)", "diamond", "#fbbf24", 5, true)],
+      presets: [
+        {
+          id: "weierstrass_classic",
+          name: "Weierstrass Classic (a=0.5, b=7)",
+          view: { xmin: -2.0, xmax: 2.0, ymin: -2.4, ymax: 2.4 },
+          sliderValues: { a: 0.5, b: 7, N: 14 },
+          visibleFnIndices: [0],
+        },
+        {
+          id: "weierstrass_deep",
+          name: "Weierstrass Self-Similar Zoom [0, 0.04]",
+          view: { xmin: -0.005, xmax: 0.04, ymin: 1.45, ymax: 2.05 },
+          sliderValues: { a: 0.5, b: 7, N: 22 },
+          visibleFnIndices: [0],
+        },
+        {
+          id: "takagi_arch",
+          name: "Takagi Blancmange Unit Arch [0, 1]",
+          view: { xmin: -0.08, xmax: 1.08, ymin: -0.08, ymax: 0.78 },
+          sliderValues: { N: 14 },
+          visibleFnIndices: [1],
+          points: [pt(0.5, 0.5, "T(½) = ½", "diamond", "#fbbf24", 5, true)],
+        },
+        {
+          id: "sweep_fractal",
+          name: "▶ Smooth → Nowhere-Diff. Sweep (N)",
+          view: { xmin: -1.5, xmax: 1.5, ymin: -2.3, ymax: 2.3 },
+          sliderValues: { a: 0.5, b: 7, N: 0 },
+          visibleFnIndices: [0],
+          startSlider: "N",
+        },
+      ],
+    },
+
+    /* =====================================================================
+     * 2D REAL MODE — FOLDER 3: NUMBER THEORY & PRIMES
      * ===================================================================== */
     {
       id: "real_pi_explicit",
       mode: "real",
-      category: "2D Real & Primes",
-      title: "Prime Counting π(x) — Explicit Formula",
-      subtitle: "Riemann's 1859 formula converging to the prime staircase as zeros increase",
+      folder: "cat_number_theory",
+      category: "Number Theory & Primes",
+      title: "Prime Counting π(x) — Riemann's Explicit Formula",
+      subtitle: "Exact prime staircase π(x), Li(x), and Riemann's 1859 explicit formula summed over up to 200 zeta zeros!",
       description: "Plots exact prime-counting π(x), logarithmic integral li(x), and Riemann’s 1859 explicit formula π_K(x) summed over up to 200 non-trivial zeta zeros in native C11.",
       showPrimes: true,
       fnCards: [
@@ -1993,75 +3412,23 @@
         { title: "Live K Zeros", code: "real_pi_explicit(x, (int)K)", color: "#fde047", visible: false, builtin: { fn: 0, kind: "approx", paramName: "K" } },
       ],
       sliders: [{ name: "K", label: "Non-trivial zeros", value: 25, min: 0, max: 200, step: 1 }],
-      defaultPoints: [
-        pt(29.0, 10.0, "π(29) = 10", "diamond", "#34d399", 5, true),
-      ],
-      defaultLines: [
-        ln("vertical", 29.0, "Prime p = 29", "#34d399", "dotted", true),
-      ],
+      defaultPoints: [pt(29.0, 10.0, "π(29) = 10", "diamond", "#34d399", 5, true)],
+      defaultLines: [ln("vertical", 29.0, "Prime p = 29", "#34d399", "dotted", true)],
       presets: [
-        {
-          id: "convergence_35",
-          name: "All Convergence Lines [2, 38]",
-          view: { xmin: 1.6, xmax: 38.0, ymin: -0.7, ymax: 14.0 },
-          visibleFnIndices: [0, 1, 2, 3, 4, 5],
-        },
-        {
-          id: "zoom_jumps",
-          name: "Zoom Prime Jumps [10, 35]",
-          view: { xmin: 9.5, xmax: 34.5, ymin: 3.2, ymax: 13.0 },
-          visibleFnIndices: [0, 1, 2, 3, 4, 5],
-        },
-        {
-          id: "wide_100",
-          name: "Wide View [2, 100]",
-          view: { xmin: 1.5, xmax: 102.0, ymin: -1.0, ymax: 32.0 },
-          visibleFnIndices: [0, 1, 3, 5],
-        },
-        {
-          id: "deep_200",
-          name: "Deep Primes [2, 200]",
-          view: { xmin: 1.5, xmax: 202.0, ymin: -2.0, ymax: 54.0 },
-          visibleFnIndices: [0, 1, 4, 5],
-        },
-        {
-          id: "animate_k",
-          name: "Sweep K: 0 → 200",
-          view: { xmin: 1.6, xmax: 42.0, ymin: -0.8, ymax: 15.5 },
-          visibleFnIndices: [0, 1, 6],
-          startSlider: "K",
-        },
-      ],
-    },
-    {
-      id: "real_J_explicit",
-      mode: "real",
-      category: "2D Real & Primes",
-      title: "Riemann Prime-Power J(x)",
-      subtitle: "Jumps by +1 at primes, +1/2 at p², +1/3 at p³",
-      description: "Compares Riemann’s prime-power counting function J(x) = Σ (1/n)π(x^(1/n)) against its explicit zero-sum formula J_K(x) as harmonic zero waves reconstruct every prime-power jump.",
-      showPrimes: true,
-      fnCards: [
-        { title: "Exact J(x)", code: "real_J_exact(x)", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 1, kind: "exact" } },
-        { title: "Li(x)", code: "real_li(x)", color: "#fbbf24", visible: true, lineStyle: "dashed", builtin: { fn: 1, kind: "baseline" } },
-        { title: "J(x) — 5 Zeros", code: "real_J_explicit(x, 5)", color: "#a78bfa", visible: true, builtin: { fn: 1, kind: "approx", k: 5 } },
-        { title: "J(x) — 25 Zeros", code: "real_J_explicit(x, 25)", color: "#38bdf8", visible: true, builtin: { fn: 1, kind: "approx", k: 25 } },
-        { title: "J(x) — K Zeros", code: "real_J_explicit(x, (int)K)", color: "#34d399", visible: true, builtin: { fn: 1, kind: "approx", paramName: "K" } },
-      ],
-      sliders: [{ name: "K", label: "Zeta zeros", value: 120, min: 0, max: 200, step: 1 }],
-      defaultPoints: [pt(4.0, 2.5, "p² = 4 (+½ jump)", "diamond", "#fbbf24", 5, true)],
-      presets: [
-        { id: "default", name: "Convergence [2, 40]", view: { xmin: 1.6, xmax: 40.0, ymin: -0.7, ymax: 16.5 } },
-        { id: "wide", name: "Wide [2, 100]", view: { xmin: 1.5, xmax: 102.0, ymin: -1.5, ymax: 36.0 } },
+        { id: "convergence_35", name: "All Convergence Lines [2, 38]", view: { xmin: 1.6, xmax: 38.0, ymin: -0.7, ymax: 14.0 }, visibleFnIndices: [0, 1, 2, 3, 4, 5] },
+        { id: "zoom_jumps", name: "Zoom Prime Jumps [10, 35]", view: { xmin: 9.5, xmax: 34.5, ymin: 3.2, ymax: 13.0 }, visibleFnIndices: [0, 1, 2, 3, 4, 5] },
+        { id: "wide_100", name: "Wide View [2, 100]", view: { xmin: 1.5, xmax: 102.0, ymin: -1.0, ymax: 32.0 }, visibleFnIndices: [0, 1, 3, 5] },
+        { id: "animate_k", name: "▶ Sweep K: 0 → 200 Zeros", view: { xmin: 1.6, xmax: 42.0, ymin: -0.8, ymax: 15.5 }, visibleFnIndices: [0, 1, 6], startSlider: "K" },
       ],
     },
     {
       id: "real_psi_explicit",
       mode: "real",
-      category: "2D Real & Primes",
-      title: "Chebyshev ψ(x) — Von Mangoldt",
-      subtitle: "ψ(x) = x − Σ x^ρ/ρ − ln(2π) − ½ln(1 − x⁻²)",
-      description: "Visualizes Chebyshev’s second function ψ(x) = Σ_{p^k ≤ x} ln(p) alongside von Mangoldt’s explicit formula, showing how the zeta zeros carve sharp logarithmic steps out of the line y = x.",
+      folder: "cat_number_theory",
+      category: "Number Theory & Primes",
+      title: "Chebyshev ψ(x) — Von Mangoldt Formula",
+      subtitle: "ψ(x) = x − Σ x^ρ/ρ − ln(2π) − ½ln(1 − x⁻²) — watch zeta waves carve prime-power jumps out of y = x!",
+      description: "Visualizes Chebyshev’s second function ψ(x) = Σ_{p^k ≤ x} ln(p) alongside von Mangoldt’s explicit formula, showing how the zeta zeros carve sharp logarithmic steps out of the main term y = x.",
       showPrimes: true,
       fnCards: [
         { title: "Exact ψ(x)", code: "real_psi_exact(x)", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 2, kind: "exact" } },
@@ -2079,9 +3446,10 @@
     {
       id: "real_hardy_z",
       mode: "real",
-      category: "2D Real & Primes",
+      folder: "cat_number_theory",
+      category: "Number Theory & Primes",
       title: "Hardy's Z(t) — Critical Line Signal",
-      subtitle: "Every zero crossing is a non-trivial Riemann zero γₖ!",
+      subtitle: "Every zero crossing is an exact non-trivial Riemann zero γₖ on Re(s) = 1/2!",
       description: "Graphs Hardy’s real-valued critical-line function Z(t) = e^(iθ(t))ζ(1/2 + it), whose real sign changes occur at the exact imaginary heights γ_k of the non-trivial Riemann zeros.",
       showZeros: true,
       fnCards: [
@@ -2093,336 +3461,622 @@
         pt(21.02204, 0.0, "γ₂ = 21.022", "ring", "#fbbf24", 5, true),
         pt(25.010858, 0.0, "γ₃ = 25.011", "ring", "#fbbf24", 5, true),
       ],
-      defaultLines: [
-        ln("vertical", 14.134725, "γ₁ = 14.135", "#fbbf24", "dashed", true),
-      ],
+      defaultLines: [ln("vertical", 14.134725, "γ₁ = 14.135", "#fbbf24", "dashed", true)],
       presets: [
         { id: "first_12", name: "First 12 Zeros [0, 62]", view: { xmin: 0.0, xmax: 62.0, ymin: -3.8, ymax: 4.2 } },
         { id: "close_zeros", name: "Close Zeros [100, 145]", view: { xmin: 100.0, xmax: 145.0, ymin: -5.5, ymax: 5.5 } },
       ],
     },
+
+    /* =====================================================================
+     * REAL MODE — FOLDER 4: CURVES, EPICYCLES & AUTOMATA
+     * ===================================================================== */
     {
-      id: "real_xi",
+      id: "real_magnum_opus",
       mode: "real",
-      category: "2D Real & Primes",
-      title: "Completed Zeta ξ(x) on ℝ",
-      subtitle: "Perfect reflection symmetry ξ(x) = ξ(1 − x)",
-      description: "Plots the real slice of completed zeta ξ(x) along the real axis and inside the critical strip [0, 1], visually confirming its mirror symmetry around x = 1/2.",
+      folder: "cat_curves_art",
+      category: "Curves, Epicycles & Automata",
+      title: "★ Magnum Opus: Chaos, Chladni Acoustics & Quantum Waves",
+      subtitle: "3D Lorenz RK4 Strange Attractor (Butterfly Effect), Acoustic Chladni Nodal Plates, Quantum Wavepacket & Van der Pol Limit Cycle!",
+      description: "Full-capacity showcase of the C11 Real Studio: live 4-thread RK4 integration of the 3D Lorenz chaotic butterfly with a perturbed twin proving sensitive dependence on initial conditions, 4-thread Marching Squares Chladni acoustic plate nodal patterns, a live propagating quantum de Broglie wavepacket, and Van der Pol's nonlinear relaxation limit cycle.",
       fnCards: [
-        { title: "Completed Zeta ξ(x)", code: "creal(c_xi(c_make(x, 0.0)))", color: "#a78bfa", visible: true, builtin: { fn: 4, kind: "exact" } },
-      ],
-      sliders: [],
-      defaultPoints: [
-        pt(0.0, 0.5, "ξ(0) = ½", "dot", "#38bdf8", 5, true),
-        pt(0.5, 0.49712, "Min at x = ½", "diamond", "#fbbf24", 5, true),
-        pt(1.0, 0.5, "ξ(1) = ½", "dot", "#38bdf8", 5, true),
-      ],
-      presets: [
-        { id: "symmetry", name: "Symmetry [-4, 5]", view: { xmin: -4.0, xmax: 5.0, ymin: 0.0, ymax: 4.5 } },
-        { id: "strip_zoom", name: "Critical Strip Zoom [-0.5, 1.5]", view: { xmin: -0.5, xmax: 1.5, ymin: 0.48, ymax: 0.56 } },
-      ],
-    },
-    {
-      id: "real_fourier",
-      mode: "real",
-      category: "2D Real & Primes",
-      title: "Fourier Square Wave (Gibbs Phenomenon)",
-      subtitle: "Inline C loop with live harmonic slider K",
-      description: "Synthesizes a square wave from N odd Fourier harmonics with a live slider, revealing Gibbs phenomenon overshoot near every jump discontinuity.",
-      fnCards: [
-        { title: "Exact Square Wave", code: "sin(x) >= 0.0 ? 1.0 : -1.0", color: "#f8fafc", visible: true, step: true, locked: true, builtin: { fn: 5, kind: "exact" } },
         {
-          title: "Fourier Sum (K terms)",
-          code: "double sum = 0.0;\nfor (int k = 1; k <= (int)K; k++) {\n    double n = 2.0 * k - 1.0;\n    sum += sin(n * x) / n;\n}\nreturn (4.0 / M_PI) * sum;",
+          title: "3D Lorenz Strange Attractor (C11 RK4)",
+          code: "parametric [0, 24]:\nstatic _Thread_local double cx[1025], cy[1025], cz[1025], c_rho = -1.0;\nif (c_rho != rho) {\n  c_rho = rho;\n  double lx = 1.0, ly = 1.0, lz = 1.0, sig = 10.0, bet = 8.0 / 3.0, h = 24.0 / 2048.0;\n  cx[0] = lx; cy[0] = ly; cz[0] = lz;\n  for (int i = 1; i <= 1024; i++) {\n    for (int s = 0; s < 2; s++) {\n      double k1x = sig*(ly - lx), k1y = lx*(rho - lz) - ly, k1z = lx*ly - bet*lz;\n      double x2 = lx + 0.5*h*k1x, y2 = ly + 0.5*h*k1y, z2 = lz + 0.5*h*k1z;\n      double k2x = sig*(y2 - x2), k2y = x2*(rho - z2) - y2, k2z = x2*y2 - bet*z2;\n      double x3 = lx + 0.5*h*k2x, y3 = ly + 0.5*h*k2y, z3 = lz + 0.5*h*k2z;\n      double k3x = sig*(y3 - x3), k3y = x3*(rho - z3) - y3, k3z = x3*y3 - bet*z3;\n      double x4 = lx + h*k3x, y4 = ly + h*k3y, z4 = lz + h*k3z;\n      double k4x = sig*(y4 - x4), k4y = x4*(rho - z4) - y4, k4z = x4*y4 - bet*z4;\n      lx += (h/6.0)*(k1x + 2.0*k2x + 2.0*k3x + k4x);\n      ly += (h/6.0)*(k1y + 2.0*k2y + 2.0*k3y + k4y);\n      lz += (h/6.0)*(k1z + 2.0*k2z + 2.0*k3z + k4z);\n    }\n    cx[i] = lx; cy[i] = ly; cz[i] = lz;\n  }\n}\ndouble u = fmax(0.0, fmin(1024.0, (t / 24.0) * 1024.0));\nint i0 = (int)u; if (i0 >= 1024) i0 = 1023;\ndouble f = u - (double)i0;\ndouble lx = cx[i0] + f*(cx[i0+1] - cx[i0]);\ndouble ly = cy[i0] + f*(cy[i0+1] - cy[i0]);\ndouble lz = cz[i0] + f*(cz[i0+1] - cz[i0]);\npx = lx * cos(yaw) - ly * sin(yaw);\npy = lz - (rho - 1.0) * 0.88;",
           color: "#38bdf8",
+          lineWidth: 2.0,
           visible: true,
-          builtin: { fn: 5, kind: "approx", paramName: "K" },
+        },
+        {
+          title: "Butterfly Twin (x₀ + 0.002 → Chaos Divergence!)",
+          code: "parametric [0, 24]:\nstatic _Thread_local double cx[1025], cy[1025], cz[1025], c_rho = -1.0;\nif (c_rho != rho) {\n  c_rho = rho;\n  double lx = 1.002, ly = 1.0, lz = 1.0, sig = 10.0, bet = 8.0 / 3.0, h = 24.0 / 2048.0;\n  cx[0] = lx; cy[0] = ly; cz[0] = lz;\n  for (int i = 1; i <= 1024; i++) {\n    for (int s = 0; s < 2; s++) {\n      double k1x = sig*(ly - lx), k1y = lx*(rho - lz) - ly, k1z = lx*ly - bet*lz;\n      double x2 = lx + 0.5*h*k1x, y2 = ly + 0.5*h*k1y, z2 = lz + 0.5*h*k1z;\n      double k2x = sig*(y2 - x2), k2y = x2*(rho - z2) - y2, k2z = x2*y2 - bet*z2;\n      double x3 = lx + 0.5*h*k2x, y3 = ly + 0.5*h*k2y, z3 = lz + 0.5*h*k2z;\n      double k3x = sig*(y3 - x3), k3y = x3*(rho - z3) - y3, k3z = x3*y3 - bet*z3;\n      double x4 = lx + h*k3x, y4 = ly + h*k3y, z4 = lz + h*k3z;\n      double k4x = sig*(y4 - x4), k4y = x4*(rho - z4) - y4, k4z = x4*y4 - bet*z4;\n      lx += (h/6.0)*(k1x + 2.0*k2x + 2.0*k3x + k4x);\n      ly += (h/6.0)*(k1y + 2.0*k2y + 2.0*k3y + k4y);\n      lz += (h/6.0)*(k1z + 2.0*k2z + 2.0*k3z + k4z);\n    }\n    cx[i] = lx; cy[i] = ly; cz[i] = lz;\n  }\n}\ndouble u = fmax(0.0, fmin(1024.0, (t / 24.0) * 1024.0));\nint i0 = (int)u; if (i0 >= 1024) i0 = 1023;\ndouble f = u - (double)i0;\ndouble lx = cx[i0] + f*(cx[i0+1] - cx[i0]);\ndouble ly = cy[i0] + f*(cy[i0+1] - cy[i0]);\ndouble lz = cz[i0] + f*(cz[i0+1] - cz[i0]);\npx = lx * cos(yaw) - ly * sin(yaw);\npy = lz - (rho - 1.0) * 0.88;",
+          color: "#fb7185",
+          lineWidth: 1.7,
+          lineStyle: "dashed",
+          visible: true,
+        },
+        {
+          title: "Acoustic Chladni Nodal Plate (Marching Squares)",
+          code: "cos(n * M_PI * x) * cos(m * M_PI * y) = cos(m * M_PI * x) * cos(n * M_PI * y)",
+          color: "#fbbf24",
+          lineWidth: 2.3,
+          visible: false,
+        },
+        {
+          title: "Quantum Wavepacket Re ψ(x, t)",
+          code: "double u = x - 1.45 * phase;\ndouble env = exp(-0.34 * u * u);\nreturn 2.3 * env * cos(5.8 * x - 9.2 * phase);",
+          color: "#38bdf8",
+          lineWidth: 2.4,
+          visible: false,
+        },
+        {
+          title: "Probability Density Envelope +|ψ(x, t)|",
+          code: "double u = x - 1.45 * phase;\nreturn 2.3 * exp(-0.34 * u * u);",
+          color: "#a78bfa",
+          lineWidth: 2.0,
+          lineStyle: "dashed",
+          visible: false,
+        },
+        {
+          title: "Van der Pol Nonlinear Limit Cycle (C11 RK4)",
+          code: "parametric [0, 26]:\nstatic _Thread_local double cu[1025], cv[1025], c_mu = -99.0;\nif (c_mu != mu) {\n  c_mu = mu;\n  double u = 0.25, v = 0.0, dt = 26.0 / 2048.0;\n  cu[0] = u; cv[0] = v;\n  for (int i = 1; i <= 1024; i++) {\n    for (int s = 0; s < 2; s++) {\n      double k1u = v, k1v = mu*(1.0 - u*u)*v - u;\n      double u2 = u + 0.5*dt*k1u, v2 = v + 0.5*dt*k1v;\n      double k2u = v2, k2v = mu*(1.0 - u2*u2)*v2 - u2;\n      double u3 = u + 0.5*dt*k2u, v3 = v + 0.5*dt*k2v;\n      double k3u = v3, k3v = mu*(1.0 - u3*u3)*v3 - u3;\n      double u4 = u + dt*k3u, v4 = v + dt*k3v;\n      double k4u = v4, k4v = mu*(1.0 - u4*u4)*v4 - u4;\n      u += (dt/6.0)*(k1u + 2.0*k2u + 2.0*k3u + k4u);\n      v += (dt/6.0)*(k1v + 2.0*k2v + 2.0*k3v + k4v);\n    }\n    cu[i] = u; cv[i] = v;\n  }\n}\ndouble p = fmax(0.0, fmin(1024.0, (t / 26.0) * 1024.0));\nint i0 = (int)p; if (i0 >= 1024) i0 = 1023;\ndouble f = p - (double)i0;\npx = cu[i0] + f*(cu[i0+1] - cu[i0]);\npy = cv[i0] + f*(cv[i0+1] - cv[i0]);",
+          color: "#34d399",
+          lineWidth: 2.4,
+          visible: false,
         },
       ],
-      sliders: [{ name: "K", label: "Harmonics", value: 9, min: 1, max: 80, step: 1 }],
-      defaultPoints: [],
+      sliders: [
+        { name: "yaw", label: "3D Lorenz Yaw", value: 0.45, min: 0.0, max: 6.2832, step: 0.03, speed: 0.45 },
+        { name: "rho", label: "Rayleigh ρ", value: 28.0, min: 14.0, max: 36.0, step: 0.5, speed: 0.4 },
+        { name: "n", label: "Chladni Mode n", value: 3, min: 1, max: 8, step: 1, speed: 0.5 },
+        { name: "m", label: "Chladni Mode m", value: 5, min: 1, max: 8, step: 1, speed: 0.5 },
+        { name: "phase", label: "Wave Time t", value: 0.0, min: -4.0, max: 4.0, step: 0.04, speed: 0.55 },
+        { name: "mu", label: "Van der Pol μ", value: 1.8, min: 0.0, max: 3.5, step: 0.05, speed: 0.45 },
+      ],
+      defaultPoints: [
+        { ...pt(2.8, 3.2, "Equilibrium C₊", "star", "#fbbf24", 5.5, true), xExpr: "sqrt(2.6667*(rho - 1)) * (cos(yaw) - sin(yaw))", yExpr: "(rho - 1) * 0.12" },
+        { ...pt(-2.8, 3.2, "Equilibrium C₋", "star", "#34d399", 5.5, true), xExpr: "-sqrt(2.6667*(rho - 1)) * (cos(yaw) - sin(yaw))", yExpr: "(rho - 1) * 0.12" },
+      ],
+      defaultLines: [],
       presets: [
-        { id: "full", name: "Full View [-2π, 2π]", view: { xmin: -6.5, xmax: 6.5, ymin: -1.6, ymax: 1.6 } },
-        { id: "gibbs", name: "Zoom Gibbs Overshoot [0, π]", view: { xmin: -0.4, xmax: 3.5, ymin: -0.2, ymax: 1.4 } },
+        {
+          id: "opus_lorenz_chaos",
+          name: "★ 3D Lorenz Strange Attractor (Butterfly Effect)",
+          squareAspect: false,
+          view: { xmin: -26.0, xmax: 26.0, ymin: -24.0, ymax: 26.0 },
+          sliderValues: { yaw: 0.45, rho: 28.0, n: 3, m: 5, phase: 0.0, mu: 1.8 },
+          visibleFnIndices: [0, 1],
+          startSlider: "yaw",
+          texts: [
+            {
+              kind: "text", title: "★ 3D Lorenz Strange Attractor (C11 RK4)",
+              text: "Cyan & dashed red curves start just $\\Delta x_0 = 0.002$ apart — they shadow each other until chaos rips them onto opposite butterfly wings!\n• Scrub $\\text{yaw}$ to rotate in 3D, or Rayleigh $\\rho$ to tune chaotic convection. Drag or resize this card freely!",
+              color: "#38bdf8", anchor: "bottom-left", width: 345, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "opus_chladni_plate",
+          name: "Acoustic Chladni Nodal Plate (Modes n, m)",
+          squareAspect: true,
+          view: { xmin: -1.12, xmax: 1.12, ymin: -1.12, ymax: 1.12 },
+          sliderValues: { yaw: 0.45, rho: 28.0, n: 3, m: 5, phase: 0.0, mu: 1.8 },
+          visibleFnIndices: [2],
+          points: [],
+          shapes: [
+            { kind: "rect", label: "Vibrating Square Plate [−1, 1]²", color: "#94a3b8", lineWidth: 1.6, opacity: 0.06, closed: true, locked: true, rawPts: rectPts(-1, -1, 1, 1) },
+          ],
+          texts: [
+            {
+              kind: "text", title: "Chladni Acoustic Resonance Plate",
+              text: "4-thread Marching Squares traces the nodal lines $\\cos(n\\pi x)\\cos(m\\pi y) = \\cos(m\\pi x)\\cos(n\\pi y)$ where sand settles on a vibrating metal plate.\n• Scrub integer modes $n$ and $m$ (try $2\\&5$, $3\\&7$, or $4\\&6$)!",
+              color: "#fbbf24", anchor: "bottom-left", width: 335, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "opus_quantum_packet",
+          name: "▶ Quantum Wavepacket & Probability Envelope",
+          squareAspect: false,
+          view: { xmin: -7.5, xmax: 7.5, ymin: -3.2, ymax: 3.4 },
+          sliderValues: { yaw: 0.45, rho: 28.0, n: 3, m: 5, phase: -2.2, mu: 1.8 },
+          visibleFnIndices: [3, 4],
+          startSlider: "phase",
+          points: [
+            { ...pt(-3.19, 2.3, "Wavepacket Crest (v_g)", "star", "#fbbf24", 5.5, true), xExpr: "1.45 * phase", yExpr: "2.3" },
+          ],
+          lines: [
+            { ...ln("vertical", -3.19, "Group center x = v_g·t", "#a78bfa", "dotted", true), valExpr: "1.45 * phase" },
+          ],
+          texts: [
+            {
+              kind: "text", title: "Quantum De Broglie Wavepacket",
+              text: "Carrier phase waves $\\Re\\psi(x,t)$ race faster than the dashed Gaussian probability envelope $|\\psi(x, t)|$ — notice the locked Wavepacket Crest & guide line tracking group velocity $v_g$ live!",
+              color: "#a78bfa", anchor: "bottom-left", width: 335, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "opus_vanderpol_cycle",
+          name: "Van der Pol Nonlinear Limit Cycle (Scrub μ)",
+          squareAspect: true,
+          view: { xmin: -4.2, xmax: 4.2, ymin: -5.2, ymax: 5.2 },
+          sliderValues: { yaw: 0.45, rho: 28.0, n: 3, m: 5, phase: 0.0, mu: 1.8 },
+          visibleFnIndices: [5],
+          points: [pt(0.0, 0.0, "Unstable Origin (0, 0)", "cross", "#fb7185", 5.5, true)],
+          texts: [
+            {
+              kind: "text", title: "Van der Pol Nonlinear Oscillator",
+              text: "Phase portrait $(u, u')$ of $u'' - \\mu(1 - u^2)u' + u = 0$ integrated live in C11 RK4.\n• Scrub $\\mu$ from $0$ (harmonic circle) up to $3.5$ to watch the sharp relaxation limit cycle emerge!",
+              color: "#34d399", anchor: "bottom-left", width: 335, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
       ],
     },
     {
-      id: "real_relations",
+      id: "real_camera_tracker",
       mode: "real",
-      category: "2D Real & Primes",
-      title: "Vertical Lines & Implicit Relations",
-      subtitle: "Non-functions in 2D Real: x = c, x = g(y), and F(x, y) = 0",
-      description: "Showcases 2D Real non-function capabilities simultaneously: implicit relations F(x,y)=0 (circles, elliptic curves), vertical lines x=c, and inverted curves x=g(y).",
+      folder: "cat_curves_art",
+      category: "Curves, Epicycles & Automata",
+      title: "Dynamic Camera Follow — Orbital Chase & Viewport Lock",
+      subtitle: "Live viewport bounds (real_xmin/xmax/ymin/ymax) dynamically locked onto a moving orbital spacecraft!",
+      description: "Demonstrates dynamic viewport camera tracking in Real mode: the computed variables real_xmin, real_xmax, real_ymin, and real_ymax are bound directly to the moving craft's coordinates (px, py) so the entire camera smoothly chases the craft along a multi-harmonic epicycle trajectory at 60 FPS!",
       fnCards: [
-        { title: "Circle x² + y² = r²", code: "x*x + y*y = r*r", color: "#38bdf8", visible: true },
-        { title: "Right Vertical Tangent", code: "x = r", color: "#fb7185", visible: true, lineStyle: "dashed" },
-        { title: "Left Vertical Tangent", code: "x = -r", color: "#fb7185", visible: true, lineStyle: "dashed" },
-        { title: "Inverted Wave x = sin(y)", code: "x = sin(y) * 1.5", color: "#a78bfa", visible: true },
-        { title: "Elliptic y² = x³ − 3x + 3", code: "y*y = x*x*x - 3.0*x + 3.0", color: "#34d399", visible: false },
+        {
+          title: "Orbital Epicycle Path (x(t), y(t))",
+          code: "parametric [0, 6.283185]:\npx = 4.6 * cos(t) + 1.55 * cos(3.0 * t);\npy = 3.8 * sin(t) - 1.35 * sin(2.0 * t);",
+          color: "#38bdf8",
+          lineWidth: 2.3,
+          visible: true,
+        },
+        {
+          title: "Inner Gravity Harmonic (x(t), y(t))",
+          code: "parametric [0, 6.283185]:\npx = 2.4 * cos(t) + 0.65 * cos(5.0 * t);\npy = 2.4 * sin(t) + 0.65 * sin(5.0 * t);",
+          color: "#a78bfa",
+          lineWidth: 1.6,
+          lineStyle: "dashed",
+          visible: true,
+        },
       ],
-      sliders: [{ name: "r", label: "Radius", value: 4.0, min: 0.5, max: 7.5, step: 0.1 }],
+      sliders: [
+        { name: "t_cam", label: "Mission Time t", value: 0.45, min: 0.0, max: 6.2832, step: 0.015, speed: 0.42 },
+        { name: "cam_r", label: "Camera Zoom Radius", value: 2.4, min: 0.85, max: 7.5, step: 0.05, speed: 0.4 },
+        { name: "follow", label: "Camera Lock (1=Follow, 0=Fixed)", value: 1.0, min: 0.0, max: 1.0, step: 1.0, speed: 0.2 },
+      ],
+      vars: [
+        { name: "craft_x", label: "Craft X position", expr: "4.6 * cos(t_cam) + 1.55 * cos(3.0 * t_cam)" },
+        { name: "craft_y", label: "Craft Y position", expr: "3.8 * sin(t_cam) - 1.35 * sin(2.0 * t_cam)" },
+        { name: "real_xmin", label: "Dynamic camera left bound", expr: "follow * craft_x - cam_r" },
+        { name: "real_xmax", label: "Dynamic camera right bound", expr: "follow * craft_x + cam_r" },
+        { name: "real_ymin", label: "Dynamic camera bottom bound", expr: "follow * craft_y - cam_r * 0.72" },
+        { name: "real_ymax", label: "Dynamic camera top bound", expr: "follow * craft_y + cam_r * 0.72" },
+      ],
+      defaultShapes: [
+        { kind: "circle", label: "Outer Reference Ring (r = 6.2)", color: "#34d399", lineWidth: 1.3, opacity: 0.0, lineStyle: "dotted", closed: true, locked: true, rawPts: circlePts(0, 0, 6.2, 128) },
+        { kind: "circle", label: "Central Star Core", color: "#fbbf24", lineWidth: 1.4, opacity: 0.92, closed: true, locked: true, rawPts: circlePts(0, 0, 0.52, 48) },
+        { kind: "circle", label: "Beacon Alpha", color: "#34d399", lineWidth: 1.2, opacity: 0.85, closed: true, locked: true, rawPts: circlePts(3.2, 2.1, 0.26, 32) },
+        { kind: "circle", label: "Beacon Beta", color: "#fb7185", lineWidth: 1.2, opacity: 0.85, closed: true, locked: true, rawPts: circlePts(-3.4, -1.8, 0.28, 32) },
+        { kind: "circle", label: "Beacon Gamma", color: "#a78bfa", lineWidth: 1.2, opacity: 0.85, closed: true, locked: true, rawPts: circlePts(-2.2, 3.0, 0.24, 32) },
+      ],
       defaultPoints: [
-        pt(4.0, 0.0, "(4, 0)", "diamond", "#34d399", 5, false),
-        pt(-4.0, 0.0, "(−4, 0)", "diamond", "#34d399", 5, false),
+        { ...pt(4.5, 0.6, "Orbital Craft", "star", "#fbbf24", 6.5, true), xExpr: "craft_x", yExpr: "craft_y" },
+        pt(0.0, 0.0, "Origin Star", "diamond", "#fde047", 4.8, true),
       ],
       defaultLines: [
-        ln("horizontal", 0.0, "Symmetry y = 0", "#fbbf24", "dotted", true),
+        { ...ln("vertical", 4.5, "x = craft_x", "#fbbf24", "dotted", true), valExpr: "craft_x" },
+        { ...ln("horizontal", 0.6, "y = craft_y", "#fbbf24", "dotted", true), valExpr: "craft_y" },
       ],
       presets: [
         {
-          id: "circle_tangents",
-          name: "Circle & Vertical Tangents",
-          view: { xmin: -8.0, xmax: 8.0, ymin: -6.0, ymax: 6.0 },
-          visibleFnIndices: [0, 1, 2, 3],
+          id: "cam_chase_lock",
+          name: "▶ Camera Follow: Orbital Craft Chase Lock",
+          coordSystem: "cartesian",
+          squareAspect: true,
+          view: { xmin: 2.1, xmax: 6.9, ymin: -1.1, ymax: 2.3 },
+          sliderValues: { t_cam: 0.45, cam_r: 2.35, follow: 1.0 },
+          startSlider: "t_cam",
+          texts: [
+            {
+              kind: "text", title: "▶ Viewport Fixed to a Moving Object",
+              text: "Dynamic bounds $\\text{real\\_xmin} = x_c - r$, $\\text{real\\_ymax} = y_c + 0.72r$ track the orbital craft $(x_c, y_c)$ live!\n• Scrub Camera Zoom Radius $r$ to zoom in/out while chasing the golden star!",
+              color: "#fbbf24", anchor: "bottom-left", width: 345, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
         },
         {
-          id: "elliptic",
-          name: "Elliptic Curve y² = x³ − 3x + 3",
-          view: { xmin: -3.5, xmax: 5.5, ymin: -6.0, ymax: 6.0 },
-          visibleFnIndices: [4],
+          id: "cam_polar_overview",
+          name: "Wide Orbital Overview (Polar Coordinate Grid)",
+          coordSystem: "polar",
+          squareAspect: true,
+          view: { xmin: -7.2, xmax: 7.2, ymin: -5.4, ymax: 5.4 },
+          sliderValues: { t_cam: 0.45, cam_r: 7.2, follow: 0.0 },
+          startSlider: "t_cam",
+          texts: [
+            {
+              kind: "text", title: "Wide Polar Overview ($\\text{follow} = 0$)",
+              text: "With $\\text{follow} = 0$ and Polar Grid active, the camera zooms out to reveal the full epicycle $(4.6\\cos t + 1.55\\cos 3t,\\; 3.8\\sin t - 1.35\\sin 2t)$ while the craft flies around it!",
+              color: "#38bdf8", anchor: "bottom-left", width: 345, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
         },
       ],
     },
+
+    /* =====================================================================
+     * REAL MODE — FOLDER: PHYSICS SIMULATIONS (NATIVE C11 RK4 ENGINE)
+     * ===================================================================== */
     {
-      id: "real_weierstrass",
+      id: "real_double_pendulum",
       mode: "real",
-      category: "2D Real & Fractals",
-      title: "Weierstrass Fractal W(x)",
-      subtitle: "Continuous everywhere, differentiable nowhere: Σ aⁿ cos(bⁿ π x) — zoom in forever!",
-      description: "Graphs the continuous, nowhere-differentiable Weierstrass fractal function Σ a^k cos(b^k π x) with deep zoom presets and harmonic depth slider.",
+      folder: "cat_physics",
+      category: "Physics Simulations",
+      title: "Double Pendulum Chaos (C11 RK4 Simulator)",
+      subtitle: "Exact nonlinear Lagrangian double pendulum with live animated hinged rods, glowing bob trail & Butterfly-Effect twin!",
+      description: "Integrates the exact coupled nonlinear Euler–Lagrange equations of a double pendulum via 4th-order Runge–Kutta (RK4) in native C11! Watch the articulated rods swing in real time, leave glowing chaotic trails, compare a twin pendulum starting just 0.01 rad apart, or inspect the (θ₁, θ₂) configuration torus.",
       fnCards: [
         {
-          title: "Weierstrass W(x)",
-          code: "double sum = 0.0, an = 1.0, bn = 1.0;\nint lim = (int)N;\nfor (int n = 0; n <= lim; n++) {\n    sum += an * cos(bn * M_PI * x);\n    an *= a;\n    bn *= b;\n}\nreturn sum;",
+          title: "Pendulum A: Chaotic Bob-2 Trail (C11 RK4)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double cx[513], cy[513], c_t = -1.0, c_a1 = -99.0, c_a2 = -99.0, c_m2 = -99.0, c_g = -99.0;\ndouble Tmax = fmax(0.05, sim_t);\nif (c_t != Tmax || c_a1 != th1 || c_a2 != th2 || c_m2 != m2 || c_g != grav) {\n  c_t = Tmax; c_a1 = th1; c_a2 = th2; c_m2 = m2; c_g = grav;\n  double a1 = th1, a2 = th2, w1 = 0.0, w2 = 0.0, m1 = 1.0, mm2 = m2, L1 = 1.4, L2 = 1.4, G = grav;\n  int sub = (int)ceil((Tmax / 512.0) / 0.015); if (sub < 1) sub = 1; if (sub > 4) sub = 4;\n  double dt = Tmax / (512.0 * (double)sub);\n  cx[0] = L1*sin(a1) + L2*sin(a2); cy[0] = -L1*cos(a1) - L2*cos(a2);\n  for (int i = 1; i <= 512; i++) {\n    for (int s = 0; s < sub; s++) {\n      double d=a1-a2, sn=sin(d), cs=cos(d), den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k1w1=(-G*(2.0*m1+mm2)*sin(a1)-mm2*G*sin(a1-2.0*a2)-2.0*sn*mm2*(w2*w2*L2+w1*w1*L1*cs))/(L1*den);\n      double k1w2=(2.0*sn*(w1*w1*L1*(m1+mm2)+G*(m1+mm2)*cos(a1)+w2*w2*L2*mm2*cs))/(L2*den);\n      double a1m=a1+0.5*dt*w1, a2m=a2+0.5*dt*w2, w1m=w1+0.5*dt*k1w1, w2m=w2+0.5*dt*k1w2;\n      d=a1m-a2m; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k2w1=(-G*(2.0*m1+mm2)*sin(a1m)-mm2*G*sin(a1m-2.0*a2m)-2.0*sn*mm2*(w2m*w2m*L2+w1m*w1m*L1*cs))/(L1*den);\n      double k2w2=(2.0*sn*(w1m*w1m*L1*(m1+mm2)+G*(m1+mm2)*cos(a1m)+w2m*w2m*L2*mm2*cs))/(L2*den);\n      double a1n=a1+0.5*dt*w1m, a2n=a2+0.5*dt*w2m, w1n=w1+0.5*dt*k2w1, w2n=w2+0.5*dt*k2w2;\n      d=a1n-a2n; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k3w1=(-G*(2.0*m1+mm2)*sin(a1n)-mm2*G*sin(a1n-2.0*a2n)-2.0*sn*mm2*(w2n*w2n*L2+w1n*w1n*L1*cs))/(L1*den);\n      double k3w2=(2.0*sn*(w1n*w1n*L1*(m1+mm2)+G*(m1+mm2)*cos(a1n)+w2n*w2n*L2*mm2*cs))/(L2*den);\n      double a1e=a1+dt*w1n, a2e=a2+dt*w2n, w1e=w1+dt*k3w1, w2e=w2+dt*k3w2;\n      d=a1e-a2e; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k4w1=(-G*(2.0*m1+mm2)*sin(a1e)-mm2*G*sin(a1e-2.0*a2e)-2.0*sn*mm2*(w2e*w2e*L2+w1e*w1e*L1*cs))/(L1*den);\n      double k4w2=(2.0*sn*(w1e*w1e*L1*(m1+mm2)+G*(m1+mm2)*cos(a1e)+w2e*w2e*L2*mm2*cs))/(L2*den);\n      a1 += (dt/6.0)*(w1+2.0*w1m+2.0*w1n+w1e); a2 += (dt/6.0)*(w2+2.0*w2m+2.0*w2n+w2e);\n      w1 += (dt/6.0)*(k1w1+2.0*k2w1+2.0*k3w1+k4w1); w2 += (dt/6.0)*(k1w2+2.0*k2w2+2.0*k3w2+k4w2);\n    }\n    cx[i] = L1*sin(a1) + L2*sin(a2); cy[i] = -L1*cos(a1) - L2*cos(a2);\n  }\n}\ndouble u = fmax(0.0, fmin(512.0, t * 512.0));\nint i0 = (int)u; if (i0 >= 512) i0 = 511;\ndouble f = u - (double)i0;\npx = cx[i0] + f*(cx[i0+1] - cx[i0]); py = cy[i0] + f*(cy[i0+1] - cy[i0]);",
           color: "#38bdf8",
+          lineWidth: 2.1,
           visible: true,
         },
         {
-          title: "Base Wave cos(πx)",
-          code: "cos(M_PI * x)",
-          color: "#64748b",
-          visible: false,
+          title: "Pendulum A: Live Articulated Rods & Bobs at t = sim_t",
+          code: "parametric [0, 3]:\nstatic _Thread_local double lx1 = 0.0, ly1 = 0.0, lx2 = 0.0, ly2 = 0.0, c_t = -1.0, c_a1 = -99.0, c_a2 = -99.0, c_m2 = -99.0, c_g = -99.0;\ndouble target = fmax(0.0, sim_t);\nif (c_t != target || c_a1 != th1 || c_a2 != th2 || c_m2 != m2 || c_g != grav) {\n  c_t = target; c_a1 = th1; c_a2 = th2; c_m2 = m2; c_g = grav;\n  double a1 = th1, a2 = th2, w1 = 0.0, w2 = 0.0, m1 = 1.0, mm2 = m2, L1 = 1.4, L2 = 1.4, G = grav;\n  int steps = (int)ceil(target / 0.012); if (steps > 1600) steps = 1600;\n  double dt = steps > 0 ? target / (double)steps : 0.0;\n  for (int k = 0; k < steps; k++) {\n    double d=a1-a2, sn=sin(d), cs=cos(d), den=2.0*m1+mm2-mm2*cos(2.0*d);\n    double k1w1=(-G*(2.0*m1+mm2)*sin(a1)-mm2*G*sin(a1-2.0*a2)-2.0*sn*mm2*(w2*w2*L2+w1*w1*L1*cs))/(L1*den);\n    double k1w2=(2.0*sn*(w1*w1*L1*(m1+mm2)+G*(m1+mm2)*cos(a1)+w2*w2*L2*mm2*cs))/(L2*den);\n    double a1m=a1+0.5*dt*w1, a2m=a2+0.5*dt*w2, w1m=w1+0.5*dt*k1w1, w2m=w2+0.5*dt*k1w2;\n    d=a1m-a2m; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n    double k2w1=(-G*(2.0*m1+mm2)*sin(a1m)-mm2*G*sin(a1m-2.0*a2m)-2.0*sn*mm2*(w2m*w2m*L2+w1m*w1m*L1*cs))/(L1*den);\n    double k2w2=(2.0*sn*(w1m*w1m*L1*(m1+mm2)+G*(m1+mm2)*cos(a1m)+w2m*w2m*L2*mm2*cs))/(L2*den);\n    double a1n=a1+0.5*dt*w1m, a2n=a2+0.5*dt*w2m, w1n=w1+0.5*dt*k2w1, w2n=w2+0.5*dt*k2w2;\n    d=a1n-a2n; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n    double k3w1=(-G*(2.0*m1+mm2)*sin(a1n)-mm2*G*sin(a1n-2.0*a2n)-2.0*sn*mm2*(w2n*w2n*L2+w1n*w1n*L1*cs))/(L1*den);\n    double k3w2=(2.0*sn*(w1n*w1n*L1*(m1+mm2)+G*(m1+mm2)*cos(a1n)+w2n*w2n*L2*mm2*cs))/(L2*den);\n    double a1e=a1+dt*w1n, a2e=a2+dt*w2n, w1e=w1+dt*k3w1, w2e=w2+dt*k3w2;\n    d=a1e-a2e; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n    double k4w1=(-G*(2.0*m1+mm2)*sin(a1e)-mm2*G*sin(a1e-2.0*a2e)-2.0*sn*mm2*(w2e*w2e*L2+w1e*w1e*L1*cs))/(L1*den);\n    double k4w2=(2.0*sn*(w1e*w1e*L1*(m1+mm2)+G*(m1+mm2)*cos(a1e)+w2e*w2e*L2*mm2*cs))/(L2*den);\n    a1 += (dt/6.0)*(w1+2.0*w1m+2.0*w1n+w1e); a2 += (dt/6.0)*(w2+2.0*w2m+2.0*w2n+w2e);\n    w1 += (dt/6.0)*(k1w1+2.0*k2w1+2.0*k3w1+k4w1); w2 += (dt/6.0)*(k1w2+2.0*k2w2+2.0*k3w2+k4w2);\n  }\n  lx1 = L1*sin(a1); ly1 = -L1*cos(a1); lx2 = lx1 + L2*sin(a2); ly2 = ly1 - L2*cos(a2);\n}\nif (t < 1.0) { px = t * lx1; py = t * ly1; }\nelse if (t < 2.0) { double u = t - 1.0; px = lx1 + u * (lx2 - lx1); py = ly1 + u * (ly2 - ly1); }\nelse if (t < 2.5) { double ang = (t - 2.0) * 4.0 * M_PI; px = lx1 + 0.11 * cos(ang); py = ly1 + 0.11 * sin(ang); }\nelse { double ang = (t - 2.5) * 4.0 * M_PI; px = lx2 + 0.14 * cos(ang); py = ly2 + 0.14 * sin(ang); }",
+          color: "#fbbf24",
+          lineWidth: 3.0,
+          visible: true,
+        },
+        {
+          title: "Pendulum B: Butterfly-Effect Twin (+0.01 rad)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double cx[513], cy[513], c_t = -1.0, c_a1 = -99.0, c_a2 = -99.0, c_m2 = -99.0, c_g = -99.0;\ndouble Tmax = fmax(0.05, sim_t);\nif (c_t != Tmax || c_a1 != th1 || c_a2 != th2 || c_m2 != m2 || c_g != grav) {\n  c_t = Tmax; c_a1 = th1; c_a2 = th2; c_m2 = m2; c_g = grav;\n  double a1 = th1 + 0.01, a2 = th2, w1 = 0.0, w2 = 0.0, m1 = 1.0, mm2 = m2, L1 = 1.4, L2 = 1.4, G = grav;\n  int sub = (int)ceil((Tmax / 512.0) / 0.015); if (sub < 1) sub = 1; if (sub > 4) sub = 4;\n  double dt = Tmax / (512.0 * (double)sub);\n  cx[0] = L1*sin(a1) + L2*sin(a2); cy[0] = -L1*cos(a1) - L2*cos(a2);\n  for (int i = 1; i <= 512; i++) {\n    for (int s = 0; s < sub; s++) {\n      double d=a1-a2, sn=sin(d), cs=cos(d), den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k1w1=(-G*(2.0*m1+mm2)*sin(a1)-mm2*G*sin(a1-2.0*a2)-2.0*sn*mm2*(w2*w2*L2+w1*w1*L1*cs))/(L1*den);\n      double k1w2=(2.0*sn*(w1*w1*L1*(m1+mm2)+G*(m1+mm2)*cos(a1)+w2*w2*L2*mm2*cs))/(L2*den);\n      double a1m=a1+0.5*dt*w1, a2m=a2+0.5*dt*w2, w1m=w1+0.5*dt*k1w1, w2m=w2+0.5*dt*k1w2;\n      d=a1m-a2m; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k2w1=(-G*(2.0*m1+mm2)*sin(a1m)-mm2*G*sin(a1m-2.0*a2m)-2.0*sn*mm2*(w2m*w2m*L2+w1m*w1m*L1*cs))/(L1*den);\n      double k2w2=(2.0*sn*(w1m*w1m*L1*(m1+mm2)+G*(m1+mm2)*cos(a1m)+w2m*w2m*L2*mm2*cs))/(L2*den);\n      double a1n=a1+0.5*dt*w1m, a2n=a2+0.5*dt*w2m, w1n=w1+0.5*dt*k2w1, w2n=w2+0.5*dt*k2w2;\n      d=a1n-a2n; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k3w1=(-G*(2.0*m1+mm2)*sin(a1n)-mm2*G*sin(a1n-2.0*a2n)-2.0*sn*mm2*(w2n*w2n*L2+w1n*w1n*L1*cs))/(L1*den);\n      double k3w2=(2.0*sn*(w1n*w1n*L1*(m1+mm2)+G*(m1+mm2)*cos(a1n)+w2n*w2n*L2*mm2*cs))/(L2*den);\n      double a1e=a1+dt*w1n, a2e=a2+dt*w2n, w1e=w1+dt*k3w1, w2e=w2+dt*k3w2;\n      d=a1e-a2e; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k4w1=(-G*(2.0*m1+mm2)*sin(a1e)-mm2*G*sin(a1e-2.0*a2e)-2.0*sn*mm2*(w2e*w2e*L2+w1e*w1e*L1*cs))/(L1*den);\n      double k4w2=(2.0*sn*(w1e*w1e*L1*(m1+mm2)+G*(m1+mm2)*cos(a1e)+w2e*w2e*L2*mm2*cs))/(L2*den);\n      a1 += (dt/6.0)*(w1+2.0*w1m+2.0*w1n+w1e); a2 += (dt/6.0)*(w2+2.0*w2m+2.0*w2n+w2e);\n      w1 += (dt/6.0)*(k1w1+2.0*k2w1+2.0*k3w1+k4w1); w2 += (dt/6.0)*(k1w2+2.0*k2w2+2.0*k3w2+k4w2);\n    }\n    cx[i] = L1*sin(a1) + L2*sin(a2); cy[i] = -L1*cos(a1) - L2*cos(a2);\n  }\n}\ndouble u = fmax(0.0, fmin(512.0, t * 512.0));\nint i0 = (int)u; if (i0 >= 512) i0 = 511;\ndouble f = u - (double)i0;\npx = cx[i0] + f*(cx[i0+1] - cx[i0]); py = cy[i0] + f*(cy[i0+1] - cy[i0]);",
+          color: "#fb7185",
+          lineWidth: 1.9,
           lineStyle: "dashed",
+          visible: false,
+        },
+        {
+          title: "Configuration Phase Space (θ₁ vs θ₂)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double ca1[513], ca2[513], c_t = -1.0, c_a1 = -99.0, c_a2 = -99.0, c_m2 = -99.0, c_g = -99.0;\ndouble Tmax = fmax(0.1, sim_t);\nif (c_t != Tmax || c_a1 != th1 || c_a2 != th2 || c_m2 != m2 || c_g != grav) {\n  c_t = Tmax; c_a1 = th1; c_a2 = th2; c_m2 = m2; c_g = grav;\n  double a1 = th1, a2 = th2, w1 = 0.0, w2 = 0.0, m1 = 1.0, mm2 = m2, L1 = 1.4, L2 = 1.4, G = grav;\n  int sub = (int)ceil((Tmax / 512.0) / 0.015); if (sub < 1) sub = 1; if (sub > 4) sub = 4;\n  double dt = Tmax / (512.0 * (double)sub);\n  ca1[0] = a1; ca2[0] = a2;\n  for (int i = 1; i <= 512; i++) {\n    for (int s = 0; s < sub; s++) {\n      double d=a1-a2, sn=sin(d), cs=cos(d), den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k1w1=(-G*(2.0*m1+mm2)*sin(a1)-mm2*G*sin(a1-2.0*a2)-2.0*sn*mm2*(w2*w2*L2+w1*w1*L1*cs))/(L1*den);\n      double k1w2=(2.0*sn*(w1*w1*L1*(m1+mm2)+G*(m1+mm2)*cos(a1)+w2*w2*L2*mm2*cs))/(L2*den);\n      double a1m=a1+0.5*dt*w1, a2m=a2+0.5*dt*w2, w1m=w1+0.5*dt*k1w1, w2m=w2+0.5*dt*k1w2;\n      d=a1m-a2m; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k2w1=(-G*(2.0*m1+mm2)*sin(a1m)-mm2*G*sin(a1m-2.0*a2m)-2.0*sn*mm2*(w2m*w2m*L2+w1m*w1m*L1*cs))/(L1*den);\n      double k2w2=(2.0*sn*(w1m*w1m*L1*(m1+mm2)+G*(m1+mm2)*cos(a1m)+w2m*w2m*L2*mm2*cs))/(L2*den);\n      double a1n=a1+0.5*dt*w1m, a2n=a2+0.5*dt*w2m, w1n=w1+0.5*dt*k2w1, w2n=w2+0.5*dt*k2w2;\n      d=a1n-a2n; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k3w1=(-G*(2.0*m1+mm2)*sin(a1n)-mm2*G*sin(a1n-2.0*a2n)-2.0*sn*mm2*(w2n*w2n*L2+w1n*w1n*L1*cs))/(L1*den);\n      double k3w2=(2.0*sn*(w1n*w1n*L1*(m1+mm2)+G*(m1+mm2)*cos(a1n)+w2n*w2n*L2*mm2*cs))/(L2*den);\n      double a1e=a1+dt*w1n, a2e=a2+dt*w2n, w1e=w1+dt*k3w1, w2e=w2+dt*k3w2;\n      d=a1e-a2e; sn=sin(d); cs=cos(d); den=2.0*m1+mm2-mm2*cos(2.0*d);\n      double k4w1=(-G*(2.0*m1+mm2)*sin(a1e)-mm2*G*sin(a1e-2.0*a2e)-2.0*sn*mm2*(w2e*w2e*L2+w1e*w1e*L1*cs))/(L1*den);\n      double k4w2=(2.0*sn*(w1e*w1e*L1*(m1+mm2)+G*(m1+mm2)*cos(a1e)+w2e*w2e*L2*mm2*cs))/(L2*den);\n      a1 += (dt/6.0)*(w1+2.0*w1m+2.0*w1n+w1e); a2 += (dt/6.0)*(w2+2.0*w2m+2.0*w2n+w2e);\n      w1 += (dt/6.0)*(k1w1+2.0*k2w1+2.0*k3w1+k4w1); w2 += (dt/6.0)*(k1w2+2.0*k2w2+2.0*k3w2+k4w2);\n    }\n    ca1[i] = a1; ca2[i] = a2;\n  }\n}\ndouble u = fmax(0.0, fmin(512.0, t * 512.0));\nint i0 = (int)u; if (i0 >= 512) i0 = 511;\ndouble f = u - (double)i0;\npx = ca1[i0] + f*(ca1[i0+1] - ca1[i0]); py = ca2[i0] + f*(ca2[i0+1] - ca2[i0]);",
+          color: "#a78bfa",
+          lineWidth: 1.8,
+          visible: false,
         },
       ],
       sliders: [
-        { name: "a", label: "Amplitude decay", value: 0.5, min: 0.1, max: 0.9, step: 0.02 },
-        { name: "b", label: "Frequency jump (odd)", value: 7, min: 3, max: 15, step: 2 },
-        { name: "N", label: "Fractal depth", value: 14, min: 0, max: 30, step: 1 },
+        { name: "sim_t", label: "Simulation Time t (s)", value: 6.5, min: 0.1, max: 14.0, step: 0.05, speed: 0.35 },
+        { name: "th1", label: "Initial Angle θ₁ (rad)", value: 2.15, min: -3.1, max: 3.1, step: 0.02, speed: 0.4 },
+        { name: "th2", label: "Initial Angle θ₂ (rad)", value: 2.65, min: -3.1, max: 3.1, step: 0.02, speed: 0.4 },
+        { name: "m2", label: "Lower Bob Mass m₂", value: 1.0, min: 0.25, max: 3.0, step: 0.05, speed: 0.4 },
+        { name: "grav", label: "Gravity g (m/s²)", value: 9.81, min: 1.6, max: 20.0, step: 0.1, speed: 0.5 },
       ],
-      defaultPoints: [
-        pt(0.0, 2.0, "W(0) = 1/(1−a)", "diamond", "#fbbf24", 5, true),
+      defaultPoints: [pt(0.0, 0.0, "Pivot (0, 0)", "diamond", "#e2e8f0", 5.5, true)],
+      defaultShapes: [
+        { kind: "circle", label: "Outer Reach |r| = L₁ + L₂", color: "#94a3b8", lineWidth: 1.1, opacity: 0.0, lineStyle: "dotted", closed: true, locked: true, rawPts: circlePts(0, 0, 2.8, 72) },
       ],
       presets: [
         {
-          id: "classic",
-          name: "Classic (a=0.5, b=7)",
-          view: { xmin: -2.0, xmax: 2.0, ymin: -2.4, ymax: 2.4 },
-          sliderValues: { a: 0.5, b: 7, N: 14 },
-          visibleFnIndices: [0],
-        },
-        {
-          id: "zoom_1",
-          name: "Fractal Zoom [0, 0.35]",
-          view: { xmin: -0.02, xmax: 0.35, ymin: 0.4, ymax: 2.15 },
-          sliderValues: { a: 0.5, b: 7, N: 18 },
-          visibleFnIndices: [0],
-        },
-        {
-          id: "deep_zoom",
-          name: "Deep Self-Similar [0, 0.04]",
-          view: { xmin: -0.005, xmax: 0.04, ymin: 1.45, ymax: 2.05 },
-          sliderValues: { a: 0.5, b: 7, N: 22 },
-          visibleFnIndices: [0],
-        },
-        {
-          id: "sweep_n",
-          name: "Smooth → Fractal Sweep (N)",
-          view: { xmin: -1.5, xmax: 1.5, ymin: -2.3, ymax: 2.3 },
-          sliderValues: { a: 0.5, b: 7, N: 0 },
+          id: "dpend_live_chaos",
+          name: "▶ Live Chaotic Double Pendulum (Rods + Trail)",
+          squareAspect: true,
+          view: { xmin: -3.4, xmax: 3.4, ymin: -3.2, ymax: 3.0 },
+          sliderValues: { sim_t: 0.2, th1: 2.15, th2: 2.65, m2: 1.0, grav: 9.81 },
           visibleFnIndices: [0, 1],
-          startSlider: "N",
+          startSlider: "sim_t",
+          texts: [
+            {
+              kind: "text", title: "Double Pendulum Chaos (Native C11 RK4)",
+              text: "Integrates the coupled Euler–Lagrange equations for $(\\theta_1, \\theta_2)$ in native C11: gold articulated rods swing live while cyan traces bob $m_2$'s chaotic trajectory!\n• Scrub $\\theta_1$, $\\theta_2$, mass ratio $m_2$, or gravity $g$!",
+              color: "#38bdf8", anchor: "bottom-left", width: 345, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "dpend_butterfly",
+          name: "▶ Twin Butterfly-Effect Chaos (Δθ₁ = 0.01 rad)",
+          squareAspect: true,
+          view: { xmin: -3.4, xmax: 3.4, ymin: -3.2, ymax: 3.0 },
+          sliderValues: { sim_t: 0.2, th1: 2.25, th2: 2.45, m2: 1.0, grav: 9.81 },
+          visibleFnIndices: [0, 1, 2],
+          startSlider: "sim_t",
+          texts: [
+            {
+              kind: "text", title: "Exponential Sensitivity: $\\Delta\\theta_1 = 0.01\\,\\text{rad}$",
+              text: "Cyan and dashed rose double pendulums start nearly identical ($0.57^\\circ$ apart) — watch them swing in lockstep before chaos rips their paths apart completely!",
+              color: "#fb7185", anchor: "bottom-left", width: 345, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "dpend_phase_torus",
+          name: "Configuration Phase Portrait (θ₁ vs θ₂)",
+          squareAspect: true,
+          view: { xmin: -5.2, xmax: 5.2, ymin: -5.2, ymax: 5.2 },
+          sliderValues: { sim_t: 11.5, th1: 1.55, th2: 2.1, m2: 1.0, grav: 9.81 },
+          visibleFnIndices: [3],
+          points: [],
+          shapes: [],
+          texts: [
+            {
+              kind: "text", title: "Double Pendulum Phase Space $(\\theta_1, \\theta_2)$",
+              text: "Plots the angle coordinates $(\\theta_1(t), \\theta_2(t))$ directly: low-energy swings form closed Lissajous loops, while high-energy flips wind endlessly across the torus!",
+              color: "#a78bfa", anchor: "bottom-left", width: 340, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
         },
       ],
     },
     {
-      id: "real_takagi",
+      id: "real_nbody_gravity",
       mode: "real",
-      category: "2D Real & Fractals",
-      title: "Takagi Blancmange Fractal",
-      subtitle: "Another continuous nowhere-differentiable curve: Σ 2⁻ⁿ dist(2ⁿ x, ℤ)",
-      description: "Displays the Takagi (Blancmange) fractal curve constructed from dyadic triangle waves, exhibiting exact self-similarity across scales.",
+      folder: "cat_physics",
+      category: "Physics Simulations",
+      title: "3-Body Gravitational Choreography & Slingshot",
+      subtitle: "Exact Newtonian 3-body RK4 gravity simulator — famous Figure-8 choreography & chaotic binary-star slingshot!",
+      description: "Simulates three mutually gravitating bodies under Newton's inverse-square law in native C11 RK4. Explore the remarkable Chenciner–Montgomery stable Figure-8 3-body orbit (zero angular momentum!) or perturb the velocity to unleash chaotic gravitational slingshots.",
       fnCards: [
         {
-          title: "Blancmange T(x)",
-          code: "double sum = 0.0, scale = 1.0;\nint lim = (int)N;\nfor (int n = 0; n <= lim; n++) {\n    double u = scale * x;\n    double frac = u - floor(u);\n    double tri = frac < 0.5 ? frac : (1.0 - frac);\n    sum += tri / scale;\n    scale *= 2.0;\n}\nreturn sum;",
-          color: "#34d399",
+          title: "Body 1 Orbit (Cyan · Symplectic Leapfrog)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double cx[513], cy[513], c_t = -1.0, c_dv = -99.0;\ndouble Tmax = fmax(0.05, sim_t);\nif (c_t != Tmax || c_dv != dv) {\n  c_t = Tmax; c_dv = dv;\n  double x1=-0.97000436, y1=0.24308753, vx1=0.466203685+dv, vy1=0.43236573;\n  double x2=0.97000436, y2=-0.24308753, vx2=0.466203685, vy2=0.43236573;\n  double x3=0.0, y3=0.0, vx3=-0.93240737-dv, vy3=-0.86473146;\n  int sub = (int)ceil((Tmax / 512.0) / 0.009); if (sub < 1) sub = 1; if (sub > 4) sub = 4;\n  double dt = Tmax / (512.0 * (double)sub), eps = 0.002;\n  cx[0] = x1; cy[0] = y1;\n  for (int i = 1; i <= 512; i++) {\n    for (int s = 0; s < sub; s++) {\n      double dx12=x2-x1, dy12=y2-y1, r12=dx12*dx12+dy12*dy12+eps; r12*=sqrt(r12);\n      double dx13=x3-x1, dy13=y3-y1, r13=dx13*dx13+dy13*dy13+eps; r13*=sqrt(r13);\n      double dx23=x3-x2, dy23=y3-y2, r23=dx23*dx23+dy23*dy23+eps; r23*=sqrt(r23);\n      double ax1=dx12/r12+dx13/r13, ay1=dy12/r12+dy13/r13;\n      double ax2=-dx12/r12+dx23/r23, ay2=-dy12/r12+dy23/r23;\n      double ax3=-dx13/r13-dx23/r23, ay3=-dy13/r13-dy23/r23;\n      vx1+=0.5*dt*ax1; vy1+=0.5*dt*ay1; vx2+=0.5*dt*ax2; vy2+=0.5*dt*ay2; vx3+=0.5*dt*ax3; vy3+=0.5*dt*ay3;\n      x1+=dt*vx1; y1+=dt*vy1; x2+=dt*vx2; y2+=dt*vy2; x3+=dt*vx3; y3+=dt*vy3;\n      dx12=x2-x1; dy12=y2-y1; r12=dx12*dx12+dy12*dy12+eps; r12*=sqrt(r12);\n      dx13=x3-x1; dy13=y3-y1; r13=dx13*dx13+dy13*dy13+eps; r13*=sqrt(r13);\n      dx23=x3-x2; dy23=y3-y2; r23=dx23*dx23+dy23*dy23+eps; r23*=sqrt(r23);\n      ax1=dx12/r12+dx13/r13; ay1=dy12/r12+dy13/r13;\n      ax2=-dx12/r12+dx23/r23; ay2=-dy12/r12+dy23/r23;\n      ax3=-dx13/r13-dx23/r23; ay3=-dy13/r13-dy23/r23;\n      vx1+=0.5*dt*ax1; vy1+=0.5*dt*ay1; vx2+=0.5*dt*ax2; vy2+=0.5*dt*ay2; vx3+=0.5*dt*ax3; vy3+=0.5*dt*ay3;\n    }\n    cx[i] = x1; cy[i] = y1;\n  }\n}\ndouble u = fmax(0.0, fmin(512.0, t * 512.0));\nint i0 = (int)u; if (i0 >= 512) i0 = 511;\ndouble f = u - (double)i0;\npx = cx[i0] + f*(cx[i0+1] - cx[i0]); py = cy[i0] + f*(cy[i0+1] - cy[i0]);",
+          color: "#38bdf8",
+          lineWidth: 2.3,
           visible: true,
         },
         {
-          title: "Smooth Parabola 2x(1−x)",
-          code: "2.0 * x * (1.0 - x)",
+          title: "Body 2 Orbit (Gold · Symplectic Leapfrog)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double cx[513], cy[513], c_t = -1.0, c_dv = -99.0;\ndouble Tmax = fmax(0.05, sim_t);\nif (c_t != Tmax || c_dv != dv) {\n  c_t = Tmax; c_dv = dv;\n  double x1=-0.97000436, y1=0.24308753, vx1=0.466203685+dv, vy1=0.43236573;\n  double x2=0.97000436, y2=-0.24308753, vx2=0.466203685, vy2=0.43236573;\n  double x3=0.0, y3=0.0, vx3=-0.93240737-dv, vy3=-0.86473146;\n  int sub = (int)ceil((Tmax / 512.0) / 0.009); if (sub < 1) sub = 1; if (sub > 4) sub = 4;\n  double dt = Tmax / (512.0 * (double)sub), eps = 0.002;\n  cx[0] = x2; cy[0] = y2;\n  for (int i = 1; i <= 512; i++) {\n    for (int s = 0; s < sub; s++) {\n      double dx12=x2-x1, dy12=y2-y1, r12=dx12*dx12+dy12*dy12+eps; r12*=sqrt(r12);\n      double dx13=x3-x1, dy13=y3-y1, r13=dx13*dx13+dy13*dy13+eps; r13*=sqrt(r13);\n      double dx23=x3-x2, dy23=y3-y2, r23=dx23*dx23+dy23*dy23+eps; r23*=sqrt(r23);\n      double ax1=dx12/r12+dx13/r13, ay1=dy12/r12+dy13/r13;\n      double ax2=-dx12/r12+dx23/r23, ay2=-dy12/r12+dy23/r23;\n      double ax3=-dx13/r13-dx23/r23, ay3=-dy13/r13-dy23/r23;\n      vx1+=0.5*dt*ax1; vy1+=0.5*dt*ay1; vx2+=0.5*dt*ax2; vy2+=0.5*dt*ay2; vx3+=0.5*dt*ax3; vy3+=0.5*dt*ay3;\n      x1+=dt*vx1; y1+=dt*vy1; x2+=dt*vx2; y2+=dt*vy2; x3+=dt*vx3; y3+=dt*vy3;\n      dx12=x2-x1; dy12=y2-y1; r12=dx12*dx12+dy12*dy12+eps; r12*=sqrt(r12);\n      dx13=x3-x1; dy13=y3-y1; r13=dx13*dx13+dy13*dy13+eps; r13*=sqrt(r13);\n      dx23=x3-x2; dy23=y3-y2; r23=dx23*dx23+dy23*dy23+eps; r23*=sqrt(r23);\n      ax1=dx12/r12+dx13/r13; ay1=dy12/r12+dy13/r13;\n      ax2=-dx12/r12+dx23/r23; ay2=-dy12/r12+dy23/r23;\n      ax3=-dx13/r13-dx23/r23; ay3=-dy13/r13-dy23/r23;\n      vx1+=0.5*dt*ax1; vy1+=0.5*dt*ay1; vx2+=0.5*dt*ax2; vy2+=0.5*dt*ay2; vx3+=0.5*dt*ax3; vy3+=0.5*dt*ay3;\n    }\n    cx[i] = x2; cy[i] = y2;\n  }\n}\ndouble u = fmax(0.0, fmin(512.0, t * 512.0));\nint i0 = (int)u; if (i0 >= 512) i0 = 511;\ndouble f = u - (double)i0;\npx = cx[i0] + f*(cx[i0+1] - cx[i0]); py = cy[i0] + f*(cy[i0+1] - cy[i0]);",
           color: "#fbbf24",
-          visible: false,
-          lineStyle: "dashed",
+          lineWidth: 2.3,
+          visible: true,
+        },
+        {
+          title: "Body 3 Orbit (Rose · Symplectic Leapfrog)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double cx[513], cy[513], c_t = -1.0, c_dv = -99.0;\ndouble Tmax = fmax(0.05, sim_t);\nif (c_t != Tmax || c_dv != dv) {\n  c_t = Tmax; c_dv = dv;\n  double x1=-0.97000436, y1=0.24308753, vx1=0.466203685+dv, vy1=0.43236573;\n  double x2=0.97000436, y2=-0.24308753, vx2=0.466203685, vy2=0.43236573;\n  double x3=0.0, y3=0.0, vx3=-0.93240737-dv, vy3=-0.86473146;\n  int sub = (int)ceil((Tmax / 512.0) / 0.009); if (sub < 1) sub = 1; if (sub > 4) sub = 4;\n  double dt = Tmax / (512.0 * (double)sub), eps = 0.002;\n  cx[0] = x3; cy[0] = y3;\n  for (int i = 1; i <= 512; i++) {\n    for (int s = 0; s < sub; s++) {\n      double dx12=x2-x1, dy12=y2-y1, r12=dx12*dx12+dy12*dy12+eps; r12*=sqrt(r12);\n      double dx13=x3-x1, dy13=y3-y1, r13=dx13*dx13+dy13*dy13+eps; r13*=sqrt(r13);\n      double dx23=x3-x2, dy23=y3-y2, r23=dx23*dx23+dy23*dy23+eps; r23*=sqrt(r23);\n      double ax1=dx12/r12+dx13/r13, ay1=dy12/r12+dy13/r13;\n      double ax2=-dx12/r12+dx23/r23, ay2=-dy12/r12+dy23/r23;\n      double ax3=-dx13/r13-dx23/r23, ay3=-dy13/r13-dy23/r23;\n      vx1+=0.5*dt*ax1; vy1+=0.5*dt*ay1; vx2+=0.5*dt*ax2; vy2+=0.5*dt*ay2; vx3+=0.5*dt*ax3; vy3+=0.5*dt*ay3;\n      x1+=dt*vx1; y1+=dt*vy1; x2+=dt*vx2; y2+=dt*vy2; x3+=dt*vx3; y3+=dt*vy3;\n      dx12=x2-x1; dy12=y2-y1; r12=dx12*dx12+dy12*dy12+eps; r12*=sqrt(r12);\n      dx13=x3-x1; dy13=y3-y1; r13=dx13*dx13+dy13*dy13+eps; r13*=sqrt(r13);\n      dx23=x3-x2; dy23=y3-y2; r23=dx23*dx23+dy23*dy23+eps; r23*=sqrt(r23);\n      ax1=dx12/r12+dx13/r13; ay1=dy12/r12+dy13/r13;\n      ax2=-dx12/r12+dx23/r23; ay2=-dy12/r12+dy23/r23;\n      ax3=-dx13/r13-dx23/r23; ay3=-dy13/r13-dy23/r23;\n      vx1+=0.5*dt*ax1; vy1+=0.5*dt*ay1; vx2+=0.5*dt*ax2; vy2+=0.5*dt*ay2; vx3+=0.5*dt*ax3; vy3+=0.5*dt*ay3;\n    }\n    cx[i] = x3; cy[i] = y3;\n  }\n}\ndouble u = fmax(0.0, fmin(512.0, t * 512.0));\nint i0 = (int)u; if (i0 >= 512) i0 = 511;\ndouble f = u - (double)i0;\npx = cx[i0] + f*(cx[i0+1] - cx[i0]); py = cy[i0] + f*(cy[i0+1] - cy[i0]);",
+          color: "#fb7185",
+          lineWidth: 2.3,
+          visible: true,
         },
       ],
       sliders: [
-        { name: "N", label: "Depth", value: 14, min: 0, max: 24, step: 1 },
+        { name: "sim_t", label: "Orbital Time t", value: 2.1, min: 0.1, max: 9.5, step: 0.05, speed: 0.4 },
+        { name: "dv", label: "Velocity Perturbation Δv", value: 0.0, min: -0.35, max: 0.35, step: 0.01, speed: 0.4 },
       ],
-      defaultPoints: [
-        pt(0.5, 0.5, "T(½) = ½", "diamond", "#fbbf24", 5, true),
+      defaultPoints: [pt(0.0, 0.0, "Center of Mass", "cross", "#94a3b8", 4.5, true)],
+      presets: [
+        {
+          id: "nbody_figure8",
+          name: "▶ Chenciner–Montgomery Figure-8 Orbit",
+          squareAspect: true,
+          view: { xmin: -1.45, xmax: 1.45, ymin: -1.0, ymax: 1.0 },
+          sliderValues: { sim_t: 0.2, dv: 0.0 },
+          startSlider: "sim_t",
+          texts: [
+            {
+              kind: "text", title: "3-Body Figure-8 Choreography ($\\Delta v = 0$)",
+              text: "Three equal masses obey $\\ddot{\\mathbf{r}}_i = \\sum_{j \\neq i} \\frac{\\mathbf{r}_j - \\mathbf{r}_i}{|\\mathbf{r}_j - \\mathbf{r}_i|^3}$ via symplectic Leapfrog in C11 — chasing each other eternally along a single figure-8!\n• Nudge $\\Delta v$ off $0$ to shatter symmetry into chaotic slingshots!",
+              color: "#38bdf8", anchor: "bottom-left", width: 350, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "nbody_slingshot",
+          name: "▶ Perturbed 3-Body Gravitational Slingshot",
+          squareAspect: true,
+          view: { xmin: -2.4, xmax: 2.4, ymin: -1.8, ymax: 1.8 },
+          sliderValues: { sim_t: 0.3, dv: 0.16 },
+          startSlider: "sim_t",
+          texts: [
+            {
+              kind: "text", title: "3-Body Chaos & Gravitational Slingshot ($\\Delta v = 0.16$)",
+              text: "Breaking the figure-8 symmetry causes dramatic close encounters: two stars pair into a tight binary while slingshotting the third body far into deep space!",
+              color: "#fb7185", anchor: "bottom-left", width: 345, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "real_physics_lab",
+      mode: "real",
+      folder: "cat_physics",
+      category: "Physics Simulations",
+      title: "Duffing Chaos & Ballistic Air Drag Lab",
+      subtitle: "Driven double-well Duffing strange attractor & exact RK4 projectile trajectories with quadratic air resistance!",
+      description: "Two classic computational physics experiments in native C11 RK4: explore the driven nonlinear Duffing oscillator (scrub driving amplitude γ to cross from periodic loops into chaos!) and compare ideal parabolic vacuum ballistics against exact quadratic aerodynamic drag.",
+      fnCards: [
+        {
+          title: "Driven Duffing Phase Portrait (x, dx/dt)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double cu[1025], cv[1025], c_gam = -99.0, c_del = -99.0;\nif (c_gam != gamma || c_del != delta) {\n  c_gam = gamma; c_del = delta;\n  double u = 0.25, v = 0.0, tt = 0.0, dt = 70.0 / 2048.0;\n  cu[0] = u; cv[0] = v;\n  for (int i = 1; i <= 1024; i++) {\n    for (int s = 0; s < 2; s++) {\n      double k1u = v, k1v = -delta*v + u - u*u*u + gamma*cos(1.2*tt);\n      double u2 = u + 0.5*dt*k1u, v2 = v + 0.5*dt*k1v, t2 = tt + 0.5*dt;\n      double k2u = v2, k2v = -delta*v2 + u2 - u2*u2*u2 + gamma*cos(1.2*t2);\n      double u3 = u + 0.5*dt*k2u, v3 = v + 0.5*dt*k2v;\n      double k3u = v3, k3v = -delta*v3 + u3 - u3*u3*u3 + gamma*cos(1.2*t2);\n      double u4 = u + dt*k3u, v4 = v + dt*k3v, t4 = tt + dt;\n      double k4u = v4, k4v = -delta*v4 + u4 - u4*u4*u4 + gamma*cos(1.2*t4);\n      u += (dt/6.0)*(k1u + 2.0*k2u + 2.0*k3u + k4u);\n      v += (dt/6.0)*(k1v + 2.0*k2v + 2.0*k3v + k4v);\n      tt += dt;\n    }\n    cu[i] = u; cv[i] = v;\n  }\n}\ndouble p = fmax(0.0, fmin(1024.0, t * 1024.0));\nint i0 = (int)p; if (i0 >= 1024) i0 = 1023;\ndouble f = p - (double)i0;\npx = cu[i0] + f*(cu[i0+1] - cu[i0]); py = cv[i0] + f*(cv[i0+1] - cv[i0]);",
+          color: "#a78bfa",
+          lineWidth: 1.9,
+          visible: true,
+        },
+        {
+          title: "Ballistic Arc — Quadratic Air Drag (C11 RK2)",
+          code: "parametric [0, 1]:\nstatic _Thread_local double cx[513], cy[513], c_th = -99.0, c_v0 = -99.0, c_dr = -99.0;\nif (c_th != theta_deg || c_v0 != v0 || c_dr != drag) {\n  c_th = theta_deg; c_v0 = v0; c_dr = drag;\n  double ang = theta_deg * M_PI / 180.0;\n  double x0 = 0.0, y0 = 0.0, vx = v0 * cos(ang), vy = v0 * sin(ang), dt = 4.2 / 512.0;\n  cx[0] = 0.0; cy[0] = 0.0;\n  for (int i = 1; i <= 512; i++) {\n    if (y0 < -0.02) { cx[i] = NAN; cy[i] = NAN; continue; }\n    double sp = hypot(vx, vy);\n    double ax = -drag * sp * vx, ay = -9.81 - drag * sp * vy;\n    double vx2 = vx + 0.5*dt*ax, vy2 = vy + 0.5*dt*ay;\n    double sp2 = hypot(vx2, vy2);\n    double ax2 = -drag * sp2 * vx2, ay2 = -9.81 - drag * sp2 * vy2;\n    x0 += dt * vx2; y0 += dt * vy2;\n    vx += dt * ax2; vy += dt * ay2;\n    if (y0 < -0.02) { cx[i] = NAN; cy[i] = NAN; } else { cx[i] = x0; cy[i] = y0; }\n  }\n}\ndouble p = fmax(0.0, fmin(512.0, t * 512.0));\nint i0 = (int)p; if (i0 >= 512) i0 = 511;\ndouble f = p - (double)i0;\nif (!isfinite(cx[i0]) || !isfinite(cx[i0+1])) { px = NAN; py = NAN; }\nelse { px = cx[i0] + f*(cx[i0+1] - cx[i0]); py = cy[i0] + f*(cy[i0+1] - cy[i0]); }",
+          color: "#38bdf8",
+          lineWidth: 2.6,
+          visible: false,
+        },
+        {
+          title: "Ideal Vacuum Parabola (No Drag)",
+          code: "parametric [0, 4.2]:\ndouble ang = theta_deg * M_PI / 180.0;\ndouble xx = v0 * cos(ang) * t;\ndouble yy = v0 * sin(ang) * t - 0.5 * 9.81 * t * t;\nif (yy < -0.02) { px = NAN; py = NAN; }\nelse { px = xx; py = yy; }",
+          color: "#34d399",
+          lineWidth: 2.0,
+          lineStyle: "dashed",
+          visible: false,
+        },
+      ],
+      sliders: [
+        { name: "gamma", label: "Duffing Drive γ", value: 0.34, min: 0.05, max: 0.65, step: 0.01, speed: 0.35 },
+        { name: "delta", label: "Damping δ", value: 0.25, min: 0.05, max: 0.6, step: 0.01, speed: 0.35 },
+        { name: "theta_deg", label: "Launch Angle θ (°)", value: 45.0, min: 10.0, max: 82.0, step: 1.0, speed: 0.45 },
+        { name: "v0", label: "Launch Speed v₀ (m/s)", value: 18.0, min: 6.0, max: 30.0, step: 0.5, speed: 0.4 },
+        { name: "drag", label: "Quadratic Drag c", value: 0.045, min: 0.0, max: 0.25, step: 0.005, speed: 0.4 },
       ],
       presets: [
         {
-          id: "unit",
-          name: "Unit Arch [0, 1]",
-          view: { xmin: -0.08, xmax: 1.08, ymin: -0.08, ymax: 0.78 },
+          id: "phys_duffing_chaos",
+          name: "▶ Driven Duffing Double-Well Strange Attractor",
+          squareAspect: false,
+          view: { xmin: -2.0, xmax: 2.0, ymin: -1.8, ymax: 1.8 },
+          sliderValues: { gamma: 0.34, delta: 0.25, theta_deg: 45.0, v0: 18.0, drag: 0.045 },
           visibleFnIndices: [0],
+          points: [
+            pt(-1.0, 0.0, "Left Well (−1, 0)", "ring", "#34d399", 4.5, true),
+            pt(1.0, 0.0, "Right Well (+1, 0)", "ring", "#34d399", 4.5, true),
+            pt(0.0, 0.0, "Saddle (0, 0)", "cross", "#fb7185", 5.0, true),
+          ],
+          texts: [
+            {
+              kind: "text", title: "Driven Duffing Oscillator ($\\ddot{x} + \\delta\\dot{x} - x + x^3 = \\gamma\\cos(1.2t)$)",
+              text: "Phase portrait $(x, \\dot{x})$ of a damped particle hopping chaotically between twin potential wells at $x = \\pm 1$!\n• Scrub driving force $\\gamma$ between $0.20$ (periodic) and $0.38$ (chaotic attractor)!",
+              color: "#a78bfa", anchor: "bottom-left", width: 350, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
         },
         {
-          id: "self_similar",
-          name: "Zoom Self-Similarity [0, 0.25]",
-          view: { xmin: -0.02, xmax: 0.27, ymin: -0.04, ymax: 0.58 },
-          visibleFnIndices: [0],
+          id: "phys_ballistic_drag",
+          name: "Ballistic Trajectory: Vacuum vs Quadratic Air Drag",
+          squareAspect: true,
+          view: { xmin: -2.0, xmax: 36.0, ymin: -1.5, ymax: 18.0 },
+          sliderValues: { gamma: 0.34, delta: 0.25, theta_deg: 45.0, v0: 18.0, drag: 0.045 },
+          visibleFnIndices: [1, 2],
+          lines: [ln("horizontal", 0.0, "Ground y = 0", "#94a3b8", "solid", true)],
+          texts: [
+            {
+              kind: "text", title: "Ballistics: Vacuum vs Quadratic Air Drag",
+              text: "Compares ideal vacuum flight (dashed green) against exact C11 RK4 quadratic drag $\\mathbf{F}_d = -c|\\mathbf{v}|\\mathbf{v}$ (solid cyan).\n• Notice the optimal max-range angle drops strictly below $45^\\circ$ as drag $c$ increases!",
+              color: "#38bdf8", anchor: "bottom-left", width: 345, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
         },
-        {
-          id: "sweep_takagi",
-          name: "Build Fractal (N: 0 → 20)",
-          view: { xmin: -0.08, xmax: 1.08, ymin: -0.08, ymax: 0.78 },
-          visibleFnIndices: [0, 1],
-          startSlider: "N",
-        },
+      ],
+    },
+    {
+      id: "real_solar_orrery",
+      mode: "real",
+      folder: "cat_curves_art",
+      category: "Curves, Epicycles & Automata",
+      title: "Solar Orrery & Venus-Earth Resonance Mandala",
+      subtitle: "Layered 100%-solid vector planets, glowing solar corona, implicit orbits & animated Earth-Venus dance!",
+      description: "Combines 2D Real’s full vector shape layering (solid golden Sun, glowing translucent corona, solid planets with rings) with native C11 implicit orbits and the famous 8:13 Earth–Venus orbital resonance rosette.",
+      fnCards: [
+        { title: "Venus–Earth Resonance Petal (8:13)", code: "parametric [0, 50.26548]:\ndouble a1 = t + phase, a2 = (13.0 / 8.0) * t + phase;\ndouble blend = 0.5 + 0.5 * cos(5.0 * t);\npx = (1.0 - blend) * 4.2 * cos(a1) + blend * 2.9 * cos(a2);\npy = (1.0 - blend) * 4.2 * sin(a1) + blend * 2.9 * sin(a2);", color: "#38bdf8", lineWidth: 1.6, visible: true },
+        { title: "Outer Gas Giant Orbit (r = 6.2)", code: "x*x + y*y = 38.44", color: "#a78bfa", lineWidth: 1.4, lineStyle: "dashed", visible: true },
+        { title: "Earth Orbit (r = 4.2)", code: "x*x + y*y = 17.64", color: "#34d399", lineWidth: 1.3, lineStyle: "dotted", visible: true },
+        { title: "Venus Orbit (r = 2.9)", code: "x*x + y*y = 8.41", color: "#fbbf24", lineWidth: 1.3, lineStyle: "dotted", visible: true },
+      ],
+      sliders: [{ name: "phase", label: "Orbital Rotation φ", value: 0.0, min: 0.0, max: 6.2832, step: 0.02, speed: 0.35 }],
+      defaultShapes: [
+        { kind: "circle", label: "Outer Solar Corona", color: "#f59e0b", lineWidth: 0, opacity: 0.16, closed: true, rawPts: circlePts(0, 0, 1.55, 64) },
+        { kind: "circle", label: "Inner Solar Glow", color: "#fbbf24", lineWidth: 0, opacity: 0.34, closed: true, rawPts: circlePts(0, 0, 1.05, 64) },
+        { kind: "circle", label: "Golden Sun Core", color: "#fde047", lineWidth: 1.4, opacity: 1.0, closed: true, rawPts: circlePts(0, 0, 0.72, 64) },
+        { kind: "circle", label: "Venus (Solid Amber)", color: "#f59e0b", lineWidth: 1.0, opacity: 1.0, closed: true, rawPts: circlePts(2.05, 2.05, 0.28, 36) },
+        { kind: "circle", label: "Earth (Solid Sapphire)", color: "#0284c7", lineWidth: 1.2, opacity: 1.0, closed: true, rawPts: circlePts(-4.2, 0.0, 0.34, 36) },
+        { kind: "circle", label: "Saturn Ring Halo", color: "#fde68a", lineWidth: 2.0, opacity: 0.28, closed: true, rawPts: circlePts(4.38, -4.38, 0.82, 48) },
+        { kind: "circle", label: "Saturn (Solid Ochre)", color: "#d97706", lineWidth: 1.0, opacity: 1.0, closed: true, rawPts: circlePts(4.38, -4.38, 0.44, 40) },
+        { kind: "circle", label: "Mars (Solid Rust)", color: "#e11d48", lineWidth: 1.0, opacity: 1.0, closed: true, rawPts: circlePts(0.0, 5.15, 0.24, 32) },
+      ],
+      defaultPoints: [
+        pt(0.0, 0.0, "Sun", "star", "#fef08a", 4.5, true),
+        pt(-4.2, 0.0, "Earth", "dot", "#38bdf8", 4.0, true),
+        pt(4.38, -4.38, "Saturn", "dot", "#fde68a", 4.0, true),
+      ],
+      presets: [
+        { id: "orrery_mandala", name: "Solar Orrery & 8:13 Resonance", squareAspect: true, view: { xmin: -7.5, xmax: 7.5, ymin: -7.5, ymax: 7.5 }, sliderValues: { phase: 0.0 }, visibleFnIndices: [0, 1, 2, 3] },
+        { id: "orrery_rotate", name: "▶ Rotate Resonance Mandala", squareAspect: true, view: { xmin: -7.5, xmax: 7.5, ymin: -7.5, ymax: 7.5 }, sliderValues: { phase: 0.0 }, visibleFnIndices: [0, 1, 2, 3], startSlider: "phase" },
+      ],
+    },
+    {
+      id: "real_fourier_epicycles",
+      mode: "real",
+      folder: "cat_curves_art",
+      category: "Curves, Epicycles & Automata",
+      title: "Fourier Epicycle Drawing Machine",
+      subtitle: "Rotating phasor chain Σ c_k e^(i k θ) tracing a 5-fold star curve at (0, 0) — scrub φ or epicycle count N!",
+      description: "Rotating phasor chain Σ c_k e^(i k θ) drawing a closed 5-fold star curve with live animated epicycle circles, phasor arms, and harmonic count N slider.",
+      fnCards: [
+        { title: "Synthesized Fourier Curve (N Epicycles)", code: "parametric [0, 6.283185]:\nint lim = (int)floor(N + 0.5);\nif (lim < 1) lim = 1;\nif (lim > 25) lim = 25;\ndouble x0 = 0.0, y0 = 0.0;\nfor (int m = 0; m < lim; m++) {\n  int freq = (m % 2 == 0) ? (1 + (m / 2) * 5) : -(4 + (m / 2) * 5);\n  double amp = 4.2 / ((double)abs(freq) * (1.0 + 0.15 * m));\n  x0 += amp * cos((double)freq * t);\n  y0 += amp * sin((double)freq * t);\n}\npx = x0;\npy = y0;", color: "#38bdf8", visible: true },
+        { title: "Live Epicycle Circles & Phasor Arms (at φ)", code: "parametric [0, 999]:\nint lim = (int)floor(N + 0.5);\nif (lim < 1) lim = 1;\nif (lim > 20) lim = 20;\nint idx = (int)floor(t + 0.5);\nint ring = idx / 45, s = idx % 45;\nif (ring >= lim || s == 44) { px = NAN; py = NAN; } else {\n  double cx = 0.0, cy = 0.0;\n  for (int m = 0; m < ring; m++) {\n    int f0 = (m % 2 == 0) ? (1 + (m / 2) * 5) : -(4 + (m / 2) * 5);\n    double a0 = 4.2 / ((double)abs(f0) * (1.0 + 0.15 * m));\n    cx += a0 * cos((double)f0 * phi);\n    cy += a0 * sin((double)f0 * phi);\n  }\n  int freq = (ring % 2 == 0) ? (1 + (ring / 2) * 5) : -(4 + (ring / 2) * 5);\n  double amp = 4.2 / ((double)abs(freq) * (1.0 + 0.15 * ring));\n  if (s <= 40) {\n    double ang = (double)s * (2.0 * M_PI / 40.0);\n    px = cx + amp * cos(ang);\n    py = cy + amp * sin(ang);\n  } else if (s == 41) {\n    px = NAN; py = NAN;\n  } else if (s == 42) {\n    px = cx; py = cy;\n  } else {\n    px = cx + amp * cos((double)freq * phi);\n    py = cy + amp * sin((double)freq * phi);\n  }\n}", color: "#fbbf24", visible: true },
+      ],
+      sliders: [
+        { name: "N", label: "Number of Epicycles", value: 9, min: 1, max: 20, step: 1 },
+        { name: "phi", label: "Phasor Angle φ (rad)", value: 0.85, min: 0.0, max: 6.2832, step: 0.02 },
+      ],
+      defaultPoints: [pt(0.0, 0.0, "Pivot (0, 0)", "dot", "#fbbf24", 4.5, true)],
+      presets: [
+        { id: "epicycle_star", name: "5-Fold Epicycle Star Machine", squareAspect: true, view: { xmin: -6.5, xmax: 6.5, ymin: -6.5, ymax: 6.5 }, sliderValues: { N: 9, phi: 0.85 }, visibleFnIndices: [0, 1] },
+        { id: "epicycle_spin", name: "▶ Animate Epicycle Arms (Play φ)", squareAspect: true, view: { xmin: -6.5, xmax: 6.5, ymin: -6.5, ymax: 6.5 }, sliderValues: { N: 11, phi: 0.0 }, visibleFnIndices: [0, 1], startSlider: "phi" },
       ],
     },
     {
       id: "real_parametric_gallery",
       mode: "real",
-      category: "2D Real & Parametric",
-      title: "Parametric Gallery: Butterfly, Heart & Rose",
-      subtitle: "Continuous non-function 4-thread C11 parametric curves — try clicking 1:1!",
-      description: "Gallery of non-function 2D parametric curves (Temple Fay Butterfly, Heart, and Spirograph) evaluated across 4 native C11 threads.",
+      folder: "cat_curves_art",
+      category: "Curves, Epicycles & Automata",
+      title: "Parametric Curves, Implicit Relations & Cornu Spiral",
+      subtitle: "Non-function showcase: Temple Fay Butterfly, Heart, Spirograph, Fresnel Clothoid Spiral & Implicit Elliptic Curves!",
+      description: "Unified gallery of 2D Real non-function capabilities evaluated across 4 native C11 threads: Temple Fay Butterfly, Parametric Heart, animated Spirograph, Fresnel Cornu clothoid spiral, and implicit relations F(x, y) = 0 with vertical tangents.",
       fnCards: [
-        {
-          title: "Temple Fay Butterfly Curve",
-          code: "parametric [0, 37.69911]:\ndouble r = exp(cos(t)) - 2.0 * cos(4.0 * t) - pow(sin(t / 12.0), 5.0);\npx = sin(t) * r;\npy = cos(t) * r;",
-          color: "#38bdf8",
-          visible: true,
-        },
-        {
-          title: "Parametric Heart",
-          code: "(0.22*(16.0*pow(sin(t),3)), 0.22*(13.0*cos(t)-5.0*cos(2*t)-2.0*cos(3*t)-cos(4*t))) for t in [0, 2*M_PI]",
-          color: "#fb7185",
-          visible: false,
-        },
-        {
-          title: "Spirograph Hypotrochoid (k)",
-          code: "parametric [0, 62.83185]:\ndouble R0 = 3.2, r0 = 1.0;\npx = (R0 - r0) * cos(t) + k * cos(((R0 - r0) / r0) * t);\npy = (R0 - r0) * sin(t) - k * sin(((R0 - r0) / r0) * t);",
-          color: "#a78bfa",
-          visible: false,
-        },
+        { title: "Temple Fay Butterfly Curve", code: "parametric [0, 37.69911]:\ndouble rad = exp(cos(t)) - 2.0 * cos(4.0 * t) - pow(sin(t / 12.0), 5.0);\npx = sin(t) * rad;\npy = cos(t) * rad;", color: "#38bdf8", visible: true },
+        { title: "Parametric Heart", code: "(0.22*(16.0*pow(sin(t),3)), 0.22*(13.0*cos(t)-5.0*cos(2*t)-2.0*cos(3*t)-cos(4*t))) for t in [0, 2*M_PI]", color: "#fb7185", visible: false },
+        { title: "Spirograph Hypotrochoid (k)", code: "parametric [0, 62.83185]:\ndouble R0 = 3.2, r0 = 1.0;\npx = (R0 - r0) * cos(t) + k * cos(((R0 - r0) / r0) * t);\npy = (R0 - r0) * sin(t) - k * sin(((R0 - r0) / r0) * t);", color: "#a78bfa", visible: false },
+        { title: "Fresnel Cornu Spiral (C(t), S(t))", code: "parametric [-4.5, 4.5]:\nint steps = 120;\ndouble du = t / (double)steps;\ndouble cx = 0.0, cy = 0.0;\nfor (int i = 0; i < steps; i++) {\n    double u = (i + 0.5) * du;\n    double ang = 0.5 * M_PI * u * u;\n    cx += cos(ang) * du;\n    cy += sin(ang) * du;\n}\npx = cx;\npy = cy;", color: "#34d399", visible: false },
+        { title: "Implicit Circle x² + y² = r²", code: "x*x + y*y = r*r", color: "#38bdf8", visible: false },
+        { title: "Vertical Tangent x = r", code: "x = r", color: "#fb7185", lineStyle: "dashed", visible: false },
+        { title: "Elliptic Curve y² = x³ − 3x + 3", code: "y*y = x*x*x - 3.0*x + 3.0", color: "#fbbf24", visible: false },
       ],
       sliders: [
-        { name: "k", label: "Spirograph pen", value: 1.6, min: 0.2, max: 3.4, step: 0.05 },
+        { name: "k", label: "Spirograph pen", value: 1.6, min: 0.2, max: 3.4, step: 0.05, speed: 0.5 },
+        { name: "r", label: "Implicit circle radius", value: 4.0, min: 0.8, max: 7.0, step: 0.1, speed: 0.4 },
       ],
       defaultPoints: [],
       presets: [
+        { id: "butterfly", name: "Butterfly Curve", squareAspect: true, view: { xmin: -5.2, xmax: 5.2, ymin: -3.8, ymax: 4.5 }, visibleFnIndices: [0] },
+        { id: "heart", name: "Parametric Heart", squareAspect: true, view: { xmin: -5.5, xmax: 5.5, ymin: -4.4, ymax: 3.6 }, visibleFnIndices: [1] },
+        { id: "spirograph", name: "▶ Animated Spirograph", squareAspect: true, view: { xmin: -6.5, xmax: 6.5, ymin: -5.5, ymax: 5.5 }, visibleFnIndices: [2], startSlider: "k" },
         {
-          id: "butterfly",
-          name: "Butterfly Curve",
-          view: { xmin: -5.2, xmax: 5.2, ymin: -3.8, ymax: 4.5 },
-          visibleFnIndices: [0],
-        },
-        {
-          id: "heart",
-          name: "Parametric Heart",
-          view: { xmin: -5.5, xmax: 5.5, ymin: -4.4, ymax: 3.6 },
-          visibleFnIndices: [1],
-        },
-        {
-          id: "spirograph",
-          name: "Animated Spirograph",
-          view: { xmin: -6.5, xmax: 6.5, ymin: -5.5, ymax: 5.5 },
-          visibleFnIndices: [2],
-          startSlider: "k",
-        },
-      ],
-    },
-    {
-      id: "real_fresnel_cornu",
-      mode: "real",
-      category: "2D Real & Parametric",
-      title: "Fresnel Cornu Spiral (Clothoid)",
-      subtitle: "Optical diffraction spiral (C(t), S(t)) = (∫ cos(πu²/2) du, ∫ sin(πu²/2) du) converging to ±(½, ½)",
-      description: "Traces the Cornu (Euler) spiral defined by Fresnel cosine and sine integrals C(t) and S(t), converging symmetrically onto its two focal eyes (±1/2, ±1/2).",
-      fnCards: [
-        {
-          title: "Cornu Spiral (C(t), S(t))",
-          code: "parametric [-4.5, 4.5]:\nint steps = 120;\ndouble du = t / (double)steps;\ndouble cx = 0.0, cy = 0.0;\nfor (int i = 0; i < steps; i++) {\n    double u = (i + 0.5) * du;\n    double ang = 0.5 * M_PI * u * u;\n    cx += cos(ang) * du;\n    cy += sin(ang) * du;\n}\npx = cx;\npy = cy;",
-          color: "#38bdf8",
-          visible: true,
-        },
-      ],
-      sliders: [],
-      defaultPoints: [
-        pt(0.5, 0.5, "(+½, +½) Focus", "ring", "#34d399", 5, true),
-        pt(-0.5, -0.5, "(−½, −½) Focus", "ring", "#fb7185", 5, true),
-      ],
-      presets: [
-        {
-          id: "cornu_full",
-          name: "Full Clothoid Spiral",
+          id: "cornu_spiral",
+          name: "Fresnel Cornu Spiral (±½, ±½)",
+          squareAspect: true,
           view: { xmin: -1.35, xmax: 1.35, ymin: -1.0, ymax: 1.0 },
+          visibleFnIndices: [3],
+          points: [
+            pt(0.5, 0.5, "(+½, +½) Focus", "ring", "#34d399", 5, true),
+            pt(-0.5, -0.5, "(−½, −½) Focus", "ring", "#fb7185", 5, true),
+          ],
         },
-        {
-          id: "cornu_eye",
-          name: "Zoom Positive Focus (+½, +½)",
-          view: { xmin: 0.15, xmax: 0.88, ymin: 0.15, ymax: 0.88 },
-        },
+        { id: "implicit_elliptic", name: "Implicit Circle, Tangent & Elliptic Curve", squareAspect: true, view: { xmin: -6.5, xmax: 6.5, ymin: -5.5, ymax: 5.5 }, sliderValues: { r: 3.5 }, visibleFnIndices: [4, 5, 6] },
       ],
     },
     {
       id: "real_game_of_life",
       mode: "real",
-      category: "2D Real & Cellular Automata",
+      folder: "cat_curves_art",
+      category: "Curves, Epicycles & Automata",
       title: "Conway's Game of Life — Centered [-R, R]² Sandbox",
-      subtitle: "Single radius parameter R sets how many blocks out from (0, 0) the boundary goes! Begins in 1:1 mode at (0, 0) with a symmetric Pulsar Cathedral centerpiece!",
+      subtitle: "Native C11 cellular automaton on [-R, R]² with paintable cells, Pulsar Cathedral & Twin Gosper Glider Guns!",
       description: "Interactive Conway’s Game of Life (B3/S23) cellular automaton running in native C11 on a centered [−R, R]² cell grid with paintable seed polygons and live generation scrubbing.",
       fnCards: [
-        {
-          title: "Conway's Game of Life ([-R, R]² · Gen G)",
-          code: "parametric [0, 3599]:\nint rad = (int)floor(R + 0.5);\nint gens = (int)floor(G + 0.5);\nint idx = (int)floor(t + 0.5);\nint cell = idx / 6, v = idx % 6;\nint cx = 0, cy = 0;\nint cnt = real_life_cell_at(rad, gens, cell, &cx, &cy);\nif (cell >= cnt || v == 5) {\n  px = NAN; py = NAN;\n} else {\n  double x0 = (double)cx + 0.10, y0 = (double)cy + 0.10;\n  px = (v == 1 || v == 2) ? x0 + 0.80 : x0;\n  py = (v == 2 || v == 3) ? y0 + 0.80 : y0;\n}",
-          color: "#34d399",
-          visible: true,
-        },
-        {
-          title: "Arena Boundary [-R, R] × [-R, R]",
-          code: "parametric [0, 4]:\ndouble r = R < 4.0 ? 4.0 : (R > 60.0 ? 60.0 : R);\nif (t < 1.0) { px = -r + 2.0 * r * t; py = -r; }\nelse if (t < 2.0) { px = r; py = -r + 2.0 * r * (t - 1.0); }\nelse if (t < 3.0) { px = r - 2.0 * r * (t - 2.0); py = r; }\nelse { px = -r; py = r - 2.0 * r * (t - 3.0); }",
-          color: "#38bdf8",
-          visible: true,
-          lineStyle: "dashed",
-        },
+        { title: "Conway's Game of Life ([-R, R]² · Gen G)", code: "parametric [0, 3599]:\nint rad = (int)floor(R + 0.5);\nint gens = (int)floor(G + 0.5);\nint idx = (int)floor(t + 0.5);\nint cell = idx / 6, v = idx % 6;\nint cx = 0, cy = 0;\nint cnt = real_life_cell_at(rad, gens, cell, &cx, &cy);\nif (cell >= cnt || v == 5) {\n  px = NAN; py = NAN;\n} else {\n  double x0 = (double)cx + 0.10, y0 = (double)cy + 0.10;\n  px = (v == 1 || v == 2) ? x0 + 0.80 : x0;\n  py = (v == 2 || v == 3) ? y0 + 0.80 : y0;\n}", color: "#34d399", visible: true },
+        { title: "Arena Boundary [-R, R] × [-R, R]", code: "parametric [0, 4]:\ndouble r = R < 4.0 ? 4.0 : (R > 60.0 ? 60.0 : R);\nif (t < 1.0) { px = -r + 2.0 * r * t; py = -r; }\nelse if (t < 2.0) { px = r; py = -r + 2.0 * r * (t - 1.0); }\nelse if (t < 3.0) { px = r - 2.0 * r * (t - 2.0); py = r; }\nelse { px = -r; py = r - 2.0 * r * (t - 3.0); }", color: "#38bdf8", visible: true, lineStyle: "dashed" },
       ],
-      sliders: [
-        { name: "G", label: "Generation", value: 0, min: 0, max: 240, step: 1 },
-      ],
-      vars: [
-        { name: "R", label: "Blocks out from origin (0,0) in each direction [-R, R]²", expr: "32" },
-      ],
-      defaultPoints: [
-        pt(0.0, 0.0, "Origin (0, 0)", "cross", "#38bdf8", 4.5, true),
-      ],
+      sliders: [{ name: "G", label: "Generation", value: 0, min: 0, max: 240, step: 1 }],
+      vars: [{ name: "R", label: "Arena radius [-R, R]²", expr: "32" }],
+      defaultPoints: [pt(0.0, 0.0, "Origin (0, 0)", "cross", "#38bdf8", 4.5, true)],
       presets: [
         {
           id: "cathedral_centerpiece",
-          name: "Pulsar Cathedral & 4-Way Glider Armada (Origin)",
+          name: "Pulsar Cathedral & 4-Way Glider Armada",
           squareAspect: true,
           view: { xmin: -36.0, xmax: 36.0, ymin: -36.0, ymax: 36.0 },
           sliderValues: { G: 0 },
           visibleFnIndices: [0, 1],
           polyTool: "select",
           polygons: [
-            /* 1. Central Period-3 Pulsar Cathedral centered right at (0, 0) */
             [-6,-4],[-6,-3],[-6,-2],[-6,2],[-6,3],[-6,4],
             [-1,-4],[-1,-3],[-1,-2],[-1,2],[-1,3],[-1,4],
             [1,-4],[1,-3],[1,-2],[1,2],[1,3],[1,4],
@@ -2431,22 +4085,18 @@
             [-4,-1],[-3,-1],[-2,-1],[2,-1],[3,-1],[4,-1],
             [-4,1],[-3,1],[-2,1],[2,1],[3,1],[4,1],
             [-4,6],[-3,6],[-2,6],[2,6],[3,6],[4,6],
-            /* 2. Four Pentadecathlon (Period-15) Dynamo Pillars at (0, ±18) & (±18, 0) */
             [-4,18],[-3,18],[-2,17],[-2,19],[-1,18],[0,18],[1,18],[2,18],[3,17],[3,19],[4,18],[5,18],
             [-4,-18],[-3,-18],[-2,-17],[-2,-19],[-1,-18],[0,-18],[1,-18],[2,-18],[3,-17],[3,-19],[4,-18],[5,-18],
             [18,-4],[18,-3],[17,-2],[19,-2],[18,-1],[18,0],[18,1],[18,2],[17,3],[19,3],[18,4],[18,5],
             [-18,-4],[-18,-3],[-17,-2],[-19,-2],[-18,-1],[-18,0],[-18,1],[-18,2],[-17,3],[-19,3],[-18,4],[-18,5],
-            /* 3. Four Diagonal Outward-Firing Glider Squadrons (NE, NW, SE, SW) */
             [10,12],[11,12],[12,12],[12,11],[11,10],
             [-11,12],[-12,12],[-13,12],[-13,11],[-12,10],
             [10,-13],[11,-13],[12,-13],[12,-12],[11,-11],
             [-11,-13],[-12,-13],[-13,-13],[-13,-12],[-12,-11],
-            /* Second wave of diagonal gliders at (±17, ±17) */
             [17,19],[18,19],[19,19],[19,18],[18,17],
             [-18,19],[-19,19],[-20,19],[-20,18],[-19,17],
             [17,-20],[18,-20],[19,-20],[19,-19],[18,-18],
             [-18,-20],[-19,-20],[-20,-20],[-20,-19],[-19,-18],
-            /* 4. Four Corner Beacon Stills at (±27, ±27) */
             [26,26],[27,26],[26,27],[27,27],
             [-27,26],[-28,26],[-27,27],[-28,27],
             [26,-27],[27,-27],[26,-28],[27,-28],
@@ -2455,7 +4105,7 @@
         },
         {
           id: "twin_guns_duel",
-          name: "Twin Gosper Glider Guns Duel at (0, 0)",
+          name: "▶ Twin Gosper Glider Guns Duel",
           squareAspect: true,
           view: { xmin: -36.0, xmax: 36.0, ymin: -36.0, ymax: 36.0 },
           sliderValues: { G: 0 },
@@ -2463,7 +4113,6 @@
           startSlider: "G",
           polyTool: "select",
           polygons: [
-            /* Top-Left Gosper Glider Gun firing SE toward (0, 0) */
             ...[
               [1,5],[1,6],[2,5],[2,6],
               [11,5],[11,6],[11,7],[12,4],[12,8],[13,3],[13,9],[14,3],[14,9],
@@ -2472,7 +4121,6 @@
               [25,1],[25,2],[25,6],[25,7],
               [35,3],[35,4],[36,3],[36,4],
             ].map(([x, y]) => [-29 + x, 27 - y]),
-            /* Bottom-Right Gosper Glider Gun (180° point-reflected) firing NW toward (0, 0)! */
             ...[
               [1,5],[1,6],[2,5],[2,6],
               [11,5],[11,6],[11,7],[12,4],[12,8],[13,3],[13,9],[14,3],[14,9],
@@ -2485,7 +4133,7 @@
         },
         {
           id: "supernova_origin",
-          name: "R-Pentomino & Acorn Supernova at (0, 0)",
+          name: "▶ R-Pentomino & Acorn Supernova",
           squareAspect: true,
           view: { xmin: -36.0, xmax: 36.0, ymin: -36.0, ymax: 36.0 },
           sliderValues: { G: 0 },
@@ -2493,16 +4141,14 @@
           startSlider: "G",
           polyTool: "select",
           polygons: [
-            /* Classic R-pentomino right at the origin (0, 0) */
             [0,1],[1,1],[-1,0],[0,0],[0,-1],
-            /* Symmetric twin Diehard / Acorn catalysts at (±14, ±14) */
             [-15,14],[-14,16],[-14,14],[-12,15],[-11,14],[-10,14],[-9,14],
             [15,-14],[14,-16],[14,-14],[12,-15],[11,-14],[10,-14],[9,-14],
           ],
         },
         {
           id: "sandbox_sculpt",
-          name: "Custom Sandbox — Fill [-R, R]² Grid (Sculpt!)",
+          name: "Custom Sandbox — Fill [-R, R]² Grid",
           squareAspect: true,
           view: { xmin: -36.0, xmax: 36.0, ymin: -36.0, ymax: 36.0 },
           sliderValues: { G: 0 },
@@ -2513,63 +4159,1019 @@
         },
       ],
     },
-    {
-      id: "real_fourier_epicycles",
-      mode: "real",
-      category: "2D Real & Parametric",
-      title: "Fourier Epicycle Drawing Machine & Harmonic Synthesis",
-      subtitle: "Rotating phasor chain Σ c_k e^(i k θ) tracing a closed star curve at (0, 0) in 1:1 mode — scrub phase phi or harmonic count N!",
-      description: "Rotating phasor chain Σ c_k e^(i k θ) drawing a closed 5-fold star curve with live animated epicycle circles, phasor arms, and harmonic count N slider.",
-      fnCards: [
-        {
-          title: "Synthesized Fourier Curve (N Epicycles)",
-          code: "parametric [0, 6.283185]:\nint lim = (int)floor(N + 0.5);\nif (lim < 1) lim = 1;\nif (lim > 25) lim = 25;\ndouble x0 = 0.0, y0 = 0.0;\nfor (int m = 0; m < lim; m++) {\n  int freq = (m % 2 == 0) ? (1 + (m / 2) * 5) : -(4 + (m / 2) * 5);\n  double amp = 4.2 / ((double)abs(freq) * (1.0 + 0.15 * m));\n  x0 += amp * cos((double)freq * t);\n  y0 += amp * sin((double)freq * t);\n}\npx = x0;\npy = y0;",
-          color: "#38bdf8",
-          visible: true,
-        },
-        {
-          title: "Live Epicycle Circles & Phasor Arms (at φ)",
-          code: "parametric [0, 999]:\nint lim = (int)floor(N + 0.5);\nif (lim < 1) lim = 1;\nif (lim > 20) lim = 20;\nint idx = (int)floor(t + 0.5);\nint ring = idx / 45, s = idx % 45;\nif (ring >= lim || s == 44) { px = NAN; py = NAN; } else {\n  double cx = 0.0, cy = 0.0;\n  for (int m = 0; m < ring; m++) {\n    int f0 = (m % 2 == 0) ? (1 + (m / 2) * 5) : -(4 + (m / 2) * 5);\n    double a0 = 4.2 / ((double)abs(f0) * (1.0 + 0.15 * m));\n    cx += a0 * cos((double)f0 * phi);\n    cy += a0 * sin((double)f0 * phi);\n  }\n  int freq = (ring % 2 == 0) ? (1 + (ring / 2) * 5) : -(4 + (ring / 2) * 5);\n  double amp = 4.2 / ((double)abs(freq) * (1.0 + 0.15 * ring));\n  if (s <= 40) {\n    double ang = (double)s * (2.0 * M_PI / 40.0);\n    px = cx + amp * cos(ang);\n    py = cy + amp * sin(ang);\n  } else if (s == 41) {\n    px = NAN; py = NAN;\n  } else if (s == 42) {\n    px = cx; py = cy;\n  } else {\n    px = cx + amp * cos((double)freq * phi);\n    py = cy + amp * sin((double)freq * phi);\n  }\n}",
-          color: "#fbbf24",
-          visible: true,
-        },
-      ],
-      sliders: [
-        { name: "N", label: "Number of Epicycles", value: 9, min: 1, max: 20, step: 1 },
-        { name: "phi", label: "Phasor Angle φ (rad)", value: 0.85, min: 0.0, max: 6.2832, step: 0.02 },
-      ],
-      defaultPoints: [
-        pt(0.0, 0.0, "Pivot (0, 0)", "dot", "#fbbf24", 4.5, true),
-      ],
-      presets: [
-        {
-          id: "epicycle_star",
-          name: "5-Fold Epicycle Star Machine (1:1 Origin)",
-          squareAspect: true,
-          view: { xmin: -6.5, xmax: 6.5, ymin: -6.5, ymax: 6.5 },
-          sliderValues: { N: 9, phi: 0.85 },
-          visibleFnIndices: [0, 1],
-        },
-        {
-          id: "epicycle_spin",
-          name: "Animate Epicycle Arms (Play φ)",
-          squareAspect: true,
-          view: { xmin: -6.5, xmax: 6.5, ymin: -6.5, ymax: 6.5 },
-          sliderValues: { N: 11, phi: 0.0 },
-          visibleFnIndices: [0, 1],
-          startSlider: "phi",
-        },
-      ],
-    },
   ];
+
+  /* Curated classroom & visual explanation Text Cards attached to all 29 projects.
+   * Each card renders as a clean glass note on the canvas and is fully editable in ELEMENTS & LAYERS. */
+  const note = (title, text, color = "#38bdf8", anchor = "bottom-left", plane = "in", maxWidth = 315) => ({
+    kind: "text",
+    title,
+    text,
+    color,
+    anchor,
+    plane,
+    maxWidth,
+    opacity: 0.92,
+    visible: true,
+    locked: false,
+  });
+
+  const EXAMPLE_NOTES = {
+    map_magnum_opus: [
+      note(
+        "★ Magnum Opus: The Conformal Cosmos",
+        "Exact $\\mathrm{SL}(2,\\mathbb{Z})$-reduced Klein modular $j(\\tau)$ on the Poincaré Disk, 60 FPS 3D Black-Hole Orb, live orbiting Cauchy residues ($\\oint$), and Burning Ship deep zoom.\n• Switch presets below or drag & resize this card anywhere!",
+        "#a78bfa", "bottom-left", "in", 335
+      ),
+    ],
+    real_magnum_opus: [
+      note(
+        "★ Magnum Opus: Chaos, Chladni & Quantum Lab",
+        "Live C11 RK4 3D Lorenz Strange Attractor & Butterfly Effect, 4-thread Chladni acoustic nodal plates, propagating quantum wavepacket $\\psi(x,t)$, and Van der Pol limit cycles.\n• Switch presets below or drag & resize this card anywhere!",
+        "#38bdf8", "bottom-left", "in", 340
+      ),
+    ],
+    map_zeta: [
+      note(
+        "Riemann Zeta $\\zeta(s)$",
+        "The critical line $\\Re(s) = \\frac{1}{2}$ (left) spirals through the origin $w = 0$ (right) at every non-trivial zero $\\rho_n$.\n• Try presets to inspect Domain Coloring, Residue at $s = 1$ ($\\oint = 2\\pi i$), or Homotopy Morph.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    map_dirichlet: [
+      note(
+        "Dirichlet Series Wall at $\\Re(s) = 1$",
+        "Partial sums $S_N(s) = \\sum_{k=1}^N k^{-s}$ match $\\zeta(s)$ for $\\Re(s) > 1$, but diverge violently left of $\\Re(s) = 1$.\n• Scrub or play $N$ to watch $S_N(s)$ blow up at the boundary while analytic $\\zeta(s)$ stays smooth.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    map_joukowsky: [
+      note(
+        "Joukowsky Wing Transform",
+        "$w = \\frac{1}{2}\\left(z + \\frac{1}{z}\\right)$ maps an off-center circle passing through $z = 1$ into an aerodynamic airfoil (right).\n• Scrub $c_{x0}$ (thickness) and $c_{y0}$ (camber) — watch the locked Center $c_0$ and wing reshape live!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    map_exp_inv: [
+      note(
+        "Great Picard Theorem · $\\exp(1/z)$",
+        "Around the essential singularity $z = 0$, even a tiny circle maps onto wild spirals covering every value $w \\neq 0$ infinitely often.\n• Shrink slider $r \\to 0$ or switch to the Riemann Sphere preset.",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    map_blaschke_kaleidoscope: [
+      note(
+        "Blaschke Disk Automorphisms",
+        "$B(z) = e^{i\\theta}\\frac{z - a}{1 - \\bar{a}z}$ maps the open unit disk $|z| < 1$ bijectively onto itself while preserving angles.\n• Scrub $a$ and $\\theta$ to slide hyperbolic geodesics inside the Poincaré Disk!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    int_cauchy_residues: [
+      note(
+        "Cauchy Residue Theorem",
+        "$\\oint f(z)\\,dz = 2\\pi i \\sum \\operatorname{Res}(f, z_k)$ over all enclosed poles.\n• Drag any contour across a pole to watch the live integral jump by $\\pm 2\\pi i \\cdot \\operatorname{Res}$ in the Contour panel!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    int_zero_counter: [
+      note(
+        "Argument Principle Zero Counter",
+        "$\\frac{1}{2\\pi i}\\oint \\frac{\\zeta'(s)}{\\zeta(s)}\\,ds = Z - P$ counts zeros minus poles enclosed by the box.\n• Drag the box edges to enclose $1, 2,$ or $3$ Riemann zeros — or include the pole at $s = 1$!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    int_gamma: [
+      note(
+        "Euler Gamma $\\Gamma(z)$ Residue Ladder",
+        "$\\Gamma(z)$ has simple poles at $z = 0, -1, -2, \\dots$ with alternating residues $\\frac{(-1)^n}{n!}$.\n• Check the Contour panel to verify each loop's integral equals $2\\pi i \\frac{(-1)^n}{n!}$.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    int_keyhole: [
+      note(
+        "Keyhole (Pac-Man) Branch Cut",
+        "Indents around the branch cut of $z^a$ on $[0, \\infty)$ so top and bottom edges differ by $e^{2\\pi i a}$ instead of cancelling.\n• Scrub $t$ to close the slit $\\varepsilon \\to 0$, or tune exponent $a$.",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    int_fresnel_sector: [
+      note(
+        "Fresnel $45^\\circ$ Pie-Slice ($\\oint = 0$)",
+        "Since $e^{-z^2}$ is entire, the closed $45^\\circ$ wedge integrates to $0$. As arc radius $R \\to \\infty$ the outer arc vanishes, proving $\\int_0^\\infty \\cos(x^2)\\,dx = \\int_0^\\infty \\sin(x^2)\\,dx = \\sqrt{\\frac{\\pi}{8}}$.\n• Sweep $R$ to watch the arc shrink to $0$!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    map_mandelbrot: [
+      note(
+        "Mandelbrot & Multibrot ($z^p + c$)",
+        "Black points stay bounded under $z \\mapsto z^p + c$; exterior bands measure smooth escape potential $\\nu(c)$.\n• Scrub $\\text{zoom}$ for a $100{,}000\\times$ live dive, $\\text{shift}$ to cycle colors, or power $p$ for Multibrots!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    map_julia_sculptor: [
+      note(
+        "Julia Set Sculptor ($z^2 + c$)",
+        "Each point $c = r e^{i\\theta}$ spawns its own Julia fractal — connected when $c \\in \\mathcal{M}$, shattering into Fatou dust outside.\n• Hit ▶ on $\\theta_c$ or scrub $\\text{shift}$ for smooth real-time morphing!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    map_newton_kaleidoscope: [
+      note(
+        "Newton Stained-Glass Basins",
+        "Each color marks which $n$-th root of $z^n - 1 = 0$ Newton's method converges to; brightness encodes speed.\n• Notice every boundary point borders ALL $n$ basins! Scrub $n$ or Nova relaxation $a$.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    map_earth_atlas: [
+      note(
+        "Full-Color 3D Earth Atlas",
+        "87 solid geographic layers mapped onto the Riemann Sphere $S^2$ via inverse stereographic projection.\n• Drag the globe to orbit, hit ▶ on $\\text{spin}$ for 60 FPS rotation, or try Antipodal $w = 1/z$!",
+        "#38bdf8", "bottom-left", "out"
+      ),
+    ],
+    map_stained_glass_sphere: [
+      note(
+        "Conformal Stained-Glass Orb",
+        "Layered $100\\%$-solid jewel polygons warped by Möbius automorphisms $w = \\frac{z - a}{1 - a z}$ on the Riemann Sphere & Poincaré Disk.\n• Scrub $a$ to shift hyperbolic symmetry, or play $\\text{spin}$ for 60 FPS rotation.",
+        "#fbbf24", "bottom-left", "out"
+      ),
+    ],
+    real_mvt_rolle: [
+      note(
+        "Mean Value Theorem",
+        "Yellow dashed: secant on $[a, b]$. Green dotted: guaranteed parallel tangent at $c^* \\in (a, b)$ with $f'(c^*) = \\frac{f(b) - f(a)}{b - a}$.\n• Scrub $a, b,$ or $c$ — locked endpoints & tangent point glide live along $f(x)$!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    real_riemann_ftc: [
+      note(
+        "Darboux Bounds & Riemann Integral",
+        "Red step = Upper Darboux sum; Green step = Lower Darboux sum trapping the exact area under $f(x)$ on $[0, b]$.\n• Increase $N$ to squeeze $U - L \\to 0$, or try the FTC preset for $F(x) = \\int_0^x f(t)\\,dt$!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    real_taylor_approx: [
+      note(
+        "Taylor Polynomials & Convergence",
+        "Dashed curve = exact function; colored curve = degree-$N$ Taylor polynomial $P_N(x)$.\n• Try the $\\frac{1}{1+x^2}$ preset to see $P_N$ explode outside $|x| < 1$ due to hidden complex poles at $z = \\pm i$!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    real_fourier: [
+      note(
+        "Fourier Series & Gibbs Overshoot",
+        "Summing $K$ odd harmonics builds a square wave, but a persistent $\\approx 9\\%$ Gibbs spike remains near every jump discontinuity.\n• Increase $K$ or switch to the Gibbs Zoom preset!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    real_lebesgue_vs_riemann: [
+      note(
+        "Lebesgue Integration (Slice $Y$, Not $X$)",
+        "Unlike Riemann (vertical $X$-bars), Lebesgue slices the $Y$-axis into dyadic levels $k / 2^n$ and measures each level set.\n• Play $n$ to watch simple functions climb monotonically (MCT), or try Fatou's Lemma!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    real_cantor_staircase: [
+      note(
+        "Cantor's Devil's Staircase",
+        "Continuous everywhere, rises from $0$ to $1$, yet has derivative $f'(x) = 0$ almost everywhere — all growth occurs on the measure-zero Cantor set!\n• Scrub iteration $k$ or zoom into $[0, \\frac{1}{3}]$ to see exact self-similarity.",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    real_weierstrass_takagi: [
+      note(
+        "Continuous, Nowhere Differentiable",
+        "Weierstrass $\\sum a^n \\cos(b^n \\pi x)$ ($ab > 1 + \\frac{3\\pi}{2}$) and Takagi's blancmange curve are continuous everywhere yet have no tangent anywhere.\n• Zoom in deeply or sweep $a$ and $N$ to see infinite fractal roughness!",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    real_pi_explicit: [
+      note(
+        "Riemann's Explicit Prime Formula",
+        "White step = exact prime count $\\pi(x)$; colored waves add $K$ non-trivial zeros of $\\zeta(s)$ as harmonic oscillators.\n• More zeta zeros sharpen every prime jump at $p = 2, 3, 5, 7, 11, \\dots$!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    real_psi_explicit: [
+      note(
+        "Chebyshev $\\psi(x)$ & Von Mangoldt",
+        "$\\psi(x)$ jumps by $\\ln p$ at every prime power $p^k$; subtracting the zeta-zero wave sum $\\sum \\frac{x^\\rho}{\\rho}$ reconstructs the staircase from $y = x$.\n• Scrub $K$ to watch prime powers emerge from zeta harmonics.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    real_hardy_z: [
+      note(
+        "Hardy's $Z(t)$ on the Critical Line",
+        "$Z(t)$ is real-valued with $|Z(t)| = |\\zeta(\\frac{1}{2} + it)|$, so every sign change on the horizontal axis is a proven Riemann zero.\n• Try Lehmer's Pair preset to inspect two nearly-touching zeros!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    real_solar_orrery: [
+      note(
+        "Venus–Earth $8:13$ Resonance Mandala",
+        "Drawing chords between Earth and Venus at equal time steps traces a $5$-petaled rose over $8$ Earth years ($13$ Venus orbits).\n• Hit ▶ on $\\text{phase}$ to rotate the planetary resonance live!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    real_fourier_epicycles: [
+      note(
+        "Fourier Epicycle Drawing Machine",
+        "Rotating harmonic circles $\\sum c_k e^{ik\\theta}$ chained tip-to-tail synthesize intricate closed curves.\n• Increase $N$ for sharper corners, or hit ▶ on $\\phi$ to spin the epicycle chain!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    real_parametric_gallery: [
+      note(
+        "Parametric & Implicit Curve Gallery",
+        "Demonstrates parametric curves $(x(t), y(t))$, implicit zero-sets $F(x, y) = 0$, and Fresnel's Cornu spiral compiled natively in C11.\n• Switch presets or scrub $k$ and $r$!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    real_game_of_life: [
+      note(
+        "Conway's Game of Life Sandbox",
+        "Click cells on the grid to paint live seeds, then scrub or play Generation $G$ to evolve Conway's $\\mathrm{B3/S23}$ cellular automaton in native C11!\n• Try Twin Glider Guns or Supernova presets.",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+  };
+
+  const PRESET_NOTES = {
+    /* 1. map_zeta */
+    "map_zeta:critical_line": [
+      note(
+        "Critical Line $\\Re(s) = \\frac{1}{2}$ & First Zero",
+        "The vertical critical line segment passes directly through ζ's first nontrivial zero at $s = \\frac{1}{2} + 14.1347i$ — watch its image spiral right through $w = 0$ on the Output plane!\n• Drag the yellow segment left/right off $\\Re(s) = \\frac{1}{2}$ to see the curve miss the origin.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_zeta:zeta_domain_portrait": [
+      note(
+        "Riemann $\\zeta(s)$ Domain Coloring Portrait",
+        "Color hue encodes $\\arg \\zeta(s)$ while brightness encodes $|\\zeta(s)|$: the blazing white star at $s = 1$ is the simple pole (phase winds clockwise), while dark dots at −2, −4, −6 and on $\\Re(s) = \\frac{1}{2}$ are zeros!\n• Hover anywhere to read $\\zeta(s)$ live or toggle Output Plane in the top bar.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "map_zeta:zeta_residue_contour": [
+      note(
+        "∮ Contour Residue: Pole $s = 1$ vs Holomorphic Loop",
+        "The cyan circle encloses the simple pole $s = 1$ ($\\operatorname{Res} = 1$), giving $\\oint \\zeta(s)\\,ds = 2\\pi i \\approx 6.2832i$, while the emerald loop lies in a holomorphic region so its integral is strictly $0$!\n• Drag the green loop over $s = 1$ and watch its contour integral jump instantaneously by $2\\pi i$!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "map_zeta:zeta_stereo_disk": [
+      note(
+        "Stereographic Disk Compactification of $\\zeta(s)$",
+        "Maps all of $\\mathbb{C} \\cup \\{\\infty\\}$ into the bounded Stereographic Disk $|W| < 1$ so the pole $s = 1$ reaches the outer ∞ rim cleanly instead of flying off-screen!\n• Drag loops near $s = 1$ to watch their output image touch the ∞ boundary.",
+        "#fbbf24", "bottom-left", "out"
+      ),
+    ],
+    "map_zeta:zeta_homotopy_morph": [
+      note(
+        "▶ Homotopy Morph: Identity z → ζ(z)",
+        "Smoothly interpolates $f_t(z) = (1-t)z + t\\zeta(z)$ from t = 0 (flat identity) to t = 1 (full Riemann zeta), showing exactly how the critical strip bends into ζ-loops!\n• Pause or scrub slider t to freeze any intermediate deformation.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_zeta:zeta_completed_xi": [
+      note(
+        "Completed Xi Function $\\xi(s) = \\xi(1-s)$",
+        "Multiplying $\\zeta(s)$ by $\\frac{1}{2}s(s-1)\\pi^{-s/2}\\Gamma(\\frac{s}{2})$ cancels the pole at $s = 1$ and all trivial zeros, leaving an entire function with exact mirror symmetry across $\\Re(s) = \\frac{1}{2}$!\n• Notice symmetric phase colors left and right of the critical line.",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+
+    /* 2. map_dirichlet */
+    "map_dirichlet:wall_box": [
+      note(
+        "Dirichlet Series Wall at $\\Re(s) = 1$",
+        "The partial sum $\\sum_{n=1}^{N} n^{-s}$ matches $\\zeta(s)$ smoothly to the right of $\\Re(s) = 1$, but explodes violently inside $\\Re(s) < 1$ where the series diverges!\n• Compare the right half of the box (tame) with the left half (wildly amplified).",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "map_dirichlet:dirichlet_animate": [
+      note(
+        "▶ Divergence Explosion Past $\\Re(s) = 1$",
+        "Watch N sweep upward: for $\\Re(s) > 1$ the curve settles quickly onto $\\zeta(s)$, while for $\\Re(s) < 1$ adding more terms makes the oscillations grow without bound!\n• This proves why analytic continuation (not the raw series) is needed for the critical strip.",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    "map_dirichlet:right_converge": [
+      note(
+        "Safe Convergence Half-Plane $\\Re(s) > 1$.3",
+        "Strictly inside the half-plane of absolute convergence ($\\Re(s) > 1$), the Dirichlet series $\\sum n^{-s}$ converges uniformly and maps the box smoothly onto a compact lens!\n• Drag the box leftward across the dashed $\\Re(s) = 1$ wall to trigger divergence.",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+
+    /* 3. map_joukowsky */
+    "map_joukowsky:airfoil": [
+      note(
+        "Cambered Joukowsky Airfoil (z + 1/z)",
+        "A circle passing through the trailing-edge branch point z = 1 with slight center offset (cx0, cy0) transforms conformally into a crisp lifting airfoil with a sharp Kutta cusp!\n• Scrub cx0 for wing thickness and cy0 for camber curvature live.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_joukowsky:concentric": [
+      note(
+        "Concentric Circles → Confocal Ellipses",
+        "Circles centered at the origin with radii r > 1 map under $w = \\frac{1}{2}(z + \\frac{1}{z})$ onto confocal ellipses with foci at w = ±1, while the unit circle collapses flat onto [−1, 1]!\n• Scrub or drag any ring to watch radial lines become orthogonal hyperbolas.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "map_joukowsky:joukowsky_domain": [
+      note(
+        "Joukowsky Branch Points & Phase Portrait",
+        "Color domain portrait of $w = \\frac{1}{2}(z + \\frac{1}{z})$ reveals the simple pole at $z = 0$, zeros at $z = \\pm i$, and critical branch points $z = \\pm 1$ where $f'(z) = 0$ doubles angles (creating the wing's sharp tail)!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 4. map_exp_inv */
+    "map_exp_inv:near_origin": [
+      note(
+        "Essential Singularity $e^{1/z}$ — Picard's Great Theorem",
+        "Even a tiny circle of radius r around $z = 0$ explodes into wild spirals hitting every complex value $w \\neq 0$ infinitely many times!\n• Shrink slider r → 0.08 to watch the output spirals multiply dramatically.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_exp_inv:exp_inv_sphere": [
+      note(
+        "Essential Singularity on the Riemann Sphere",
+        "Compactifying $w = e^{1/z}$ onto the Riemann Sphere tames the exponential blowup: values approaching ∞ converge cleanly to the North Pole while values near 0 gather at the South Pole!\n• Drag the sphere to inspect both poles in 3D.",
+        "#ec4899", "bottom-left", "out"
+      ),
+    ],
+
+    /* 5. map_blaschke_kaleidoscope */
+    "map_blaschke_kaleidoscope:blaschke_poincare": [
+      note(
+        "▶ Blaschke 3-Fold Cover on the Poincaré Disk",
+        "A degree-3 Blaschke product maps the unit disk 𝔻 conformally onto itself 3-to-1 while preserving the boundary $|z| = 1$!\n• Watch θ orbit the three zeros inside $|z| < 1$ and sculpt hyperbolic petals live.",
+        "#a78bfa", "bottom-left", "out"
+      ),
+    ],
+    "map_blaschke_kaleidoscope:blaschke_disk": [
+      note(
+        "Planar 3-Fold Unit Disk Branched Cover",
+        "Compare the flat Input disk (left) with its 3-sheeted Output image (right): every circle near $|z| = 1$ wraps exactly 3 times around the Output unit circle!\n• Scrub zero radius r0 to watch the two critical points coalesce.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_blaschke_kaleidoscope:blaschke_sphere": [
+      note(
+        "Blaschke Cover Lifted to the Riemann Sphere",
+        "On the Riemann Sphere, $|w| = 1$ becomes the Equator: the Southern Hemisphere (interior of 𝔻) covers itself 3 times while the Northern Hemisphere mirrors it by Schwarz reflection!\n• Drag the Riemann Sphere to inspect the equatorial symmetry.",
+        "#34d399", "bottom-left", "out"
+      ),
+    ],
+
+    /* 6. int_cauchy_residues */
+    "int_cauchy_residues:cancelling": [
+      note(
+        "∮ Cauchy Residue Theorem: Single Pole vs Cancelling Pair",
+        "$f(z) = \\frac{1}{z^2 + 1}$ has poles at $+i$ ($\\operatorname{Res} = \\frac{1}{2i}$) and $-i$ ($\\operatorname{Res} = -\\frac{1}{2i}$). The loop around $+i$ yields $+\\pi$, while the large loop enclosing BOTH poles sums to $\\pi - \\pi = 0$!\n• Open the Contour Integrals readout and drag either loop across a pole.",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "int_cauchy_residues:upper_lower": [
+      note(
+        "Upper vs Lower Arc Around Pole +i (Δ = π)",
+        "Two open paths share the exact same endpoints, yet pass on opposite sides of the pole z = +i — so their integrals differ by exactly $2\\pi i \\cdot \\Res(+i) = \\pi$!\n• Path independence breaks whenever a singularity sits between the two paths.",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    "int_cauchy_residues:path_independence": [
+      note(
+        "Path Independence for Entire sin(z)",
+        "Because sin(z) is holomorphic everywhere on ℂ with antiderivative −cos(z), BOTH paths from a to b yield the exact same integral regardless of shape, and any closed loop integrates to 0!\n• Drag vertices of either path and watch both integrals stay identical.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "int_cauchy_residues:poles_domain_view": [
+      note(
+        "Pole Domain Coloring Portrait of 1/(z² + 1)",
+        "Switching off Contour Mode reveals the phase portrait of $f(z) = \\frac{1}{z^2 + 1}$: notice opposite rainbow winding directions around the two simple poles at z = +i and z = −i!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+
+    /* 7. int_zero_counter */
+    "int_zero_counter:count_3": [
+      note(
+        "∮ Argument Principle: Counting 3 Riemann Zeros",
+        "By the Argument Principle, $\\frac{1}{2\\pi i}\\oint \\frac{\\zeta'(s)}{\\zeta(s)}\\,ds$ equals (# zeros) − (# poles) inside the contour! This box encloses the first 3 nontrivial Riemann zeros on $\\Re(s) = \\frac{1}{2}$, returning +3.0000.\n• Resize the box vertically to count 1, 2, 3, or 4 zeros live!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "int_zero_counter:zeros_vs_pole": [
+      note(
+        "Compare: 1st Riemann Zero (+1) vs Simple Pole (−1)",
+        "The emerald loop encloses the first zero $s = \\frac{1}{2} + 14.1347i$ (+1), while the rose loop encloses the simple pole $s = 1$ (−1) — demonstrating the exact sign difference in the Argument Principle!",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "int_zero_counter:trivial_zero": [
+      note(
+        "Counting the Trivial Zero at s = −2",
+        "The loop around s = −2 isolates ζ's first trivial zero on the negative real axis, returning an exact integer winding count of +1.0000.\n• Drag the loop left to s = −4 or −6 to verify each simple trivial zero!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "int_zero_counter:logderiv_domain": [
+      note(
+        "Phase Winding of $\\frac{\\zeta'(s)}{\\zeta(s)}$ Around Zeros",
+        "Every zero and pole of $\\zeta(s)$ becomes a simple pole of $\\frac{\\zeta'(s)}{\\zeta(s)}$ with residue ±1 — making every zero light up as a bright white beacon in domain coloring!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+
+    /* 8. int_gamma */
+    "int_gamma:ladder": [
+      note(
+        "∮ Gamma Function Pole Ladder: $\\Res(-n) = \\frac{(-1)^n}{n!}$",
+        "Three loops encircle the simple poles of $\\Gamma(z)$ at $z = 0$, −1, and −2 — check the Contour panel to watch their exact residues alternate: +1, −1, and +½ (× 2πi)!\n• Drag a loop onto z = −3 to measure Res = −1/6.",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    "int_gamma:gamma_domain": [
+      note(
+        "Euler Gamma $\\Gamma(z)$ Domain Coloring Portrait",
+        "$\\Gamma(z)$ has no zeros anywhere in ℂ (1/Γ is entire!) and an infinite ladder of simple poles at 0, −1, −2, −3, … whose alternating signs create vivid color dipoles along the negative real axis.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+
+    /* 9. int_keyhole */
+    "int_keyhole:pacman_4pieces": [
+      note(
+        "Keyhole (Pac-Man) Contour Around the Branch Cut",
+        "Decomposes the keyhole integral of $\\frac{z^{p-1}}{1+z}$ into 4 pieces: upper cut, lower cut, outer circle R, and inner circle ε.\n• Scrub t from 0 → 1 to shrink ε → 0 and grow R → ∞, isolating the real integral $\\frac{\\pi}{\\sin(\\pi p)}$!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "int_keyhole:pacman_animate": [
+      note(
+        "▶ Keyhole Limit Animation (ε → 0, R → ∞)",
+        "Watch the outer arc expand and inner circle collapse while the total contour integral stays locked to 2πi · Res(−1) by Cauchy's Theorem — proving $\\int_0^\\infty \\frac{x^{p-1}}{1+x}\\,dx = \\frac{\\pi}{\\sin(\\pi p)}$!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "int_keyhole:pacman_branch_domain": [
+      note(
+        "Branch Cut Discontinuity in Domain Coloring",
+        "Notice the razor-sharp hue jump along the positive real axis: that discontinuity is the branch cut of z^(p−1), which is why the upper and lower keyhole lips do not cancel!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 10. int_fresnel_sector */
+    "int_fresnel_sector:sector_3_pieces": [
+      note(
+        "45° Fresnel Pie-Slice Contour (Total Sum = 0)",
+        "Because $e^{iz^2}$ is entire, the 3-piece sector integral (real leg + 45° arc + diagonal ray) sums strictly to 0!\n• As R grows, the arc vanishes and the real Fresnel integral equals the Gaussian ray integral $\\sqrt{\\frac{\\pi}{8}}(1+i)$.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "int_fresnel_sector:sector_sweep": [
+      note(
+        "▶ Expand Sector Radius R → ∞ (Jordan's Lemma)",
+        "Watch the circular arc contribution decay exponentially to 0 as R increases, locking the oscillatory real leg $\\int_0^R e^{ix^2}\\,dx$ onto the exact Fresnel limit $(1+i)\\sqrt{\\frac{\\pi}{8}}$!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "int_fresnel_sector:fresnel_saddle": [
+      note(
+        "Gaussian Saddle Landscape of $e^{iz^2}$",
+        "Domain coloring reveals alternating valleys of exponential decay (1st & 3rd quadrants) and peaks of blowup (2nd & 4th quadrants) — explaining why 45° is the exact steepest-descent ray!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+
+    /* 11. map_mandelbrot */
+    "map_mandelbrot:mandelbrot_full": [
+      note(
+        "Mandelbrot Set — Full Overview (Ultra-Fractal)",
+        "Black interior points remain bounded under $z \\to z^2 + c$, while smooth continuous escape coloring highlights period bulbs, Seahorse Valley, Elephant Valley, and the real antenna!\n• Switch presets for live 10,000× & 100,000× zoom dives.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_mandelbrot:mandelbrot_deep_spiral": [
+      note(
+        "▶ Live 10,000× Zoom Dive: Double Spiral",
+        "Animated logarithmic zoom (in_r = 1.6 · 10^(−zoom)) dives smoothly into Seahorse Valley's iconic double spiral while C11 dynamically scales iteration depth!\n• Pause zoom anytime to let full native retina resolution settle.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "map_mandelbrot:mandelbrot_deep_minibrot": [
+      note(
+        "▶ Live 100,000× Zoom Dive: Mini-Mandelbrot",
+        "Plunges 100,000× down the real antenna onto a self-similar baby Mandelbrot island at c ≈ −1.7499577 — demonstrating exact universal self-similarity!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    "map_mandelbrot:mandelbrot_deep_spiral_static": [
+      note(
+        "Double Spiral — 10,000× Crisp Static View",
+        "Frozen at 10,000× magnification in full native device-pixel resolution so you can inspect every delicate filament, spiral arm, and satellite bulb cleanly.\n• Scroll to zoom even deeper or drag to pan!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "map_mandelbrot:mandelbrot_elephant": [
+      note(
+        "Elephant Valley (Inferno Flame Palette)",
+        "Nestled inside the cusp between the main cardioid and the east bulb (c ≈ 0.28 + 0.009i), curled trunk-like spirals cascade infinitely toward the cusp in Inferno Flame!",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "map_mandelbrot:multibrot_cubic": [
+      note(
+        "Cubic Multibrot Set ($z \\to z^3 + c$)",
+        "Raising the exponent from 2 to 3 introduces 2-fold rotational symmetry and twin main cusps, rendered in the Electric Ocean palette!\n• Scroll to explore its symmetric mini-multibrots.",
+        "#0ea5e9", "bottom-left", "in"
+      ),
+    ],
+
+    /* 12. map_julia_sculptor */
+    "map_julia_sculptor:julia_ocean_spiral": [
+      note(
+        "Electric Ocean Julia Spiral (|c| = 0.7885)",
+        "Fixed parameter $c = 0.7885 e^{ia}$ near the Mandelbrot boundary creates an intricate swirling spiral web.\n• Scrub angle a or radius r live to sculpt the Julia set in real time!",
+        "#0ea5e9", "bottom-left", "in"
+      ),
+    ],
+    "map_julia_sculptor:julia_orbit_morph": [
+      note(
+        "▶ Live Julia Set Orbit Morph (|c| = 0.7885)",
+        "As $c = 0.7885 e^{ia}$ orbits the Mandelbrot cardioid, watch the Julia set morph continuously between connected dragons, spirals, rabbits, and Cantor dust!\n• Pause a anywhere to settle into crisp full resolution.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_julia_sculptor:julia_dendrite": [
+      note(
+        "Misiurewicz Lightning Dendrite (c = i)",
+        "Because c = i lies strictly on the Mandelbrot boundary with a pre-periodic critical orbit, its Julia set has zero interior area and forms an infinitely branching lightning tree!",
+        "#ec4899", "bottom-left", "in"
+      ),
+    ],
+    "map_julia_sculptor:julia_rabbit": [
+      note(
+        "Douady's Rabbit (c ≈ −0.122 + 0.745i)",
+        "Choosing c inside the period-3 Mandelbrot bulb produces Douady's classic 3-ear rabbit fractal where every central body sprouts recursive rabbit ears at every scale!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "map_julia_sculptor:julia_live_zoom": [
+      note(
+        "▶ Live Zoom Dive into Julia Spiral",
+        "Zooms logarithmically into a deep Julia spiral core, showcasing how every neighborhood of a Julia boundary point contains a miniature copy of the entire fractal!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 13. map_newton_kaleidoscope */
+    "map_newton_kaleidoscope:newton_cubic_classic": [
+      note(
+        "Cubic Newton Basins ($z^3 - 1 = 0$)",
+        "Each of the 3 colored basins converges to a distinct cube root of unity under $z_{n+1} = z_n - \\frac{f(z_n)}{f'(z_n)}$ — yet EVERY boundary point touches ALL THREE basins simultaneously (Wada property)!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "map_newton_kaleidoscope:newton_quintic_neon": [
+      note(
+        "Quintic Newton Fractal ($z^5 - 1 = 0$ · Neon Prism)",
+        "Five-fold rotational symmetry divides the complex plane into 5 root basins separated by luminous braided jewel chains of slow-converging fractal filaments!",
+        "#ec4899", "bottom-left", "in"
+      ),
+    ],
+    "map_newton_kaleidoscope:newton_nova_inferno": [
+      note(
+        "Relaxed Nova Fractal (a = 1.55 · Inferno Flame)",
+        "Multiplying the Newton step by relaxation factor a ≠ 1 breaks standard convergence and births miniature Mandelbrot-like black islands along the basin seams!\n• Scrub slider a between 0.5 and 2.0!",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "map_newton_kaleidoscope:newton_live_zoom": [
+      note(
+        "▶ Live Zoom into Newton Basin Seam",
+        "Dives straight down the fractal seam between competing root basins, revealing endless self-similar pearls of alternating roots at arbitrary depth!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 14. map_stained_glass_sphere */
+    "map_stained_glass_sphere:glass_3d_spin": [
+      note(
+        "▶ Stained-Glass Riemann Sphere (60 FPS Spin)",
+        "100%-solid layered jewel petals over a deep sapphire ocean with sunlit spherical shading — rotating smoothly at 60 FPS via sphere_yaw (zero spin inside f(z))!\n• Scrub Möbius Shift a to deform symmetry conformally.",
+        "#fbbf24", "bottom-left", "out"
+      ),
+    ],
+    "map_stained_glass_sphere:glass_poincare_mandala": [
+      note(
+        "Poincaré Disk Hyperbolic Mandala",
+        "Projects the stained-glass petals into the hyperbolic Poincaré Disk where Möbius shifts act as rigid hyperbolic isometries!\n• Scrub slider a to slide the entire mandala across hyperbolic space.",
+        "#a78bfa", "bottom-left", "out"
+      ),
+    ],
+    "map_stained_glass_sphere:glass_stereo_jewel": [
+      note(
+        "Stereographic Jewel Disk Projection",
+        "Maps the full celestial sphere into the bounded Stereographic Disk $|W| < 1$ with exact angle preservation and full-disk ocean backdrop!",
+        "#38bdf8", "bottom-left", "out"
+      ),
+    ],
+    "map_stained_glass_sphere:glass_double_rose": [
+      note(
+        "Double-Rose Kaleidoscope ($w = z^2$)",
+        "Squaring $w = z^2$ doubles every polar angle $\\theta \\to 2\\theta$, multiplying the jewel mandala into a lush double-layered stained-glass rosette on the Riemann Sphere!",
+        "#ec4899", "bottom-left", "out"
+      ),
+    ],
+
+    /* 15. real_mvt_rolle */
+    "real_mvt_rolle:mvt_classic": [
+      note(
+        "Mean Value Theorem on [−1.5, 2.5]",
+        "The dashed secant connects (a, f(a)) to (b, f(b)). By MVT, there exists at least one interior point c* where the tangent line is strictly parallel to the secant: $f'(c^*) = \\frac{f(b)-f(a)}{b-a}$!\n• Scrub a, b, or c to verify live.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_mvt_rolle:mvt_sweep_c": [
+      note(
+        "▶ Sweep Tangent Point c Along [a, b]",
+        "Watch the gold tangent line glide along f(x) until it snaps perfectly parallel to the dashed green secant at c*!\n• Compare the live tangent slope against the secant slope.",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    "real_mvt_rolle:rolle_theorem": [
+      note(
+        "Rolle's Theorem: f(a) = f(b)",
+        "When $f(-2) = f(2) = 1$, the secant is horizontal (slope 0), guaranteeing at least one flat tangent $f'(c^*) = 0$ inside (−2, 2).\n• Here BOTH $c_1^* = -\\frac{2}{\\sqrt{3}}$ and $c_2^* = +\\frac{2}{\\sqrt{3}}$ satisfy $f'(c^*) = 0$!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "real_mvt_rolle:mvt_fails_cusp": [
+      note(
+        "Counterexample: Cusp $f(x) = |x|$",
+        "f(−2) = f(2) = 2 so the secant has slope 0 — yet $f'(x) = \\pm 1$ everywhere x ≠ 0, and f'(0) does not exist!\n• Differentiability on (a, b) is strictly required for Rolle / MVT.",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+
+    /* 16. real_riemann_ftc */
+    "real_riemann_ftc:darboux_squeeze": [
+      note(
+        "Upper vs Lower Darboux Sum Squeeze (N = 10)",
+        "Upper step rectangles always bound f(x) from above while Lower step rectangles bound f(x) from below — trapping the true integral tightly between them!\n• Scrub N upward to watch the gap shrink toward 0.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_riemann_ftc:darboux_refine": [
+      note(
+        "▶ Darboux Partition Refinement (N: 3 → 80)",
+        "As partition count N increases, the upper and lower step staircases squeeze together onto the continuous curve f(x), proving Riemann integrability!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "real_riemann_ftc:ftc_accumulation": [
+      note(
+        "Fundamental Theorem of Calculus",
+        "Purple dashed $F(x) = \\int_0^x f(t)\\,dt$ tracks cumulative area under blue f(x).\n• Where f(x) peaks, F(x) rises steepest ($F' = f$); scrub b to move the upper limit!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+
+    /* 17. real_taylor_approx */
+    "real_taylor_approx:taylor_sin_sweep": [
+      note(
+        "▶ Global Taylor Convergence for sin(x)",
+        "Because sin(z) is entire on ℂ (radius of convergence R = ∞), higher-degree Maclaurin polynomials hug sin(x) further and further across the entire real line as N grows!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_taylor_approx:taylor_runge_wall": [
+      note(
+        "Hidden Complex Poles at $z = \\pm i$",
+        "$f(x) = \\frac{1}{1+x^2}$ is infinitely smooth on all of ℝ, yet its Taylor series diverges past |x| = 1!\n• Why? Distance from 0 to its complex poles ±i is R = 1.",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "real_taylor_approx:taylor_log": [
+      note(
+        "Taylor Series of $\\ln(1+x)$ on (−1, 1]",
+        "The logarithmic singularity at x = −1 caps the radius of convergence at R = 1: inside (−1, 1] the polynomial locks onto $\\ln(1+x)$, while beyond x > 1 it explodes wildly!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+
+    /* 18. real_fourier */
+    "real_fourier:full": [
+      note(
+        "Fourier Series of a Square Wave on [−2π, 2π]",
+        "Summing odd sine harmonics $\\frac{4}{\\pi}\\sum \\frac{\\sin((2k-1)x)}{2k-1}$ reconstructs sharp flat plateaus and vertical jumps from smooth waves.\n• Scrub K to add harmonics up to K = 60!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_fourier:gibbs": [
+      note(
+        "▶ Gibbs Phenomenon Overshoot (~9% Ringing)",
+        "Zoomed onto the jump discontinuity at x = 0: as K grows, the overshoot spike narrows toward x = 0 yet NEVER shrinks in height — staying locked at ~8.95% of the jump!",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "real_fourier:sawtooth": [
+      note(
+        "Sawtooth Wave Harmonics (All Integer Frequencies)",
+        "Unlike the square wave (odd harmonics only), the sawtooth wave uses ALL harmonics $(-1)^{k+1}\\frac{\\sin(kx)}{k}$ to sculpt linear ramps separated by periodic drops!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 19. real_lebesgue_vs_riemann */
+    "real_lebesgue_vs_riemann:lebesgue_mct": [
+      note(
+        "Lebesgue Simple Functions $s_n \\nearrow f$ (MCT)",
+        "Lebesgue integration slices the vertical y-range into dyadic levels $\\frac{k}{2^n}$ instead of the x-domain, building a monotone increasing sequence of simple functions $s_n \\nearrow f$!\n• Scrub n from 0 to 6.",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "real_lebesgue_vs_riemann:lebesgue_vs_riemann": [
+      note(
+        "Lebesgue (Range Slicing) vs Riemann (Domain Slicing)",
+        "Compare emerald horizontal-range Lebesgue plateaus against amber vertical-domain Riemann rectangles on the same function — both converge to the same integral for smooth f!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    "real_lebesgue_vs_riemann:lebesgue_animate": [
+      note(
+        "▶ Animate Monotone Convergence Theorem (n: 0 → 6)",
+        "Watch sₙ(x) climb monotonically upward from below toward f(x): MCT guarantees $\\lim \\int s_n\\,d\\mu = \\int (\\lim s_n)\\,d\\mu$ even for unbounded measurable functions!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_lebesgue_vs_riemann:fatou_escaping_bump": [
+      note(
+        "Fatou's Lemma · Escaping Mass",
+        "Each tall bump has integral $\\int f_n = 1$, yet pointwise $\\liminf f_n(x) = 0$ everywhere!\n• Thus $\\int \\liminf f_n = 0 < 1 = \\liminf \\int f_n$ — strict inequality happens when mass escapes to ∞.",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+
+    /* 20. real_cantor_staircase */
+    "real_cantor_staircase:cantor_full": [
+      note(
+        "Cantor-Lebesgue Devil's Staircase C(x)",
+        "Continuous everywhere and climbs from $C(0) = 0$ to $C(1) = 1$, yet $C'(x) = 0$ almost everywhere (flat on every deleted middle-third interval, total measure 1)!\n• A classic counterexample to the naive Fundamental Theorem of Calculus.",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "real_cantor_staircase:cantor_construct": [
+      note(
+        "▶ Cantor Set Measure $(2/3)^k \\to 0$",
+        "At each step k, removing the open middle third leaves 2^k intervals of total length $(2/3)^k \\to 0$ — creating an uncountable fractal dust of Lebesgue measure zero!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "real_cantor_staircase:cantor_zoom_third": [
+      note(
+        "Self-Similar Zoom on [0, 1/3] × [0, 1/2]",
+        "Zoomed onto the first third of the unit interval: $C(\\frac{x}{3}) = \\frac{1}{2}C(x)$, so the Devil's Staircase repeats an exact miniature copy of itself forever!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 21. real_weierstrass_takagi */
+    "real_weierstrass_takagi:weierstrass_classic": [
+      note(
+        "Weierstrass Nowhere-Differentiable Function",
+        "$W(x) = \\sum a^n \\cos(b^n \\pi x)$ with a = 0.5, b = 7 (a·b = 3.5 > 1) is continuous at every point yet has NO tangent line anywhere on ℝ!\n• Zoom in to see fresh jagged peaks at every scale.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_weierstrass_takagi:weierstrass_deep": [
+      note(
+        "Weierstrass Deep Self-Similar Zoom [0, 0.04]",
+        "Even magnified 25×, the curve refuses to flatten into a line — proving visually why no finite derivative exists at any x!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "real_weierstrass_takagi:takagi_arch": [
+      note(
+        "Takagi Blancmange Fractal Arch on [0, 1]",
+        "Built by summing scaled triangle waves $\\sum 2^{-n}\\text{tri}(2^n x)$, the Blancmange arch looks deceptively smooth from afar yet is nowhere differentiable everywhere on [0, 1]!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "real_weierstrass_takagi:sweep_fractal": [
+      note(
+        "▶ Smooth Wave → Fractal Monster (Animate N)",
+        "Watch N sweep from 1 to 14: a smooth single cosine wave sprouts higher and higher frequency ripples until differentiability shatters everywhere!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 22. real_pi_explicit */
+    "real_pi_explicit:convergence_35": [
+      note(
+        "Riemann's Explicit Formula for $\\pi(x)$ on [2, 38]",
+        "Compares the true prime-counting staircase $\\pi(x)$ against the smooth baseline $\\text{Li}(x)$ and Riemann's exact formula summed over K zeta zeros!\n• Watch zero waves sharpen every prime jump.",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_pi_explicit:zoom_jumps": [
+      note(
+        "Zoomed Prime Jumps [10, 35]",
+        "Close-up on primes 11, 13, 17, 19, 23, 29, 31: notice how the harmonic sum of zeta zeros locks right onto each vertical prime step!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "real_pi_explicit:wide_100": [
+      note(
+        "Wide Prime Distribution View [2, 100]",
+        "Across all primes up to 100, $\\text{Li}(x)$ tracks the macro growth while Riemann's zero harmonics reproduce every microscopic oscillation of $\\pi(x) - \\text{Li}(x)$!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "real_pi_explicit:animate_k": [
+      note(
+        "▶ Music of the Primes: Sweep K = 0 → 200 Zeros",
+        "Watch the smooth curve $\\text{Li}(x)$ crystallize step-by-step into the sharp prime staircase $\\pi(x)$ as more nontrivial Riemann zeros join the symphony!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 23. real_psi_explicit */
+    "real_psi_explicit:default": [
+      note(
+        "Chebyshev $\\psi(x)$ & Von Mangoldt Explicit Formula",
+        "$\\psi(x)$ jumps by ln(p) at every prime power p^k: Riemann's zero waves $x - \\sum \\frac{x^\\rho}{\\rho}$ carve out those exact vertical steps right along the diagonal y = x!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_psi_explicit:wide": [
+      note(
+        "Wide View of Chebyshev $\\psi(x)$ [2, 100]",
+        "The Prime Number Theorem states $\\psi(x)$ ~ x, while the Riemann Hypothesis asserts the error |$\\psi(x)$ − x| stays bounded by $O(\\sqrt{x}\\ln^2 x)$!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+
+    /* 24. real_hardy_z */
+    "real_hardy_z:first_12": [
+      note(
+        "Hardy's Z(t) Function — First 12 Riemann Zeros",
+        "Z(t) is real-valued with $|Z(t)| = |\\zeta(\\frac{1}{2}+it)|$, so every sign change across the x-axis rigorously certifies a nontrivial Riemann zero on the critical line!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_hardy_z:close_zeros": [
+      note(
+        "Close Riemann Zero Pairs on [100, 145]",
+        "At higher heights t > 100, nontrivial zeros pack much tighter and dramatic Lehmer near-misses appear where Z(t) barely grazes the x-axis!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 25. real_solar_orrery */
+    "real_solar_orrery:orrery_mandala": [
+      note(
+        "Solar Orrery & 8:13 Earth–Venus Resonance",
+        "Connects Earth and Venus along concentric orbits over 8 Earth years (13 Venus years), tracing a sacred 5-fold pentagonal rose mandala around the layered golden Sun!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+    "real_solar_orrery:orrery_rotate": [
+      note(
+        "▶ Rotating Orbital Resonance Mandala",
+        "Animates orbital phase φ continuously so you can watch the 8:13 Earth–Venus harmonic rosette precess smoothly around the Solar System!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+
+    /* 26. real_fourier_epicycles */
+    "real_fourier_epicycles:epicycle_star": [
+      note(
+        "5-Fold Fourier Epicycle Drawing Machine",
+        "Stacks rotating circular arms at integer frequencies (1, −4, +6) to trace a crisp 5-pointed star curve parametrically in native C11.\n• Scrub harmonic weights or phase φ!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "real_fourier_epicycles:epicycle_spin": [
+      note(
+        "▶ Animated Epicycle Arms (Play φ)",
+        "Watch the linked phase rotation φ drive the 5-fold Fourier epicycle around its harmonic orbit — click any element in Move mode to inspect or resize!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+
+    /* 27. real_parametric_gallery */
+    "real_parametric_gallery:butterfly": [
+      note(
+        "Temple Fay's Butterfly Curve (Parametric C11)",
+        "Generated by $r(t) = e^{\\sin t} - 2\\cos(4t) + \\sin^5(\\frac{2t-\\pi}{24})$, weaving intricate symmetric wing loops in a single 4-thread C11 parametric curve!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_parametric_gallery:heart": [
+      note(
+        "Classic Parametric Heart Curve",
+        "$x(t) = 16\\sin^3 t$, $y(t) = 13\\cos t - 5\\cos 2t - 2\\cos 3t - \\cos 4t$ — a smooth closed trigonometric heart rendered in native C11.",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "real_parametric_gallery:spirograph": [
+      note(
+        "▶ Animated Hypotrochoid Spirograph",
+        "A rolling gear inside a fixed ring traces hypnotic multi-petal spirograph rosettes — scrub gear ratio or play phase to morph the weave live!",
+        "#a78bfa", "bottom-left", "in"
+      ),
+    ],
+    "real_parametric_gallery:cornu_spiral": [
+      note(
+        "Fresnel Cornu Spiral (Clothoid) → (±½, ±½)",
+        "Parametric integration of $(C(t), S(t)) = (\\int \\cos\\frac{\\pi u^2}{2}\\,du,\; \\int \\sin\\frac{\\pi u^2}{2}\\,du)$ whose curvature grows linearly with arc length — used in optics diffraction and highway transitions!",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "real_parametric_gallery:implicit_elliptic": [
+      note(
+        "Implicit Relations: Circle, Tangent & Elliptic Curve",
+        "4-thread C11 Marching Squares traces implicit zero-sets $F(x, y) = 0$ simultaneously — compare the elliptic curve $y^2 = x^3 - x + 1$ alongside circles and tangents!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+
+    /* 28. real_game_of_life */
+    "real_game_of_life:cathedral_centerpiece": [
+      note(
+        "Conway's Game of Life — Pulsar Cathedral & Gliders",
+        "Period-3 Pulsar centerpiece flanked by a 4-way converging glider armada computed natively in C11!\n• Hit ▶ on Generation G to watch the symmetric collision unfold.",
+        "#34d399", "bottom-left", "in"
+      ),
+    ],
+    "real_game_of_life:twin_guns_duel": [
+      note(
+        "▶ Twin Gosper Glider Guns Duel",
+        "Two opposing Gosper Glider Guns continuously fire streams of gliders across the grid every 30 generations — demonstrating infinite growth from a finite seed!",
+        "#38bdf8", "bottom-left", "in"
+      ),
+    ],
+    "real_game_of_life:supernova_origin": [
+      note(
+        "▶ R-Pentomino & Acorn Supernova Methuselah",
+        "Just a handful of starting cells erupt into a chaotic supernova lasting over 1,100 generations before stabilizing into gliders, blinkers, and beehives!",
+        "#fb7185", "bottom-left", "in"
+      ),
+    ],
+    "real_game_of_life:sandbox_sculpt": [
+      note(
+        "Custom Game of Life Sandbox — Sculpt Your Own Seed",
+        "Use the cell polygon tools (Add / Select / Deselect / Delete) directly on the grid to sculpt any custom initial pattern, then play Generation G to evolve it in C11!",
+        "#fbbf24", "bottom-left", "in"
+      ),
+    ],
+  };
+
+  for (const ex of EXAMPLES) {
+    if (!ex.defaultTexts && EXAMPLE_NOTES[ex.id]) {
+      ex.defaultTexts = EXAMPLE_NOTES[ex.id];
+    }
+    if (Array.isArray(ex.presets)) {
+      for (const pr of ex.presets) {
+        const key = `${ex.id}:${pr.id}`;
+        if (!pr.texts && PRESET_NOTES[key]) {
+          pr.texts = PRESET_NOTES[key];
+        }
+      }
+    }
+  }
+
+  /* Backward-compatible aliases so legacy bookmarks/URLs resolve cleanly after v36 consolidation */
+  const LEGACY_ALIASES = {
+    map_world_sphere: "map_earth_atlas",
+    map_morph: "map_zeta",
+    map_xi: "map_zeta",
+    int_zeta: "map_zeta",
+    int_two_poles: "int_cauchy_residues",
+    int_path_indep: "int_cauchy_residues",
+    real_weierstrass: "real_weierstrass_takagi",
+    real_takagi: "real_weierstrass_takagi",
+    real_relations: "real_parametric_gallery",
+    real_fresnel_cornu: "real_parametric_gallery",
+    real_J_explicit: "real_pi_explicit",
+    real_xi: "real_hardy_z",
+  };
 
   window.CFVExamples = {
     list: EXAMPLES,
     byId(id) {
-      return EXAMPLES.find((e) => e.id === id) || EXAMPLES[0];
+      const resolved = LEGACY_ALIASES[id] || id;
+      return EXAMPLES.find((e) => e.id === resolved) || EXAMPLES[0];
     },
     forMode(mode) {
-      return EXAMPLES.filter((e) => e.mode === mode);
+      const m = mode === "real" ? "real" : "map";
+      return EXAMPLES.filter((e) => e.mode === m);
     },
     helpers: { linePts, circlePts, rectPts, arcPts, wavyPts, pt, ln },
   };

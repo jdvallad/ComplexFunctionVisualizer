@@ -1,0 +1,683 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795467058341_269",
+  "name": "Double Pendulum",
+  "folder": "my",
+  "subtitle": "5 cards · 4 presets",
+  "description": "",
+  "mode": "real",
+  "cards": [
+    {
+      "title": "Primary Bob 2 Chaotic Trail (0 to T)",
+      "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+      "color": "#38bdf8",
+      "lineWidth": 2.4,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Ghost Bob 2 Chaotic Trail (+eps rad)",
+      "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+      "color": "#fb7185",
+      "lineWidth": 2,
+      "opacity": 1,
+      "lineStyle": "dashed",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Primary Rods & Bobs at Time T",
+      "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+      "color": "#f8fafc",
+      "lineWidth": 3,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Ghost Rods & Bobs at Time T (+eps rad)",
+      "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+      "color": "#fbbf24",
+      "lineWidth": 2.4,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Max Reach Envelope (R = 2L)",
+      "code": "(R_max*cos(t), R_max*sin(t)) for t in [0, 2*M_PI]",
+      "color": "#a78bfa",
+      "lineWidth": 1.2,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    }
+  ],
+  "sliders": [
+    {
+      "name": "T",
+      "label": "Time T (s)",
+      "value": 10.58320000000084,
+      "min": 0,
+      "max": 12,
+      "step": 0.05,
+      "speed": 1
+    },
+    {
+      "name": "th1",
+      "label": "Initial Angle 1 (rad)",
+      "value": 0.6,
+      "min": 0.2,
+      "max": 3.14,
+      "step": 0.02,
+      "speed": 0.5
+    },
+    {
+      "name": "th2",
+      "label": "Initial Angle 2 (rad)",
+      "value": 0.6,
+      "min": 0.2,
+      "max": 3.14,
+      "step": 0.02,
+      "speed": 0.5
+    },
+    {
+      "name": "eps",
+      "label": "Ghost Offset (rad)",
+      "value": 0.001,
+      "min": 0.0001,
+      "max": 0.05,
+      "step": 0.0005,
+      "speed": 0.25
+    },
+    {
+      "name": "g",
+      "label": "Gravity g (m/s^2)",
+      "value": 9.81,
+      "min": 1,
+      "max": 20,
+      "step": 0.1,
+      "speed": 0.5
+    },
+    {
+      "name": "L",
+      "label": "Rod Length L (m)",
+      "value": 1,
+      "min": 0.5,
+      "max": 1.5,
+      "step": 0.05,
+      "speed": 0.5
+    }
+  ],
+  "vars": [
+    {
+      "name": "R_max",
+      "label": "Max Reach Radius (2L)",
+      "expr": "2.0 * L"
+    }
+  ],
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "label": "Pivot (0, 0)",
+      "icon": "ring",
+      "color": "#f8fafc",
+      "size": 5,
+      "opacity": 1,
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "lines": [
+    {
+      "orientation": "vertical",
+      "value": 0,
+      "label": "Equilibrium Axis",
+      "color": "#a78bfa",
+      "lineWidth": 1.5,
+      "opacity": 1,
+      "lineStyle": "dotted",
+      "locked": true,
+      "visible": true,
+      "showLabel": true
+    }
+  ],
+  "viewport": {
+    "view": {
+      "xmin": -4.8915,
+      "xmax": 4.8915,
+      "ymin": -2.6,
+      "ymax": 2.6
+    },
+    "squareAspect": true,
+    "showPrimes": false,
+    "showZeros": false
+  },
+  "presets": [
+    {
+      "id": "butterfly_divergence",
+      "name": "Butterfly Divergence (T = 6.5s)",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Primary Bob 2 Chaotic Trail (0 to T)",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+          "color": "#38bdf8",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Ghost Bob 2 Chaotic Trail (+eps rad)",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+          "color": "#fb7185",
+          "lineWidth": 2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Primary Rods & Bobs at Time T",
+          "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+          "color": "#f8fafc",
+          "lineWidth": 3,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Ghost Rods & Bobs at Time T (+eps rad)",
+          "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+          "color": "#fbbf24",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Max Reach Envelope (R = 2L)",
+          "code": "(R_max*cos(t), R_max*sin(t)) for t in [0, 2*M_PI]",
+          "color": "#a78bfa",
+          "lineWidth": 1.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "T",
+          "label": "Time T (s)",
+          "value": 6.5,
+          "min": 0,
+          "max": 12,
+          "step": 0.05,
+          "speed": 1
+        },
+        {
+          "name": "th1",
+          "label": "Initial Angle 1 (rad)",
+          "value": 2.2,
+          "min": 0.2,
+          "max": 3.14,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "th2",
+          "label": "Initial Angle 2 (rad)",
+          "value": 2.2,
+          "min": 0.2,
+          "max": 3.14,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "eps",
+          "label": "Ghost Offset (rad)",
+          "value": 0.001,
+          "min": 0.0001,
+          "max": 0.05,
+          "step": 0.0005,
+          "speed": 0.25
+        },
+        {
+          "name": "g",
+          "label": "Gravity g (m/s^2)",
+          "value": 9.81,
+          "min": 1,
+          "max": 20,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "L",
+          "label": "Rod Length L (m)",
+          "value": 1,
+          "min": 0.5,
+          "max": 1.5,
+          "step": 0.05,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "R_max",
+          "label": "Max Reach Radius (2L)",
+          "expr": "2.0 * L"
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Pivot (0, 0)",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Equilibrium Axis",
+          "color": "#a78bfa",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "view": {
+          "xmin": -2.6,
+          "xmax": 2.6,
+          "ymin": -2.6,
+          "ymax": 2.6
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "animate_time_sweep",
+      "name": "Play Divergence Sweep",
+      "startSlider": "T",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Primary Bob 2 Chaotic Trail (0 to T)",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+          "color": "#38bdf8",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Ghost Bob 2 Chaotic Trail (+eps rad)",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+          "color": "#fb7185",
+          "lineWidth": 2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Primary Rods & Bobs at Time T",
+          "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+          "color": "#f8fafc",
+          "lineWidth": 3,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Ghost Rods & Bobs at Time T (+eps rad)",
+          "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+          "color": "#fbbf24",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Max Reach Envelope (R = 2L)",
+          "code": "(R_max*cos(t), R_max*sin(t)) for t in [0, 2*M_PI]",
+          "color": "#a78bfa",
+          "lineWidth": 1.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "T",
+          "label": "Time T (s)",
+          "value": 0,
+          "min": 0,
+          "max": 12,
+          "step": 0.05,
+          "speed": 1
+        },
+        {
+          "name": "th1",
+          "label": "Initial Angle 1 (rad)",
+          "value": 2.2,
+          "min": 0.2,
+          "max": 3.14,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "th2",
+          "label": "Initial Angle 2 (rad)",
+          "value": 2.2,
+          "min": 0.2,
+          "max": 3.14,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "eps",
+          "label": "Ghost Offset (rad)",
+          "value": 0.001,
+          "min": 0.0001,
+          "max": 0.05,
+          "step": 0.0005,
+          "speed": 0.25
+        },
+        {
+          "name": "g",
+          "label": "Gravity g (m/s^2)",
+          "value": 9.81,
+          "min": 1,
+          "max": 20,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "L",
+          "label": "Rod Length L (m)",
+          "value": 1,
+          "min": 0.5,
+          "max": 1.5,
+          "step": 0.05,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "R_max",
+          "label": "Max Reach Radius (2L)",
+          "expr": "2.0 * L"
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Pivot (0, 0)",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Equilibrium Axis",
+          "color": "#a78bfa",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "view": {
+          "xmin": -2.6,
+          "xmax": 2.6,
+          "ymin": -2.6,
+          "ymax": 2.6
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    },
+    {
+      "id": "low_energy_ordered",
+      "name": "Low-Energy Locked Motion",
+      "mode": "real",
+      "cards": [
+        {
+          "title": "Primary Bob 2 Chaotic Trail (0 to T)",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+          "color": "#38bdf8",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Ghost Bob 2 Chaotic Trail (+eps rad)",
+          "code": "parametric [0, 1]:\ndouble tau = t * T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\npx = L * (sin(a1) + sin(a2));\npy = -L * (cos(a1) + cos(a2));",
+          "color": "#fb7185",
+          "lineWidth": 2,
+          "opacity": 1,
+          "lineStyle": "dashed",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Primary Rods & Bobs at Time T",
+          "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+          "color": "#f8fafc",
+          "lineWidth": 3,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Ghost Rods & Bobs at Time T (+eps rad)",
+          "code": "parametric [0, 4]:\ndouble tau = T;\ndouble h_fix = 0.012;\nint n = (int)(tau / h_fix);\ndouble rem = tau - (double)n * h_fix;\ndouble a1 = th1 + eps;\ndouble a2 = th2;\ndouble w1 = 0.0;\ndouble w2 = 0.0;\ndouble gl = g / L;\nfor (int i = 0; i <= n; i++) {\n  double h = (i < n) ? h_fix : rem;\n  if (h <= 0.0) break;\n  double d, cd, sd, den, A, B;\n  double k1_a1 = w1, k1_a2 = w2;\n  d = a1 - a2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -w2 * w2 * sd - 2.0 * gl * sin(a1);\n  B = w1 * w1 * sd - gl * sin(a2);\n  double k1_w1 = (A - B * cd) / den;\n  double k1_w2 = (2.0 * B - A * cd) / den;\n  double b1 = a1 + 0.5 * h * k1_a1, b2 = a2 + 0.5 * h * k1_a2;\n  double u1 = w1 + 0.5 * h * k1_w1, u2 = w2 + 0.5 * h * k1_w2;\n  double k2_a1 = u1, k2_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k2_w1 = (A - B * cd) / den;\n  double k2_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + 0.5 * h * k2_a1; b2 = a2 + 0.5 * h * k2_a2;\n  u1 = w1 + 0.5 * h * k2_w1; u2 = w2 + 0.5 * h * k2_w2;\n  double k3_a1 = u1, k3_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k3_w1 = (A - B * cd) / den;\n  double k3_w2 = (2.0 * B - A * cd) / den;\n  b1 = a1 + h * k3_a1; b2 = a2 + h * k3_a2;\n  u1 = w1 + h * k3_w1; u2 = w2 + h * k3_w2;\n  double k4_a1 = u1, k4_a2 = u2;\n  d = b1 - b2; cd = cos(d); sd = sin(d); den = 2.0 - cd * cd;\n  A = -u2 * u2 * sd - 2.0 * gl * sin(b1);\n  B = u1 * u1 * sd - gl * sin(b2);\n  double k4_w1 = (A - B * cd) / den;\n  double k4_w2 = (2.0 * B - A * cd) / den;\n  a1 += (h / 6.0) * (k1_a1 + 2.0 * k2_a1 + 2.0 * k3_a1 + k4_a1);\n  a2 += (h / 6.0) * (k1_a2 + 2.0 * k2_a2 + 2.0 * k3_a2 + k4_a2);\n  w1 += (h / 6.0) * (k1_w1 + 2.0 * k2_w1 + 2.0 * k3_w1 + k4_w1);\n  w2 += (h / 6.0) * (k1_w2 + 2.0 * k2_w2 + 2.0 * k3_w2 + k4_w2);\n}\ndouble x1 = L * sin(a1);\ndouble y1 = -L * cos(a1);\ndouble x2 = x1 + L * sin(a2);\ndouble y2 = y1 - L * cos(a2);\nif (t < 1.0) {\n  px = t * x1;\n  py = t * y1;\n} else if (t < 2.0) {\n  double u = t - 1.0;\n  px = x1 + u * (x2 - x1);\n  py = y1 + u * (y2 - y1);\n} else if (t < 2.02) {\n  px = NAN;\n  py = NAN;\n} else if (t < 3.0) {\n  double ang = ((t - 2.02) / 0.98) * 2.0 * M_PI;\n  double r1 = 0.065 * L;\n  px = x1 + r1 * cos(ang);\n  py = y1 + r1 * sin(ang);\n} else if (t < 3.02) {\n  px = NAN;\n  py = NAN;\n} else {\n  double ang = ((t - 3.02) / 0.98) * 2.0 * M_PI;\n  double r2 = 0.085 * L;\n  px = x2 + r2 * cos(ang);\n  py = y2 + r2 * sin(ang);\n}",
+          "color": "#fbbf24",
+          "lineWidth": 2.4,
+          "opacity": 1,
+          "lineStyle": "solid",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        },
+        {
+          "title": "Max Reach Envelope (R = 2L)",
+          "code": "(R_max*cos(t), R_max*sin(t)) for t in [0, 2*M_PI]",
+          "color": "#a78bfa",
+          "lineWidth": 1.2,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "step": false,
+          "locked": false,
+          "visible": true,
+          "active": true
+        }
+      ],
+      "sliders": [
+        {
+          "name": "T",
+          "label": "Time T (s)",
+          "value": 10,
+          "min": 0,
+          "max": 12,
+          "step": 0.05,
+          "speed": 1
+        },
+        {
+          "name": "th1",
+          "label": "Initial Angle 1 (rad)",
+          "value": 0.6,
+          "min": 0.2,
+          "max": 3.14,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "th2",
+          "label": "Initial Angle 2 (rad)",
+          "value": 0.6,
+          "min": 0.2,
+          "max": 3.14,
+          "step": 0.02,
+          "speed": 0.5
+        },
+        {
+          "name": "eps",
+          "label": "Ghost Offset (rad)",
+          "value": 0.001,
+          "min": 0.0001,
+          "max": 0.05,
+          "step": 0.0005,
+          "speed": 0.25
+        },
+        {
+          "name": "g",
+          "label": "Gravity g (m/s^2)",
+          "value": 9.81,
+          "min": 1,
+          "max": 20,
+          "step": 0.1,
+          "speed": 0.5
+        },
+        {
+          "name": "L",
+          "label": "Rod Length L (m)",
+          "value": 1,
+          "min": 0.5,
+          "max": 1.5,
+          "step": 0.05,
+          "speed": 0.5
+        }
+      ],
+      "vars": [
+        {
+          "name": "R_max",
+          "label": "Max Reach Radius (2L)",
+          "expr": "2.0 * L"
+        }
+      ],
+      "points": [
+        {
+          "x": 0,
+          "y": 0,
+          "label": "Pivot (0, 0)",
+          "icon": "ring",
+          "color": "#f8fafc",
+          "size": 5,
+          "opacity": 1,
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "lines": [
+        {
+          "orientation": "vertical",
+          "value": 0,
+          "label": "Equilibrium Axis",
+          "color": "#a78bfa",
+          "lineWidth": 1.5,
+          "opacity": 1,
+          "lineStyle": "dotted",
+          "locked": true,
+          "visible": true,
+          "showLabel": true
+        }
+      ],
+      "viewport": {
+        "view": {
+          "xmin": -2.6,
+          "xmax": 2.6,
+          "ymin": -2.6,
+          "ymax": 2.6
+        },
+        "squareAspect": true,
+        "showPrimes": false,
+        "showZeros": false
+      }
+    }
+  ]
+}

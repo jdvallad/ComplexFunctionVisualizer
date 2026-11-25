@@ -783,8 +783,8 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
 
     FunctionDef tmp_hot;
     const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
-    if (!fn || width < 16 || height < 16 || width > 900 || height > 900 || half_w <= 0.0 ||
-        half_h <= 0.0) {
+    if (!fn || width < 16 || height < 16 || width > 2400 || height > 2400 ||
+        (size_t)width * (size_t)height > 4200000 || half_w <= 0.0 || half_h <= 0.0) {
         send_json_error(fd, 400, "Invalid domain parameters", keep_alive);
         return;
     }
