@@ -1021,13 +1021,14 @@
     pt(0.5, 32.935062, "Zero #5 (32.935i)", "ring", "#34d399", 5, true),
   ];
 
-  /* Full-Color Earth Atlas (Built directly on the high-detail original Earth with 100% solid opacities,
-   * deep sapphire Global Ocean, biome layers, 16 extra islands across every ocean, and cerulean lakes!) */
+  /* Full-Color High-Detail Earth Atlas (Zero flat biome blobs! Crisp real continents, 16 extra islands,
+   * and cerulean lakes — on the 3D Riemann Sphere, sphere3d.js clips a continuous 3D Perlin/fBm
+   * hill-shaded climate, desert, rainforest, tundra & mountain-snow gradient texture inside these coastlines!) */
   function buildEarthAtlasShapes() {
     const oceanBase = {
       kind: "circle",
       label: "Global Ocean",
-      color: "#0b4f8c",
+      color: "#073466",
       lineWidth: 0,
       opacity: 1.0,
       closed: true,
@@ -1044,203 +1045,101 @@
       if (/Lake|Caspian/i.test(lbl)) {
         lakes.push({
           ...s,
-          color: "#1573ba",
-          lineWidth: 0.7,
+          color: "#0e5fa3",
+          lineWidth: 0.45,
           opacity: 1.0,
           closed: true,
+          isEarthLake: true,
         });
         continue;
       }
 
-      let color = "#3d9458"; /* default lush temperate green */
+      let color = "#377d49";
       if (/Antarctica|Greenland|Ellesmere|Devon|Svalbard|Severnaya|New Siberian/i.test(lbl)) {
-        color = "#edf5fc"; /* crisp polar ice & snow */
+        color = "#dceaf6";
       } else if (/Iceland|Baffin|Victoria Island|Banks Island|Novaya Zemlya|Southampton/i.test(lbl)) {
-        color = "#a8d5b3"; /* sub-arctic tundra */
+        color = "#7c9c82";
       } else if (/South America|Tierra|Chiloé|Galápagos/i.test(lbl)) {
-        color = "#228b52"; /* lush South American forest */
+        color = "#2b7a44";
       } else if (/North America|Newfoundland|Vancouver|Kodiak|Cuba|Hispaniola/i.test(lbl)) {
-        color = "#2e965a"; /* North American boreal & temperate green */
+        color = "#377d49";
       } else if (/Europe|Britain|Ireland|Corsica|Sicily|Crete|Balearic|Azores/i.test(lbl)) {
-        color = "#4ea860"; /* European verdant meadow */
+        color = "#438a4c";
       } else if (/Africa|Canary|Cape Verde/i.test(lbl)) {
-        color = "#8db558"; /* African savanna base (Sahara desert layered on top!) */
+        color = "#96a656";
       } else if (/Madagascar|Mauritius|Socotra/i.test(lbl)) {
-        color = "#52a358";
+        color = "#4a8c4a";
       } else if (/Australia|Tasmania/i.test(lbl)) {
-        color = "#d47d45"; /* Australian outback ochre */
+        color = "#c47542";
       } else if (/New Zealand|Fiji|Hawaii|Sumatra|Java|Borneo|Sulawesi|New Guinea|Luzon|Mindanao|Sri Lanka|Taiwan|Hainan/i.test(lbl)) {
-        color = "#24965b"; /* tropical archipelago emerald */
+        color = "#1f7a44";
       } else if (/Asia|Honshu|Hokkaido|Kyushu|Sakhalin/i.test(lbl)) {
-        color = "#5ca356"; /* Eurasian forest & steppe */
+        color = "#4a8749";
       }
 
       land.push({
         ...s,
         color,
-        lineWidth: Math.max(1.0, Number(s.lineWidth) ? Number(s.lineWidth) * 0.7 : 1.1),
+        lineWidth: 0.45,
         opacity: 1.0,
         closed: true,
+        isEarthLand: true,
       });
     }
 
-    /* 16 Additional Real-World Islands Across Every Ocean (100% Solid Opacity!) */
+    const extraLakes = [
+      { label: "Lake Tanganyika & Malawi", pts: [[29.1, -3.4], [29.8, -5.0], [30.7, -7.8], [31.1, -8.8], [30.3, -8.3], [29.4, -5.2]] },
+      { label: "Lake Titicaca", pts: [[-70.0, -15.3], [-69.1, -15.7], [-68.8, -16.4], [-69.6, -16.3]] },
+      { label: "Lake Balkhash", pts: [[73.5, 45.4], [76.2, 46.5], [79.1, 46.8], [78.6, 46.1], [75.8, 45.8], [74.0, 44.9]] },
+    ].map((lk) => ({
+      kind: "polygon",
+      label: lk.label,
+      color: "#0e5fa3",
+      lineWidth: 0.45,
+      opacity: 1.0,
+      closed: true,
+      isEarthLake: true,
+      rawPts: geoPts(lk.pts, 1),
+    }));
+
     const extraIslands = [
-      { label: "Sardinia", color: "#52a862", pts: [[8.2, 41.2], [9.5, 41.2], [9.8, 39.2], [8.4, 38.9], [8.1, 40.2]] },
-      { label: "Cyprus", color: "#68ad60", pts: [[32.3, 35.1], [33.8, 35.4], [34.5, 35.6], [33.9, 34.9], [32.9, 34.6]] },
-      { label: "Faroe Islands", color: "#8ec79b", pts: [[-7.4, 62.3], [-6.4, 62.3], [-6.6, 61.5], [-7.2, 61.6]] },
-      { label: "Falkland Islands", color: "#70a878", pts: [[-61.3, -51.4], [-57.8, -51.4], [-58.4, -52.3], [-60.9, -52.2]] },
-      { label: "South Georgia", color: "#d7e8f5", pts: [[-38.0, -54.0], [-36.0, -54.8], [-36.5, -55.1], [-38.3, -54.3]] },
-      { label: "Jamaica", color: "#289c5e", pts: [[-78.4, 18.3], [-76.2, 18.1], [-76.4, 17.8], [-78.2, 18.0]] },
-      { label: "Puerto Rico", color: "#289c5e", pts: [[-67.2, 18.5], [-65.6, 18.4], [-65.8, 18.0], [-67.1, 18.0]] },
-      { label: "Bahamas Archipelago", color: "#34b06f", pts: [[-78.8, 26.6], [-77.1, 26.5], [-76.5, 24.4], [-77.9, 24.0], [-78.5, 25.2]] },
-      { label: "Bermuda", color: "#34b06f", pts: [[-65.0, 32.4], [-64.5, 32.5], [-64.6, 32.2], [-64.9, 32.2]] },
-      { label: "Lesser Antilles Arc", color: "#289c5e", pts: [[-61.8, 17.2], [-61.0, 15.8], [-60.8, 13.8], [-61.4, 12.1], [-61.7, 13.9], [-61.5, 16.0]] },
-      { label: "Zanzibar & Comoros", color: "#4da35a", pts: [[39.1, -5.8], [39.6, -6.4], [43.5, -11.5], [44.5, -12.3], [43.2, -11.8], [39.2, -6.3]] },
-      { label: "Seychelles", color: "#2ca364", pts: [[55.1, -4.4], [55.9, -4.6], [55.7, -5.0], [55.0, -4.8]] },
-      { label: "Maldives Atolls", color: "#2ca364", pts: [[72.7, 6.8], [73.6, 6.2], [73.6, 0.2], [72.8, 0.4]] },
-      { label: "Okinawa & Ryukyu Arc", color: "#3fa362", pts: [[127.4, 26.8], [128.4, 26.9], [127.9, 25.9], [124.2, 24.4], [123.8, 24.8], [127.0, 26.1]] },
-      { label: "Tahiti & Society Islands", color: "#2ca364", pts: [[-150.2, -17.3], [-149.0, -17.6], [-149.2, -18.1], [-150.0, -17.8]] },
-      { label: "Easter Island (Rapa Nui)", color: "#76b064", pts: [[-109.6, -27.0], [-109.1, -27.1], [-109.4, -27.4]] },
+      { label: "Sardinia", color: "#548f4f", pts: [[8.2, 41.2], [9.5, 41.2], [9.8, 39.2], [8.4, 38.9], [8.1, 40.2]] },
+      { label: "Cyprus", color: "#7c9452", pts: [[32.3, 35.1], [33.8, 35.4], [34.5, 35.6], [33.9, 34.9], [32.9, 34.6]] },
+      { label: "Faroe Islands", color: "#6c9e78", pts: [[-7.4, 62.3], [-6.4, 62.3], [-6.6, 61.5], [-7.2, 61.6]] },
+      { label: "Falkland Islands", color: "#6c8c68", pts: [[-61.3, -51.4], [-57.8, -51.4], [-58.4, -52.3], [-60.9, -52.2]] },
+      { label: "South Georgia", color: "#ddecf7", pts: [[-38.0, -54.0], [-36.0, -54.8], [-36.5, -55.1], [-38.3, -54.3]] },
+      { label: "Jamaica", color: "#1f7d46", pts: [[-78.4, 18.3], [-76.2, 18.1], [-76.4, 17.8], [-78.2, 18.0]] },
+      { label: "Puerto Rico", color: "#1f7d46", pts: [[-67.2, 18.5], [-65.6, 18.4], [-65.8, 18.0], [-67.1, 18.0]] },
+      { label: "Bahamas Archipelago", color: "#2b945c", pts: [[-78.8, 26.6], [-77.1, 26.5], [-76.5, 24.4], [-77.9, 24.0], [-78.5, 25.2]] },
+      { label: "Bermuda", color: "#2b945c", pts: [[-65.0, 32.4], [-64.5, 32.5], [-64.6, 32.2], [-64.9, 32.2]] },
+      { label: "Lesser Antilles Arc", color: "#1f7d46", pts: [[-61.8, 17.2], [-61.0, 15.8], [-60.8, 13.8], [-61.4, 12.1], [-61.7, 13.9], [-61.5, 16.0]] },
+      { label: "Zanzibar & Comoros", color: "#3d8c4a", pts: [[39.1, -5.8], [39.6, -6.4], [43.5, -11.5], [44.5, -12.3], [43.2, -11.8], [39.2, -6.3]] },
+      { label: "Seychelles", color: "#228c50", pts: [[55.1, -4.4], [55.9, -4.6], [55.7, -5.0], [55.0, -4.8]] },
+      { label: "Maldives Atolls", color: "#228c50", pts: [[72.7, 6.8], [73.6, 6.2], [73.6, 0.2], [72.8, 0.4]] },
+      { label: "Okinawa & Ryukyu Arc", color: "#2e854d", pts: [[127.4, 26.8], [128.4, 26.9], [127.9, 25.9], [124.2, 24.4], [123.8, 24.8], [127.0, 26.1]] },
+      { label: "Tahiti & Society Islands", color: "#228c50", pts: [[-150.2, -17.3], [-149.0, -17.6], [-149.2, -18.1], [-150.0, -17.8]] },
+      { label: "Easter Island (Rapa Nui)", color: "#689954", pts: [[-109.6, -27.0], [-109.1, -27.1], [-109.4, -27.4]] },
     ].map((isl) => ({
       kind: "polygon",
       label: isl.label,
       color: isl.color,
-      lineWidth: 1.1,
+      lineWidth: 0.5,
       opacity: 1.0,
       closed: true,
+      isEarthLand: true,
       rawPts: geoPts(isl.pts, 1),
     }));
 
-    /* Authentic Biome Overlays (100% Solid Opacity, fill-only, layered on top of continents!) */
-    const biomes = [
-      {
-        kind: "polygon",
-        label: "Sahara Desert",
-        color: "#e6c173",
-        lineWidth: 0,
-        opacity: 1.0,
-        closed: true,
-        rawPts: geoPts([
-          [-16.2, 21.5], [-14.0, 27.5], [-9.0, 30.8], [0.0, 33.5], [10.0, 32.8],
-          [20.0, 30.5], [31.5, 30.0], [34.0, 24.5], [36.5, 19.0], [32.0, 15.5],
-          [22.0, 14.5], [10.0, 14.8], [-2.0, 15.2], [-12.0, 16.0], [-15.8, 18.2],
-        ], 2),
-      },
-      {
-        kind: "polygon",
-        label: "Arabian Desert",
-        color: "#e2b96a",
-        lineWidth: 0,
-        opacity: 1.0,
-        closed: true,
-        rawPts: geoPts([
-          [35.8, 28.5], [40.5, 31.5], [47.0, 29.2], [53.5, 24.0], [57.5, 21.5],
-          [53.0, 16.5], [45.0, 13.8], [42.5, 17.5], [39.5, 22.0], [36.5, 26.0],
-        ], 2),
-      },
-      {
-        kind: "polygon",
-        label: "Amazon Rainforest",
-        color: "#146e3f",
-        lineWidth: 0,
-        opacity: 1.0,
-        closed: true,
-        rawPts: geoPts([
-          [-75.5, 2.0], [-68.0, 4.5], [-59.0, 2.5], [-50.5, -1.0], [-49.5, -7.5],
-          [-56.0, -12.0], [-66.5, -12.5], [-74.5, -8.5], [-76.5, -3.5],
-        ], 2),
-      },
-      {
-        kind: "polygon",
-        label: "Gobi & Tibetan Plateau",
-        color: "#ccb98e",
-        lineWidth: 0,
-        opacity: 1.0,
-        closed: true,
-        rawPts: geoPts([
-          [76.0, 36.0], [86.0, 42.5], [100.0, 43.5], [110.0, 41.5], [104.0, 34.0],
-          [97.0, 29.5], [87.0, 29.0], [79.0, 31.5],
-        ], 2),
-      },
-      {
-        kind: "polygon",
-        label: "Australian Red Center",
-        color: "#bf5830",
-        lineWidth: 0,
-        opacity: 1.0,
-        closed: true,
-        rawPts: geoPts([
-          [120.0, -21.5], [130.0, -20.0], [139.0, -23.0], [138.0, -29.5],
-          [129.0, -30.5], [120.5, -28.0], [118.5, -24.5],
-        ], 2),
-      },
-    ];
-
-    return [oceanBase, ...land, ...extraIslands, ...biomes, ...lakes];
+    return [oceanBase, ...land, ...extraIslands, ...lakes, ...extraLakes];
   }
 
   const EARTH_ATLAS_SHAPES = buildEarthAtlasShapes();
-
-  /* Mercator Projection Converter: maps (lon°, lat°) onto the familiar flat rectangular
-   * Mercator plane [-π, π] × [-2.65, 2.65] so the holomorphic inverse Mercator map
-   * w = i·exp(−i·z) wraps the flat 2D Mercator Earth conformally onto the 3D Riemann Sphere! */
-  function mercPt(lon, lat, label, icon = "dot", color = "#fbbf24", size = 4.5, locked = false) {
-    const phi = (Math.max(-82, Math.min(82, lat)) * Math.PI) / 180;
-    const x = (lon * Math.PI) / 180;
-    const y = Math.log(Math.tan(Math.PI / 4 + phi / 2));
-    return pt(Number(x.toFixed(4)), Number(y.toFixed(4)), label, icon, color, size, locked);
-  }
-
-  function buildMercatorEarthShapes() {
-    const out = [];
-    /* Full Mercator Ocean Rectangle [-π, π] × [-2.65, 2.65] (isOcean fills 100% of 3D Sphere, Stereographic & Poincaré Disks!) */
-    out.push({
-      kind: "rect",
-      label: "Global Ocean (Mercator)",
-      color: "#0b4f8c",
-      lineWidth: 1.0,
-      opacity: 1.0,
-      closed: true,
-      isOcean: true,
-      rawPts: rectPts(-Math.PI, -2.65, Math.PI, 2.65),
-    });
-
-    for (const s of EARTH_ATLAS_SHAPES) {
-      if (s.isOcean) continue;
-      if (/^Antarctica$/i.test(s.label || "")) {
-        /* Build clean continuous Mercator southern ice shelf spanning [-π, π] down to y = -2.65 */
-        const coast = (s.rawPts || []).map((p) => ({
-          x: Math.atan2(p.x, p.y),
-          y: Math.max(-2.6, Math.min(2.6, Math.log(Math.max(1e-4, Math.hypot(p.x, p.y))))),
-        })).sort((a, b) => a.x - b.x);
-        const shelf = [{ x: -Math.PI, y: -2.65 }];
-        if (coast.length > 0) shelf.push({ x: -Math.PI, y: coast[0].y });
-        for (const q of coast) shelf.push(q);
-        if (coast.length > 0) shelf.push({ x: Math.PI, y: coast[coast.length - 1].y });
-        shelf.push({ x: Math.PI, y: -2.65 });
-        out.push({ ...s, rawPts: shelf });
-        continue;
-      }
-
-      const mPts = [];
-      let prevX = null;
-      for (const p of s.rawPts || []) {
-        let x = Math.atan2(p.x, p.y);
-        const y = Math.max(-2.6, Math.min(2.6, Math.log(Math.max(1e-4, Math.hypot(p.x, p.y)))));
-        if (prevX !== null) {
-          while (x - prevX > Math.PI) x -= Math.PI * 2;
-          while (x - prevX < -Math.PI) x += Math.PI * 2;
-        }
-        prevX = x;
-        mPts.push({ x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) });
-      }
-      out.push({ ...s, rawPts: mPts });
-    }
-    return out;
-  }
-
-  const MERCATOR_EARTH_SHAPES = buildMercatorEarthShapes();
+  const POLITICAL_WORLD_SHAPES = window.CFVWorldCountries
+    ? EARTH_ATLAS_SHAPES.concat(window.CFVWorldCountries.buildCountryBorderShapes())
+    : EARTH_ATLAS_SHAPES;
+  const POLITICAL_WORLD_POINTS = window.CFVWorldCountries
+    ? window.CFVWorldCountries.buildPoliticalPoints()
+    : [];
 
   /* Stained-Glass Jewel Orb & Hyperbolic Rose Mandala (Solid 100% Opacity + Translucent Layers!) */
   function buildStainedGlassShapes() {
@@ -2573,8 +2472,8 @@
         { title: "Identity Spherical Earth: z", code: "z", color: "#38bdf8", visible: true, active: true },
         { title: "Antipodal Earth Inversion: 1 / z", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : 1.0 / z", color: "#fb7185", visible: false, active: false },
         {
-          title: "C11 Textured Ocean Bathymetry & Currents (60 FPS)",
-          code: "double lon = creal(z);\ndouble lat = 2.0 * atan(exp(cimag(z))) - 0.5 * M_PI;\ndouble ridge = 3.4 * exp(-pow(sin(lon + 0.35 * sin(2.5 * lat)) / 0.22, 2.0));\ndouble gyres = 2.8 * sin(3.0 * lon + 1.4 * cos(2.0 * lat)) * cos(lat) + 1.9 * cos(6.0 * lon - 5.0 * lat) * cos(lat);\ndouble shelf = 12.2 + 7.4 * cos(2.0 * lat) + ridge + gyres;\nreturn c_make(fmax(0.25, shelf), 0.0);",
+          title: "C11 Deep Ocean Bathymetry, Ridges & Trenches (60 FPS)",
+          code: "double lon = creal(z);\ndouble lat = 2.0 * atan(exp(cimag(z))) - 0.5 * M_PI;\ndouble cl = cos(lat);\ndouble mar = 2.6 * exp(-pow(sin(0.5 * (lon + 0.52 - 0.32 * sin(2.4 * lat))) / 0.10, 2.0));\ndouble epr = 2.2 * exp(-pow(sin(0.5 * (lon + 1.92 + 0.24 * cos(1.8 * lat))) / 0.11, 2.0));\ndouble ind = 2.1 * exp(-pow((lat + 0.58 - 0.18 * cos(2.0 * (lon - 1.25))) / 0.16, 2.0)) * exp(-pow(sin(0.5 * (lon - 1.35)) / 0.45, 2.0));\ndouble frac = 0.65 * sin(14.0 * lat + 2.2 * sin(3.0 * lon)) * cl + 0.55 * cos(9.0 * lon - 7.0 * lat) * cl;\ndouble trench = -1.7 * exp(-pow((lon - 2.52) / 0.14, 2.0) - pow((lat - 0.30) / 0.38, 2.0)) - 1.4 * exp(-pow((lon - 1.92) / 0.35, 2.0) - pow((lat + 0.18) / 0.12, 2.0));\ndouble basin = 2.15 + 0.85 * cos(2.0 * lat) + mar + epr + ind + frac + trench;\nreturn c_make(fmax(0.18, fmin(9.5, basin)), 0.0);",
           color: "#0ea5e9",
           visible: false,
           active: false,
@@ -2612,49 +2511,85 @@
         { name: "sphere_zoom", label: "Riemann Sphere camera zoom", expr: "zoom" },
       ],
       defaultPoints: [
-        geoPt(-74.0, 40.7, "New York", "dot", "#f8fafc", 4.2, false),
-        geoPt(-118.2, 34.1, "Los Angeles", "dot", "#f8fafc", 4.0, false),
-        geoPt(-87.6, 41.9, "Chicago", "dot", "#f8fafc", 3.6, false),
-        geoPt(-79.4, 43.7, "Toronto", "dot", "#f8fafc", 3.6, false),
-        geoPt(-123.1, 49.3, "Vancouver", "dot", "#f8fafc", 3.5, false),
-        geoPt(-149.9, 61.2, "Anchorage", "dot", "#e0f2fe", 3.4, false),
-        geoPt(-99.1, 19.4, "Mexico City", "dot", "#f8fafc", 4.0, false),
-        geoPt(-82.4, 23.1, "Havana", "dot", "#bae6fd", 3.5, false),
-        geoPt(-74.1, 4.7, "Bogotá", "dot", "#f8fafc", 3.6, false),
-        geoPt(-77.0, -12.0, "Lima", "dot", "#f8fafc", 3.6, false),
-        geoPt(-46.6, -23.5, "São Paulo", "dot", "#f8fafc", 3.8, false),
+        /* Tier 1 Megacities & Global Capitals (size 4.3 — highest collision-free label priority!) */
+        geoPt(-74.0, 40.7, "New York", "dot", "#f8fafc", 4.3, false),
+        geoPt(-118.2, 34.1, "Los Angeles", "dot", "#f8fafc", 4.2, false),
+        geoPt(-99.1, 19.4, "Mexico City", "dot", "#f8fafc", 4.2, false),
         geoPt(-43.2, -22.9, "Rio de Janeiro", "dot", "#f8fafc", 4.2, false),
-        geoPt(-70.7, -33.4, "Santiago", "dot", "#f8fafc", 3.6, false),
         geoPt(-58.4, -34.6, "Buenos Aires", "dot", "#f8fafc", 4.2, false),
-        geoPt(-21.9, 64.1, "Reykjavik", "dot", "#e0f2fe", 3.7, false),
-        geoPt(-0.1, 51.5, "London", "dot", "#fef08a", 4.2, false),
-        geoPt(2.35, 48.85, "Paris", "dot", "#fef08a", 4.0, false),
-        geoPt(-3.7, 40.4, "Madrid", "dot", "#fef08a", 3.6, false),
-        geoPt(12.5, 41.9, "Rome", "dot", "#fef08a", 3.8, false),
-        geoPt(13.4, 52.5, "Berlin", "dot", "#fef08a", 3.7, false),
-        geoPt(18.1, 59.3, "Stockholm", "dot", "#fef08a", 3.6, false),
-        geoPt(23.7, 38.0, "Athens", "dot", "#fef08a", 3.6, false),
-        geoPt(29.0, 41.0, "Istanbul", "dot", "#fef08a", 3.9, false),
-        geoPt(37.6, 55.75, "Moscow", "dot", "#fef08a", 4.2, false),
-        geoPt(-7.6, 33.6, "Casablanca", "dot", "#fde68a", 3.6, false),
-        geoPt(31.2, 30.0, "Cairo", "dot", "#fde68a", 4.2, false),
-        geoPt(3.4, 6.5, "Lagos", "dot", "#fde68a", 3.8, false),
-        geoPt(36.8, -1.3, "Nairobi", "dot", "#fde68a", 3.8, false),
+        geoPt(-0.1, 51.5, "London", "dot", "#fef08a", 4.3, false),
+        geoPt(2.35, 48.85, "Paris", "dot", "#fef08a", 4.1, false),
+        geoPt(37.6, 55.75, "Moscow", "dot", "#fef08a", 4.3, false),
+        geoPt(29.0, 41.0, "Istanbul", "dot", "#fef08a", 4.1, false),
+        geoPt(31.2, 30.0, "Cairo", "dot", "#fde68a", 4.3, false),
+        geoPt(3.4, 6.5, "Lagos", "dot", "#fde68a", 4.2, false),
         geoPt(18.4, -33.9, "Cape Town", "dot", "#fde68a", 4.2, false),
-        geoPt(55.3, 25.2, "Dubai", "dot", "#fde68a", 3.9, false),
-        geoPt(72.9, 19.1, "Mumbai", "dot", "#e2e8f0", 4.0, false),
-        geoPt(77.2, 28.6, "New Delhi", "dot", "#e2e8f0", 3.9, false),
-        geoPt(100.5, 13.75, "Bangkok", "dot", "#e2e8f0", 3.8, false),
-        geoPt(103.8, 1.35, "Singapore", "dot", "#e2e8f0", 4.0, false),
-        geoPt(106.8, -6.2, "Jakarta", "dot", "#e2e8f0", 3.8, false),
-        geoPt(121.5, 31.2, "Shanghai", "dot", "#e2e8f0", 3.9, false),
-        geoPt(116.4, 39.9, "Beijing", "dot", "#e2e8f0", 4.2, false),
-        geoPt(127.0, 37.6, "Seoul", "dot", "#e2e8f0", 3.9, false),
-        geoPt(139.7, 35.7, "Tokyo", "dot", "#e2e8f0", 4.2, false),
-        geoPt(151.2, -33.9, "Sydney", "dot", "#fed7aa", 4.2, false),
-        geoPt(174.8, -36.85, "Auckland", "dot", "#fed7aa", 3.8, false),
-        geoPt(-157.8, 21.3, "Honolulu", "dot", "#bae6fd", 3.8, false),
-        geoPt(-149.5, -17.5, "Tahiti", "dot", "#bae6fd", 3.5, false),
+        geoPt(55.3, 25.2, "Dubai", "dot", "#fde68a", 4.2, false),
+        geoPt(77.2, 28.6, "New Delhi", "dot", "#e2e8f0", 4.3, false),
+        geoPt(72.9, 19.1, "Mumbai", "dot", "#e2e8f0", 4.1, false),
+        geoPt(116.4, 39.9, "Beijing", "dot", "#e2e8f0", 4.3, false),
+        geoPt(121.5, 31.2, "Shanghai", "dot", "#e2e8f0", 4.2, false),
+        geoPt(139.7, 35.7, "Tokyo", "dot", "#e2e8f0", 4.3, false),
+        geoPt(127.0, 37.6, "Seoul", "dot", "#e2e8f0", 4.1, false),
+        geoPt(103.8, 1.35, "Singapore", "dot", "#e2e8f0", 4.2, false),
+        geoPt(106.8, -6.2, "Jakarta", "dot", "#e2e8f0", 4.1, false),
+        geoPt(151.2, -33.9, "Sydney", "dot", "#fed7aa", 4.3, false),
+        /* Tier 2 Major Regional Hubs (size 3.6–3.9) */
+        geoPt(-87.6, 41.9, "Chicago", "dot", "#f8fafc", 3.8, false),
+        geoPt(-122.4, 37.8, "San Francisco", "dot", "#f8fafc", 3.7, false),
+        geoPt(-79.4, 43.7, "Toronto", "dot", "#f8fafc", 3.7, false),
+        geoPt(-123.1, 49.3, "Vancouver", "dot", "#f8fafc", 3.7, false),
+        geoPt(-80.2, 25.8, "Miami", "dot", "#f8fafc", 3.6, false),
+        geoPt(-149.9, 61.2, "Anchorage", "dot", "#e0f2fe", 3.6, false),
+        geoPt(-82.4, 23.1, "Havana", "dot", "#bae6fd", 3.6, false),
+        geoPt(-74.1, 4.7, "Bogotá", "dot", "#f8fafc", 3.8, false),
+        geoPt(-77.0, -12.0, "Lima", "dot", "#f8fafc", 3.8, false),
+        geoPt(-46.6, -23.5, "São Paulo", "dot", "#f8fafc", 3.8, false),
+        geoPt(-70.7, -33.4, "Santiago", "dot", "#f8fafc", 3.8, false),
+        geoPt(-21.9, 64.1, "Reykjavik", "dot", "#e0f2fe", 3.9, false),
+        geoPt(-3.7, 40.4, "Madrid", "dot", "#fef08a", 3.8, false),
+        geoPt(12.5, 41.9, "Rome", "dot", "#fef08a", 3.8, false),
+        geoPt(13.4, 52.5, "Berlin", "dot", "#fef08a", 3.8, false),
+        geoPt(18.1, 59.3, "Stockholm", "dot", "#fef08a", 3.8, false),
+        geoPt(23.7, 38.0, "Athens", "dot", "#fef08a", 3.6, false),
+        geoPt(30.5, 50.45, "Kyiv", "dot", "#fef08a", 3.6, false),
+        geoPt(-7.6, 33.6, "Casablanca", "dot", "#fde68a", 3.8, false),
+        geoPt(36.8, -1.3, "Nairobi", "dot", "#fde68a", 3.9, false),
+        geoPt(38.7, 9.0, "Addis Ababa", "dot", "#fde68a", 3.7, false),
+        geoPt(28.0, -26.2, "Johannesburg", "dot", "#fde68a", 3.8, false),
+        geoPt(15.3, -4.3, "Kinshasa", "dot", "#fde68a", 3.7, false),
+        geoPt(46.7, 24.7, "Riyadh", "dot", "#fde68a", 3.7, false),
+        geoPt(51.4, 35.7, "Tehran", "dot", "#fde68a", 3.8, false),
+        geoPt(67.0, 24.9, "Karachi", "dot", "#e2e8f0", 3.7, false),
+        geoPt(88.4, 22.6, "Kolkata", "dot", "#e2e8f0", 3.6, false),
+        geoPt(77.6, 13.0, "Bengaluru", "dot", "#e2e8f0", 3.7, false),
+        geoPt(100.5, 13.75, "Bangkok", "dot", "#e2e8f0", 3.9, false),
+        geoPt(114.2, 22.3, "Hong Kong", "dot", "#e2e8f0", 3.8, false),
+        geoPt(121.0, 14.6, "Manila", "dot", "#e2e8f0", 3.8, false),
+        geoPt(82.9, 55.0, "Novosibirsk", "dot", "#e0f2fe", 3.7, false),
+        geoPt(131.9, 43.1, "Vladivostok", "dot", "#e0f2fe", 3.6, false),
+        geoPt(115.9, -32.0, "Perth", "dot", "#fed7aa", 3.8, false),
+        geoPt(144.96, -37.8, "Melbourne", "dot", "#fed7aa", 3.7, false),
+        geoPt(174.8, -36.85, "Auckland", "dot", "#fed7aa", 3.9, false),
+        geoPt(-157.8, 21.3, "Honolulu", "dot", "#bae6fd", 3.9, false),
+        geoPt(-149.5, -17.5, "Tahiti", "dot", "#bae6fd", 3.7, false),
+        /* Tier 3 Zoom-Reveal Regional & Frontier Cities (size 3.1–3.4 — sparkle & label on zoom!) */
+        geoPt(-77.0, 38.9, "Washington", "dot", "#f8fafc", 3.2, false),
+        geoPt(-122.3, 47.6, "Seattle", "dot", "#f8fafc", 3.2, false),
+        geoPt(-105.0, 39.7, "Denver", "dot", "#f8fafc", 3.3, false),
+        geoPt(-73.6, 45.5, "Montreal", "dot", "#f8fafc", 3.2, false),
+        geoPt(-51.7, 64.2, "Nuuk", "dot", "#e0f2fe", 3.3, false),
+        geoPt(-68.3, -54.8, "Ushuaia", "dot", "#e0f2fe", 3.4, false),
+        geoPt(-9.1, 38.7, "Lisbon", "dot", "#fef08a", 3.2, false),
+        geoPt(4.9, 52.4, "Amsterdam", "dot", "#fef08a", 3.1, false),
+        geoPt(16.4, 48.2, "Vienna", "dot", "#fef08a", 3.2, false),
+        geoPt(21.0, 52.2, "Warsaw", "dot", "#fef08a", 3.2, false),
+        geoPt(10.8, 59.9, "Oslo", "dot", "#fef08a", 3.2, false),
+        geoPt(-17.4, 14.7, "Dakar", "dot", "#fde68a", 3.4, false),
+        geoPt(85.3, 27.7, "Kathmandu", "dot", "#e2e8f0", 3.3, false),
+        geoPt(106.9, 47.9, "Ulaanbaatar", "dot", "#e2e8f0", 3.4, false),
+        geoPt(121.6, 25.0, "Taipei", "dot", "#e2e8f0", 3.2, false),
+        geoPt(166.7, -77.85, "McMurdo", "dot", "#bae6fd", 3.4, false),
       ],
       presets: [
         {
@@ -2880,6 +2815,192 @@
       ],
     },
     {
+      id: "map_world_countries",
+      mode: "map",
+      folder: "cat_art_atlas",
+      category: "Spheres, Atlases & Conformal Art",
+      title: "World Political Atlas — Borders, Countries & Capitals",
+      subtitle: "Sovereign international borders, zoom-tiered country labels, national capitals (★) & top global megacities!",
+      description: "Political sibling of the Earth Atlas: adds 100+ international land borders across every continent, 145+ zoom-progressive uppercase country name labels with zero-collision cartographic layout, national capitals marked with gold stars (★), and only the world's top non-capital megacities — rendered at 60 FPS on the WebGL2 Riemann Sphere, Mercator, Mollweide & Poincaré Disk!",
+      showMesh: false,
+      fnCards: [
+        { title: "Identity Spherical Earth: z", code: "z", color: "#fde68a", visible: true, active: true },
+        { title: "Antipodal Earth Inversion: 1 / z", code: "cabs(z) < 1e-12 ? c_make(INFINITY, 0) : 1.0 / z", color: "#fb7185", visible: false, active: false },
+        {
+          title: "Mollweide Equal-Area Political Projection (Newton C11)",
+          code: "double x = creal(z), y = cimag(z);\ndouble r2 = x*x + y*y;\ndouble Z = (r2 - 1.0) / (r2 + 1.0);\ndouble lat = asin(fmax(-1.0, fmin(1.0, Z)));\ndouble lon = atan2(x, y);\ndouble rhs = M_PI * sin(lat);\ndouble th = lat;\nfor (int k = 0; k < 6; k++) {\n  double d = 2.0 + 2.0 * cos(2.0 * th);\n  if (fabs(d) < 1e-6) break;\n  th -= (2.0 * th + sin(2.0 * th) - rhs) / d;\n}\ndouble xm = (2.0 * 1.41421356 / M_PI) * lon * cos(th);\ndouble ym = 1.41421356 * sin(th);\nreturn c_make(xm, ym);",
+          color: "#fbbf24",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Azimuthal Equidistant (UN Emblem North-Pole Map)",
+          code: "double x = creal(z), y = cimag(z);\ndouble r2 = x*x + y*y;\ndouble Z = (r2 - 1.0) / (r2 + 1.0);\ndouble lat = asin(fmax(-1.0, fmin(1.0, Z)));\ndouble lon = atan2(x, y);\ndouble rho = 0.5 * M_PI - lat;\nreturn c_make(rho * sin(lon), -rho * cos(lon));",
+          color: "#34d399",
+          visible: false,
+          active: false,
+        },
+      ],
+      sliders: [
+        { name: "spin", label: "Globe Spin", value: 0.0, min: 0.0, max: 6.2832, step: 0.02, speed: 0.45 },
+        { name: "tilt", label: "Globe Pitch", value: 0.34, min: -1.35, max: 1.35, step: 0.02, speed: 0.45 },
+        { name: "zoom", label: "Globe Zoom", value: 1.25, min: 0.65, max: 6.5, step: 0.02, speed: 0.45 },
+      ],
+      vars: [
+        { name: "sphere_yaw", label: "Riemann Sphere camera yaw (60 FPS)", expr: "0.28 + spin" },
+        { name: "sphere_pitch", label: "Riemann Sphere camera pitch", expr: "tilt" },
+        { name: "sphere_zoom", label: "Riemann Sphere camera zoom", expr: "zoom" },
+      ],
+      defaultPoints: POLITICAL_WORLD_POINTS,
+      presets: [
+        {
+          id: "pol_dual_mercator",
+          name: "Political Globe → Mercator World Map (Dual View)",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "mercator",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.35 },
+          layout: { inputHidden: false, outputHidden: false, splitPct: 48 },
+          sliderValues: { spin: 0.0, tilt: 0.34, zoom: 1.22 },
+          shapes: POLITICAL_WORLD_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "World Political Atlas — Borders, Nations & Capitals",
+              text: "Left: 3D Political Riemann Sphere $S^2$ with sovereign land borders, zoom-tiered uppercase country names, gold capital stars ($\\star$), and top global megacities.\n• Zoom in (up to $48\\times$) to reveal every smaller nation and regional capital with zero label overlap!",
+              color: "#fde68a", anchor: "bottom-left", plane: "out", width: 350, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "pol_spin_globe",
+          name: "▶ Spinning 3D Political Globe (60 FPS)",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "sphere",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          layout: { inputHidden: false, outputHidden: true, sidebarCollapsed: true },
+          sliderValues: { spin: 0.0, tilt: 0.25, zoom: 1.18 },
+          startSlider: "spin",
+          shapes: POLITICAL_WORLD_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "60 FPS Spinning Political Globe",
+              text: "Smooth 60 FPS rotation via camera variable `sphere_yaw` — zero recompilation! Gold stars ($\\star$) mark sovereign national capitals; white pins mark non-capital global megacities.",
+              color: "#fde68a", anchor: "bottom-left", plane: "in", width: 335, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "pol_europe_zoom",
+          name: "Europe & Mediterranean Political Zoom (3.2×)",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "sphere",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          layout: { inputHidden: false, outputHidden: true, sidebarCollapsed: true },
+          sliderValues: { spin: 0.0, tilt: 0.84, zoom: 3.15 },
+          shapes: POLITICAL_WORLD_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Europe & Mediterranean — Deep Political Zoom",
+              text: "Zooming to $3.15\\times$ unlocks Tier-1 & Tier-2 European borders, capitals (Paris, Berlin, Rome, Vienna, Prague, Warsaw, Kyiv, Athens, Bern), and smaller sovereign states with crisp WebGL2 micro-relief.",
+              color: "#38bdf8", anchor: "bottom-left", plane: "in", width: 350, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "pol_asia_zoom",
+          name: "Asia & Middle East Political Focus (2.0×)",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "sphere",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          layout: { inputHidden: false, outputHidden: true, sidebarCollapsed: true },
+          sliderValues: { spin: 1.25, tilt: 0.48, zoom: 2.05 },
+          shapes: POLITICAL_WORLD_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Asia & Middle East Political Map",
+              text: "Focused across Iran, India, China, Central Asia, Japan & Southeast Asia — showing the Himalayan borders, Central Asian republics, national capitals ($\\star$), and megacities (Mumbai, Shanghai, Dubai).",
+              color: "#34d399", anchor: "bottom-left", plane: "in", width: 345, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "pol_americas",
+          name: "Americas Political Focus (North, Central & South)",
+          activeFnIndex: 0,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "sphere",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          layout: { inputHidden: false, outputHidden: true, sidebarCollapsed: true },
+          sliderValues: { spin: 4.58, tilt: 0.14, zoom: 1.55 },
+          shapes: POLITICAL_WORLD_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Americas — Borders, Capitals & Megacities",
+              text: "Shows Canada, the United States, Mexico, Central America, and all 12 South American nations with the 49th parallel, Rio Grande, Andean Chile–Argentina spine, and Amazonian borders.",
+              color: "#60a5fa", anchor: "bottom-left", plane: "in", width: 340, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "pol_mollweide",
+          name: "Mollweide Equal-Area World Political Map",
+          activeFnIndex: 2,
+          inProjection: "sphere",
+          enableSphere: false,
+          projection: "planar",
+          showDomain: false,
+          showOutDomain: false,
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 4.5 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.1 },
+          layout: { inputHidden: true, outputHidden: false, sidebarCollapsed: true },
+          sliderValues: { spin: 0.0, tilt: 0.24, zoom: 1.12 },
+          shapes: POLITICAL_WORLD_SHAPES,
+          texts: [
+            {
+              kind: "text", title: "Equal-Area Political World — Mollweide Projection",
+              text: "Solved natively in C11 via 6 Newton iterations on $2\\theta + \\sin(2\\theta) = \\pi\\sin(\\varphi)$, preserving true relative country surface areas across the entire globe!",
+              color: "#fbbf24", anchor: "bottom-left", plane: "out", width: 345, opacity: 0.92, visible: true, locked: false,
+            },
+          ],
+        },
+      ],
+    },
+    {
       id: "map_stained_glass_sphere",
       mode: "map",
       folder: "cat_art_atlas",
@@ -2969,6 +3090,160 @@
           outView: { cx: 0.0, cy: 0.0, r: 2.6 },
           sliderValues: { spin: 0.0, tilt: 0.35, a: 0.0 },
           shapes: STAINED_GLASS_SHAPES,
+        },
+      ],
+    },
+    {
+      id: "map_perlin_diffusion",
+      mode: "map",
+      folder: "cat_art_atlas",
+      category: "Spheres, Atlases & Conformal Art",
+      title: "Perlin Noise, Domain Warping & Diffusion Denoising",
+      subtitle: "Native C11 gradient Perlin fBm, recursive IQ domain warping, DDPM reverse-diffusion denoising (Noise → Signal!) & procedural 3D exoplanet!",
+      description: "Procedural generative graphics and diffusion-model math compiled natively in C11: explore true 2D gradient Perlin fBm with recursive domain warping, watch a Stable-Diffusion / DDPM reverse-SDE variance schedule denoise pure Gaussian latent static into a structured conformal manifold, swirl divergence-free curl-noise marble, and spin a 3D Perlin exoplanet on the Riemann Sphere!",
+      showDomain: true,
+      domainScheme: "inferno",
+      domainOpacity: 1.0,
+      fnCards: [
+        {
+          title: "Domain-Warped Perlin fBm Landscape (C11)",
+          code: "double px = creal(z) * freq + seed * 1.7, py = cimag(z) * freq - seed * 1.3;\nint oct = (int)floor(fmax(1.0, fmin(6.0, octaves + 0.5)));\ndouble val = 0.0;\nfor (int pass = 0; pass < 3; pass++) {\n  double qx = px + (pass > 0 ? warp * val : 0.0);\n  double qy = py + (pass > 0 ? warp * (val * 0.83 - 0.45) : 0.0);\n  double sum = 0.0, amp = 0.52, f = 1.0;\n  for (int o = 0; o < oct; o++) {\n    double sx = qx * f, sy = qy * f;\n    int x0 = (int)floor(sx), y0 = (int)floor(sy);\n    double fx = sx - (double)x0, fy = sy - (double)y0;\n    double u = fx*fx*fx*(fx*(fx*6.0 - 15.0) + 10.0);\n    double v = fy*fy*fy*(fy*(fy*6.0 - 15.0) + 10.0);\n    double a00 = sin((double)x0*127.1 + (double)y0*311.7) * 43758.5453; a00 = (a00 - floor(a00)) * 6.2831853;\n    double a10 = sin((double)(x0+1)*127.1 + (double)y0*311.7) * 43758.5453; a10 = (a10 - floor(a10)) * 6.2831853;\n    double a01 = sin((double)x0*127.1 + (double)(y0+1)*311.7) * 43758.5453; a01 = (a01 - floor(a01)) * 6.2831853;\n    double a11 = sin((double)(x0+1)*127.1 + (double)(y0+1)*311.7) * 43758.5453; a11 = (a11 - floor(a11)) * 6.2831853;\n    double g00 = cos(a00)*fx + sin(a00)*fy;\n    double g10 = cos(a10)*(fx-1.0) + sin(a10)*fy;\n    double g01 = cos(a01)*fx + sin(a01)*(fy-1.0);\n    double g11 = cos(a11)*(fx-1.0) + sin(a11)*(fy-1.0);\n    double nx0 = g00 + u*(g10 - g00), nx1 = g01 + u*(g11 - g01);\n    sum += amp * (nx0 + v*(nx1 - nx0));\n    f *= 2.03; amp *= 0.5;\n  }\n  val = sum;\n}\nreturn c_make(fmax(0.0, 14.0 + 18.0 * val), 0.0);",
+          color: "#fbbf24",
+          visible: true,
+          active: true,
+        },
+        {
+          title: "DDPM Reverse-Diffusion Denoising x_t = √ᾱ_t·x_0 + √(1−ᾱ_t)·ε",
+          code: "double x = creal(z), y = cimag(z);\ndouble tt = fmax(0.0, fmin(1.0, step_t));\ndouble alpha_bar = cos(tt * 0.5 * M_PI); alpha_bar *= alpha_bar;\ndouble s_sig = sqrt(alpha_bar), s_noi = sqrt(fmax(0.0, 1.0 - alpha_bar));\n/* Target clean latent manifold x_0: multi-scale conformal lotus + concentric rings */\ndouble r = hypot(x, y), th = atan2(y, x);\ndouble petals = 0.55 * cos(6.0 * th - 1.8 * r) * exp(-0.28 * (r - 1.15)*(r - 1.15));\ndouble core = 0.85 * exp(-1.6 * r * r) * (0.65 + 0.35 * cos(5.0 * r));\ndouble halo = 0.50 * exp(-3.5 * (r - 1.75)*(r - 1.75)) * (0.7 + 0.3 * cos(12.0 * th));\ndouble x0 = core + petals + halo;\n/* Multi-frequency Perlin/Gaussian latent noise ε(x,y) + score-field denoising */\ndouble eps = 0.0, amp = 0.58, f = freq * (1.2 + 2.8 * tt);\nfor (int o = 0; o < 4; o++) {\n  double sx = x * f + seed * 3.1 + (double)o * 7.3, sy = y * f - seed * 2.4;\n  int ix = (int)floor(sx), iy = (int)floor(sy);\n  double fx = sx - (double)ix, fy = sy - (double)iy;\n  double u = fx*fx*(3.0 - 2.0*fx), v = fy*fy*(3.0 - 2.0*fy);\n  double h00 = sin((double)ix*127.1 + (double)iy*311.7)*43758.5453; h00 = 2.0*(h00 - floor(h00)) - 1.0;\n  double h10 = sin((double)(ix+1)*127.1 + (double)iy*311.7)*43758.5453; h10 = 2.0*(h10 - floor(h10)) - 1.0;\n  double h01 = sin((double)ix*127.1 + (double)(iy+1)*311.7)*43758.5453; h01 = 2.0*(h01 - floor(h01)) - 1.0;\n  double h11 = sin((double)(ix+1)*127.1 + (double)(iy+1)*311.7)*43758.5453; h11 = 2.0*(h11 - floor(h11)) - 1.0;\n  eps += amp * ((h00 + u*(h10-h00)) + v*((h01 + u*(h11-h01)) - (h00 + u*(h10-h00))));\n  f *= 2.15; amp *= 0.52;\n}\ndouble xt = s_sig * x0 + s_noi * (eps * (0.8 + 0.6 * warp));\ndouble latent_re = xt * cos(2.4 * th * (1.0 - tt) + eps * tt * 3.0);\ndouble latent_im = xt * sin(2.4 * th * (1.0 - tt) + eps * tt * 3.0);\nreturn c_make(fmax(0.0, 12.0 + 18.0 * xt + 4.0 * hypot(latent_re, latent_im)), 0.0);",
+          color: "#a78bfa",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Curl-Noise Turbulent Marble & Fluid Vortices (C11)",
+          code: "double x = creal(z) * freq * 0.85, y = cimag(z) * freq * 0.85;\ndouble d = 0.04, vx = 0.0, vy = 0.0;\nfor (int k = 0; k < 2; k++) {\n  double px = x + seed, py = y - seed;\n  double p0 = sin(px*1.7 + cos(py*1.9)) + 0.5*cos(px*3.4 - sin(py*3.1)) + 0.25*sin(px*6.8 + py*6.2);\n  double px1 = sin((px+d)*1.7 + cos(py*1.9)) + 0.5*cos((px+d)*3.4 - sin(py*3.1)) + 0.25*sin((px+d)*6.8 + py*6.2);\n  double py1 = sin(px*1.7 + cos((py+d)*1.9)) + 0.5*cos(px*3.4 - sin((py+d)*3.1)) + 0.25*sin(px*6.8 + (py+d)*6.2);\n  vx = (py1 - p0) / d; vy = -(px1 - p0) / d;\n  x += 0.22 * warp * vx; y += 0.22 * warp * vy;\n}\nreturn c_make(sin(x * 2.6 + y * 1.4) + 0.55 * vx, cos(y * 2.4 - x * 1.2) + 0.55 * vy);",
+          color: "#38bdf8",
+          visible: false,
+          active: false,
+        },
+        {
+          title: "Procedural 3D Spherical Perlin Exoplanet (60 FPS Globe)",
+          code: "double lon = creal(z);\ndouble lat = 2.0 * atan(exp(cimag(z))) - 0.5 * M_PI;\ndouble cl = cos(lat);\ndouble sx = cl * sin(lon), sy = cl * cos(lon), sz = sin(lat);\ndouble h = 0.0, amp = 0.55, f = freq * 1.15;\nfor (int o = 0; o < 5; o++) {\n  double qx = sx * f + seed * 1.9, qy = sy * f - seed * 1.3, qz = sz * f + seed * 0.7;\n  double wv = sin(qx*1.9 + cos(qy*2.1 + qz*1.7)) * cos(qy*1.8 - sin(qz*2.3 - qx*1.5));\n  h += amp * wv;\n  f *= 2.08; amp *= 0.48;\n}\ndouble polar = 1.6 * pow(fabs(sz), 4.0);\ndouble elev = 6.5 + 9.5 * h + 5.0 * polar;\nreturn c_make(fmax(0.2, elev), 0.0);",
+          color: "#34d399",
+          visible: false,
+          active: false,
+        },
+      ],
+      sliders: [
+        { name: "step_t", label: "Diffusion Noise Level t (1→0)", value: 0.35, min: 0.0, max: 1.0, step: 0.01, speed: 0.45 },
+        { name: "warp", label: "Domain Warp Strength", value: 1.45, min: 0.0, max: 3.5, step: 0.05, speed: 0.45 },
+        { name: "freq", label: "Noise Frequency", value: 1.6, min: 0.5, max: 5.0, step: 0.05, speed: 0.4 },
+        { name: "octaves", label: "fBm Octaves", value: 5, min: 1, max: 6, step: 1, speed: 0.5 },
+        { name: "seed", label: "Latent Seed", value: 1.2, min: 0.0, max: 12.0, step: 0.05, speed: 0.5 },
+        { name: "spin", label: "Exoplanet Spin", value: 0.0, min: 0.0, max: 6.2832, step: 0.02, speed: 0.45 },
+      ],
+      vars: [
+        { name: "sphere_yaw", expr: "-0.4 + spin", label: "3D Exoplanet camera yaw (60 FPS)" },
+        { name: "sphere_pitch", expr: "0.26", label: "3D Exoplanet camera pitch" },
+      ],
+      defaultPoints: [],
+      presets: [
+        {
+          id: "perlin_domain_warp",
+          name: "Domain-Warped Perlin fBm (Inigo Quilez)",
+          activeFnIndex: 0,
+          showDomain: true,
+          showOutDomain: false,
+          domainScheme: "inferno",
+          domainOpacity: 1.0,
+          projection: "planar",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.3 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.3 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { step_t: 0.35, warp: 1.45, freq: 1.6, octaves: 5, seed: 1.2, spin: 0.0 },
+          texts: [
+            {
+              kind: "text", title: "Recursive Domain-Warped Perlin fBm",
+              text: "Evaluates $f(\\mathbf{p}) = \\mathrm{fbm}(\\mathbf{p} + w\\,\\mathrm{fbm}(\\mathbf{p} + w\\,\\mathrm{fbm}(\\mathbf{p})))$ using quintic $6t^5 - 15t^4 + 10t^3$ gradient Perlin noise in native C11!\n• Scrub $\\text{warp}$, $\\text{freq}$, $\\text{octaves}$, or $\\text{seed}$ to sculpt organic marble, nebula & magma landscapes!",
+              color: "#fbbf24", anchor: "bottom-left", plane: "in", width: 350, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "perlin_diffusion_denoise",
+          name: "▶ DDPM Diffusion Denoising (Noise → Signal!)",
+          activeFnIndex: 1,
+          showDomain: true,
+          showOutDomain: false,
+          domainScheme: "smooth_escape",
+          domainOpacity: 1.0,
+          projection: "planar",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.35 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.35 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { step_t: 0.98, warp: 1.1, freq: 2.4, octaves: 5, seed: 2.5, spin: 0.0 },
+          startSlider: "step_t",
+          texts: [
+            {
+              kind: "text", title: "Diffusion Model Variance Schedule (DDPM / Stable Diffusion)",
+              text: "Visualizes $\\mathbf{x}_t = \\sqrt{\\bar{\\alpha}_t}\\,\\mathbf{x}_0 + \\sqrt{1 - \\bar{\\alpha}_t}\\,\\boldsymbol{\\varepsilon}$ with cosine schedule $\\bar{\\alpha}_t = \\cos^2(\\frac{\\pi}{2}t)$.\n• Scrub $t$ from $1 \\to 0$ to watch pure latent noise crystallize into a structured harmonic lotus manifold!",
+              color: "#a78bfa", anchor: "bottom-left", plane: "in", width: 355, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "perlin_curl_fluid",
+          name: "▶ Divergence-Free Curl-Noise Fluid Vortices",
+          activeFnIndex: 2,
+          showDomain: true,
+          showOutDomain: false,
+          domainScheme: "classic",
+          domainOpacity: 1.0,
+          projection: "planar",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 2.4 },
+          outView: { cx: 0.0, cy: 0.0, r: 2.4 },
+          layout: { inputHidden: false, outputHidden: true },
+          sliderValues: { step_t: 0.35, warp: 1.6, freq: 1.5, octaves: 5, seed: 0.0, spin: 0.0 },
+          startSlider: "seed",
+          texts: [
+            {
+              kind: "text", title: "2D Curl-Noise Incompressible Turbulence",
+              text: "Advects coordinates along the divergence-free curl field $\\mathbf{v} = (\\partial_y\\psi,\\, -\\partial_x\\psi)$ with $\\nabla \\cdot \\mathbf{v} = 0$, coloring phase & velocity magnitude in Classic Domain Coloring!\n• Watch $\\text{seed}$ evolve fluid eddies live, or boost $\\text{warp}$ for wilder vortices.",
+              color: "#38bdf8", anchor: "bottom-left", plane: "in", width: 350, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
+        },
+        {
+          id: "perlin_exoplanet_sphere",
+          name: "▶ Procedural 3D Perlin Exoplanet (60 FPS Globe)",
+          activeFnIndex: 3,
+          showDomain: false,
+          showOutDomain: true,
+          outDomainMapping: "mercator",
+          domainScheme: "ocean",
+          domainOpacity: 1.0,
+          enableSphere: true,
+          projection: "sphere",
+          inSquare: true,
+          outSquare: true,
+          inView: { cx: 0.0, cy: 0.0, r: 3.15 },
+          outView: { cx: 0.0, cy: 0.0, r: 3.15 },
+          layout: { inputHidden: true, outputHidden: false },
+          sliderValues: { step_t: 0.35, warp: 1.4, freq: 1.75, octaves: 5, seed: 2.1, spin: 0.0 },
+          startSlider: "spin",
+          texts: [
+            {
+              kind: "text", title: "3D Spherical Perlin Exoplanet on $S^2$",
+              text: "Evaluates seamless 3D spherical fBm terrain $h(X, Y, Z)$ directly on the unit sphere $X^2 + Y^2 + Z^2 = 1$ (zero polar pinching!) and spins at 60 FPS via $\\text{sphere\\_yaw}$.\n• Scrub $\\text{seed}$ to generate brand-new procedural alien worlds instantly!",
+              color: "#34d399", anchor: "bottom-left", plane: "out", width: 350, opacity: 0.93, visible: true, locked: false,
+            },
+          ],
         },
       ],
     },
@@ -4289,11 +4564,25 @@
         "#38bdf8", "bottom-left", "out"
       ),
     ],
+    map_world_countries: [
+      note(
+        "World Political Atlas",
+        "100+ sovereign international borders, 145+ zoom-tiered country labels, national capitals ($\\star$), and top global megacities on the WebGL2 Riemann Sphere $S^2$ & Mercator/Mollweide projections.",
+        "#fde68a", "bottom-left", "out"
+      ),
+    ],
     map_stained_glass_sphere: [
       note(
         "Conformal Stained-Glass Orb",
         "Layered $100\\%$-solid jewel polygons warped by Möbius automorphisms $w = \\frac{z - a}{1 - a z}$ on the Riemann Sphere & Poincaré Disk.\n• Scrub $a$ to shift hyperbolic symmetry, or play $\\text{spin}$ for 60 FPS rotation.",
         "#fbbf24", "bottom-left", "out"
+      ),
+    ],
+    map_perlin_diffusion: [
+      note(
+        "Perlin Noise & Diffusion Denoising",
+        "Native C11 gradient Perlin fBm, recursive domain warping, DDPM reverse-diffusion $\\mathbf{x}_t = \\sqrt{\\bar{\\alpha}_t}\\,\\mathbf{x}_0 + \\sqrt{1-\\bar{\\alpha}_t}\\,\\boldsymbol{\\varepsilon}$, and 3D spherical exoplanets.\n• Switch presets below to watch latent noise crystallize into signal!",
+        "#a78bfa", "bottom-left", "in", 345
       ),
     ],
     real_mvt_rolle: [
@@ -5163,6 +5452,40 @@
     real_xi: "real_hardy_z",
   };
 
+  /* Merge 2D Vector Calculus Curated Projects cleanly into the unified catalog */
+  if (window.CFVVectorExamples && Array.isArray(window.CFVVectorExamples.examples)) {
+    for (const vex of window.CFVVectorExamples.examples) {
+      EXAMPLES.push({
+        ...vex,
+        title: vex.name,
+        folder: vex.category || "cat_vec_physics",
+        desc: vex.summary || "",
+        fnCards: (vex.defaultCards || []).map((c) => ({
+          title: c.title,
+          code: c.code,
+          color: c.color || "#38bdf8",
+          active: c.active !== false,
+          visible: c.visible !== false,
+          vecKind: ["potential", "matrix", "vector"].includes(c.kind) ? c.kind : "field",
+        })),
+        sliders: (vex.defaultSliders || []).map((s) => ({
+          name: s.name,
+          label: s.label || s.name,
+          value: s.val,
+          min: s.min,
+          max: s.max,
+          step: s.step,
+          speed: s.speed,
+        })),
+        presets: (vex.presets || []).map((p) => ({
+          ...p,
+          sliderValues: p.sliders || p.sliderValues || {},
+          activeFnIndex: p.activeCardIdx !== undefined ? p.activeCardIdx : p.activeFnIndex,
+        })),
+      });
+    }
+  }
+
   window.CFVExamples = {
     list: EXAMPLES,
     byId(id) {
@@ -5170,7 +5493,7 @@
       return EXAMPLES.find((e) => e.id === resolved) || EXAMPLES[0];
     },
     forMode(mode) {
-      const m = mode === "real" ? "real" : "map";
+      const m = mode === "real" ? "real" : mode === "vector" ? "vector" : "map";
       return EXAMPLES.filter((e) => e.mode === m);
     },
     helpers: { linePts, circlePts, rectPts, arcPts, wavyPts, pt, ln },

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="30%" r="72%">
+      <stop offset="0%" stop-color="#172554"/>
+      <stop offset="58%" stop-color="#0b1222"/>
+      <stop offset="100%" stop-color="#050811"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="52%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="12" y1="48" x2="52" y2="16" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#f472b6"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#bg)" stroke="url(#ring)" stroke-width="2.4"/>
+  <circle cx="32" cy="32" r="21" stroke="url(#ring)" stroke-width="2.4"/>
+  <ellipse cx="32" cy="32" rx="21" ry="8.8" stroke="#38bdf8" stroke-opacity="0.6" stroke-width="1.6"/>
+  <ellipse cx="32" cy="32" rx="9.5" ry="21" stroke="#a78bfa" stroke-opacity="0.6" stroke-width="1.6"/>
+  <path d="M16 38 C22 24, 42 40, 48 24" stroke="url(#arc)" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="32" cy="11" r="3.4" fill="#fb7185"/>
+  <circle cx="32" cy="32" r="3.6" fill="#34d399"/>
+  <circle cx="32" cy="32" r="1.4" fill="#ffffff"/>
+</svg>

@@ -1,0 +1,37 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795596530336_524",
+  "name": "My Complex Project",
+  "folder": "my",
+  "subtitle": "1 card · 0 presets",
+  "description": "",
+  "mode": "map",
+  "cards": [
+    {
+      "title": "Matrix M1",
+      "code": "[2, 1]",
+      "vecKind": "vector",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": false,
+      "active": true
+    }
+  ],
+  "sliders": [],
+  "vars": [
+    {
+      "name": "R",
+      "label": "",
+      "expr": "1.0"
+    }
+  ],
+  "shapes": [],
+  "points": [],
+  "lines": [],
+  "viewport": {},
+  "presets": []
+}

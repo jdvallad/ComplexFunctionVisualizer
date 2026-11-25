@@ -41,18 +41,10 @@
     };
   }
 
-  function cylProject(u, v) {
-    if (!Number.isFinite(u) || !Number.isFinite(v)) return { x: 0, y: 1, z: 1.05 };
-    const r = Math.hypot(u, v);
-    const lon = Math.atan2(u, v);
-    const z = Math.max(-1.05, Math.min(1.05, Math.log(Math.max(1e-4, Math.min(1e4, r))) / 2.45));
-    return { x: Math.sin(lon), y: Math.cos(lon), z };
-  }
-
   const PERSP_K = 0.72 / 3.8;
   const PERSP_ONE_MINUS_K2 = 1.0 - PERSP_K * PERSP_K;
 
-  /* Precomputed 2048-entry atanh(z) lookup table for zero-Math.log 60 FPS Earth texture mapping */
+  /* Precomputed 2048-entry atanh(z) lookup table for zero-Math.log Canvas2D fallback */
   const ATANH_LUT_N = 2048;
   const ATANH_LUT_MAX = 0.992;
   const ATANH_LUT = new Float32Array(ATANH_LUT_N + 1);
@@ -63,22 +55,13 @@
   const ATANH_LUT_SCALE = (0.5 * ATANH_LUT_N) / ATANH_LUT_MAX;
   const ATANH_LUT_HALF = 0.5 * ATANH_LUT_N;
 
-  function screenToComplex(sx, sy, canvas, surface = "sphere") {
+  function screenToComplex(sx, sy, canvas) {
     const w = canvas.clientWidth || 600, h = canvas.clientHeight || 400;
     const cx = w * 0.5, cy = h * 0.5;
     const R = Math.min(w, h) * 0.38 * sphere.zoom;
     const u = (sx - cx) / Math.max(1, R);
     const v = (cy - sy) / Math.max(1, R);
     updateFrameTrig();
-    if (surface === "cylinder") {
-      if (Math.abs(u) > 1.0 || Math.abs(v) > 1.1) return null;
-      const depth = Math.sqrt(Math.max(0, 1.0 - u * u));
-      const wx = u * _cy + depth * _sy;
-      const wy = -u * _sy + depth * _cy;
-      const lon = Math.atan2(wx, wy);
-      const r = Math.exp(v * 2.45);
-      return { x: r * Math.sin(lon), y: r * Math.cos(lon) };
-    }
     /* Exact analytic inverse of toCanvas perspective projection: u = x1 / (1 - k*d), v = screenY / (1 - k*d) */
     const a = u * u + v * v;
     const disc = 1.0 - a * PERSP_ONE_MINUS_K2;
@@ -413,29 +396,10 @@
     ctx.restore();
   }
 
-  /* Zero-allocation horizon-clipped front-hemisphere polygon fill on S^2.
-   * Caller clips ctx to rimR ONCE per frame around the entire fill pass! */
-  function fillFrontPolygonOnSphere(ctx, chains3, cx, cy, R, rimR, color, fillAlpha, isOcean) {
-    if (fillAlpha <= 0.001) return;
-    if (isOcean) {
-      if (fillAlpha >= 0.995) {
-        /* Rich multi-tone bathymetry & equatorial ocean gradient so solid Earth globes look deeply textured! */
-        const g = ctx.createRadialGradient(cx - R * 0.28, cy - R * 0.22, R * 0.06, cx, cy, rimR * 1.04);
-        g.addColorStop(0.0, "#1273ba");
-        g.addColorStop(0.45, color || "#0b4f8c");
-        g.addColorStop(0.82, "#073462");
-        g.addColorStop(1.0, "#041f3d");
-        ctx.fillStyle = g;
-      } else {
-        ctx.fillStyle = hexToRgba(color, fillAlpha, { onDarkSurface: true });
-      }
-      ctx.beginPath();
-      ctx.arc(cx, cy, rimR, 0, Math.PI * 2);
-      ctx.fill();
-      return;
-    }
-
-    ctx.fillStyle = fillAlpha >= 0.995 ? color : hexToRgba(color, fillAlpha, { onDarkSurface: true });
+  /* Trace front-hemisphere polygon path onto current ctx path (no beginPath/fill so caller can batch-clip!) */
+  function traceFrontPolygonPath(ctx, chains3, cx, cy, R) {
+    if (!chains3 || chains3.length === 0) return false;
+    let any = false;
     for (let cIdx = 0; cIdx < chains3.length; cIdx++) {
       const ch3 = chains3[cIdx];
       const n = ch3 ? ch3.length : 0;
@@ -461,7 +425,6 @@
       }
       if (firstFrontIdx < 0) continue;
 
-      ctx.beginPath();
       let started = false;
       let hasExit = false;
       let exitAng = 0;
@@ -507,23 +470,664 @@
           }
         }
       }
-      ctx.closePath();
+      if (started) {
+        ctx.closePath();
+        any = true;
+      }
+    }
+    return any;
+  }
+
+  /* Zero-allocation horizon-clipped front-hemisphere polygon fill on S^2.
+   * Caller clips ctx to rimR ONCE per frame around the entire fill pass! */
+  function fillFrontPolygonOnSphere(ctx, chains3, cx, cy, R, rimR, color, fillAlpha, isOcean) {
+    if (fillAlpha <= 0.001) return;
+    if (isOcean) {
+      if (fillAlpha >= 0.995) {
+        const g = ctx.createRadialGradient(cx - R * 0.28, cy - R * 0.22, R * 0.06, cx, cy, rimR * 1.04);
+        g.addColorStop(0.0, "#0e5d9e");
+        g.addColorStop(0.45, color || "#073466");
+        g.addColorStop(0.82, "#05254d");
+        g.addColorStop(1.0, "#021329");
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = hexToRgba(color, fillAlpha, { onDarkSurface: true });
+      }
+      ctx.beginPath();
+      ctx.arc(cx, cy, rimR, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
+    ctx.fillStyle = fillAlpha >= 0.995 ? color : hexToRgba(color, fillAlpha, { onDarkSurface: true });
+    ctx.beginPath();
+    if (traceFrontPolygonPath(ctx, chains3, cx, cy, R)) {
       ctx.fill("nonzero");
     }
+  }
+
+  /* =========================================================================
+   * Lazy-Baked Continuous 1536x768 3D Perlin/fBm Earth Land & 1024x512 Cloud Atlases
+   * + WebGL2 Native HiDPI Fragment Shader (Bilinear + Procedural Zoom Micro-Relief!)
+   * ZERO geometric biome blobs & ZERO pixelation even at 22x zoom!
+   * ========================================================================= */
+  let _earthLandPixels = null;
+  let _earthCloudPixels = null;
+  const EARTH_TW = 1536;
+  const EARTH_TH = 768;
+  const CLOUD_TW = 1024;
+  const CLOUD_TH = 512;
+
+  function hash3(ix, iy, iz) {
+    let n = Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(iz, 2147483647);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) * (1.0 / 4294967296.0);
+  }
+  function vnoise3(x, y, z) {
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    const fx = x - ix, fy = y - iy, fz = z - iz;
+    const ux = fx * fx * (3.0 - 2.0 * fx);
+    const uy = fy * fy * (3.0 - 2.0 * fy);
+    const uz = fz * fz * (3.0 - 2.0 * fz);
+    const c000 = hash3(ix, iy, iz), c100 = hash3(ix + 1, iy, iz);
+    const c010 = hash3(ix, iy + 1, iz), c110 = hash3(ix + 1, iy + 1, iz);
+    const c001 = hash3(ix, iy, iz + 1), c101 = hash3(ix + 1, iy, iz + 1);
+    const c011 = hash3(ix, iy + 1, iz + 1), c111 = hash3(ix + 1, iy + 1, iz + 1);
+    const x00 = c000 + ux * (c100 - c000), x10 = c010 + ux * (c110 - c010);
+    const x01 = c001 + ux * (c101 - c001), x11 = c011 + ux * (c111 - c011);
+    const y0 = x00 + uy * (x10 - x00), y1 = x01 + uy * (x11 - x01);
+    return y0 + uz * (y1 - y0);
+  }
+  function fbm3(x, y, z, oct = 4) {
+    let sum = 0.0, amp = 0.5, f = 1.0, norm = 0.0;
+    for (let o = 0; o < oct; o++) {
+      sum += amp * (vnoise3(x * f, y * f, z * f) * 2.0 - 1.0);
+      norm += amp;
+      f *= 2.05;
+      amp *= 0.5;
+    }
+    return sum / norm;
+  }
+  function ridge3(x, y, z) {
+    let sum = 0.0, amp = 0.55, f = 1.0;
+    for (let o = 0; o < 3; o++) {
+      const n = 1.0 - Math.abs(vnoise3(x * f, y * f, z * f) * 2.0 - 1.0);
+      sum += amp * n * n;
+      f *= 2.15;
+      amp *= 0.5;
+    }
+    return sum;
+  }
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function gaussLonLat(lonD, latD, cLon, cLat, sLon, sLat) {
+    let dl = lonD - cLon;
+    if (dl > 180) dl -= 360;
+    else if (dl < -180) dl += 360;
+    const d1 = dl / sLon, d2 = (latD - cLat) / sLat;
+    return Math.exp(-(d1 * d1 + d2 * d2));
+  }
+
+  function ensureEarthAtlases() {
+    if (_earthLandPixels && _earthCloudPixels) return;
+    const land = new Uint8ClampedArray(EARTH_TW * EARTH_TH * 4);
+    const elevBuf = new Float32Array(EARTH_TW * EARTH_TH);
+    const DEG = 180.0 / Math.PI;
+
+    /* Pass A: continuous cordillera & plateau elevation field for directional hill-shading */
+    for (let j = 0; j < EARTH_TH; j++) {
+      const lat = (0.5 - (j + 0.5) / EARTH_TH) * Math.PI;
+      const latD = lat * DEG;
+      const cl = Math.cos(lat), sz = Math.sin(lat);
+      const row = j * EARTH_TW;
+      for (let i = 0; i < EARTH_TW; i++) {
+        const lon = ((i + 0.5) / EARTH_TW - 0.5) * Math.PI * 2.0;
+        const lonD = lon * DEG;
+        const sx = cl * Math.sin(lon), sy = cl * Math.cos(lon);
+        const rN = ridge3(sx * 7.5 + 3.1, sy * 7.5 - 1.7, sz * 7.5 + 2.3);
+        const mN = fbm3(sx * 11.0, sy * 11.0, sz * 11.0, 3);
+        const mtn =
+          1.18 * gaussLonLat(lonD, latD, 87, 32, 14, 5.8) +
+          0.76 * gaussLonLat(lonD, latD, 75, 37, 8, 4.5) +
+          0.95 * gaussLonLat(lonD, latD, -70, -18, 4.2, 13) +
+          0.86 * gaussLonLat(lonD, latD, -72, -39, 3.5, 11) +
+          0.72 * gaussLonLat(lonD, latD, -76, 1, 4.0, 8.5) +
+          0.84 * gaussLonLat(lonD, latD, -114, 46, 7.5, 13) +
+          0.62 * gaussLonLat(lonD, latD, -124, 56, 7.0, 6.5) +
+          0.68 * gaussLonLat(lonD, latD, 10, 46.5, 6.5, 2.5) +
+          0.58 * gaussLonLat(lonD, latD, 44, 42.5, 5.5, 2.8) +
+          0.55 * gaussLonLat(lonD, latD, 39, 9, 4.5, 5.0) +
+          0.48 * gaussLonLat(lonD, latD, 60, 60, 3.2, 10) +
+          0.52 * gaussLonLat(lonD, latD, 53, 33, 8.0, 4.5) +
+          0.46 * gaussLonLat(lonD, latD, -4, 32, 6.5, 2.6);
+        elevBuf[row + i] = mtn * (0.55 + 0.65 * rN) + 0.16 * mN;
+      }
+    }
+
+    /* Pass B: continuous Blue-Marble climate/biome gradients + directional hill-shading */
+    for (let j = 0; j < EARTH_TH; j++) {
+      const lat = (0.5 - (j + 0.5) / EARTH_TH) * Math.PI;
+      const latD = lat * DEG;
+      const absLat = Math.abs(latD);
+      const cl = Math.cos(lat), sz = Math.sin(lat);
+      const row = j * EARTH_TW;
+      const jUp = Math.max(0, j - 1) * EARTH_TW;
+      const jDn = Math.min(EARTH_TH - 1, j + 1) * EARTH_TW;
+      for (let i = 0; i < EARTH_TW; i++) {
+        const lon = ((i + 0.5) / EARTH_TW - 0.5) * Math.PI * 2.0;
+        const lonD = lon * DEG;
+        const sx = cl * Math.sin(lon), sy = cl * Math.cos(lon);
+
+        const nMacro = fbm3(sx * 4.5, sy * 4.5, sz * 4.5, 4);
+        const nFine = fbm3(sx * 16.0 + 4.2, sy * 16.0 - 2.9, sz * 16.0 + 1.5, 3);
+        const nDune = fbm3(sx * 26.0, sy * 26.0 + 6.1, sz * 26.0, 2);
+        const elev = elevBuf[row + i];
+
+        const effLat = absLat + nMacro * 6.5;
+        let r, g, b;
+        if (effLat < 16) {
+          const t = clamp01(effLat / 16.0);
+          r = lerp(24, 62, t); g = lerp(108, 128, t); b = lerp(46, 56, t);
+        } else if (effLat < 34) {
+          const t = clamp01((effLat - 16.0) / 18.0);
+          r = lerp(62, 74, t); g = lerp(128, 124, t); b = lerp(56, 58, t);
+        } else if (effLat < 54) {
+          const t = clamp01((effLat - 34.0) / 20.0);
+          r = lerp(74, 38, t); g = lerp(124, 96, t); b = lerp(58, 58, t);
+        } else if (effLat < 67) {
+          const t = clamp01((effLat - 54.0) / 13.0);
+          r = lerp(38, 114, t); g = lerp(96, 134, t); b = lerp(58, 116, t);
+        } else {
+          const t = clamp01((effLat - 67.0) / 10.0);
+          r = lerp(114, 224, t); g = lerp(134, 236, t); b = lerp(116, 246, t);
+        }
+
+        const wet = clamp01(
+          1.15 * gaussLonLat(lonD, latD, -63, -4, 15, 10) +
+          1.10 * gaussLonLat(lonD, latD, 20, 0, 12, 8.5) +
+          1.05 * gaussLonLat(lonD, latD, 108, 4, 20, 12) +
+          0.90 * gaussLonLat(lonD, latD, 142, -5, 11, 6.5) +
+          0.85 * gaussLonLat(lonD, latD, -85, 11, 8, 6.0) +
+          0.70 * gaussLonLat(lonD, latD, 80, 18, 11, 10) +
+          0.65 * gaussLonLat(lonD, latD, 112, 27, 13, 9) +
+          nMacro * 0.22
+        );
+        r = lerp(r, 18 + nFine * 14, wet * 0.78);
+        g = lerp(g, 92 + nFine * 18, wet * 0.78);
+        b = lerp(b, 42 + nFine * 10, wet * 0.78);
+
+        const warpLon = lonD + nMacro * 5.2, warpLat = latD + nMacro * 3.8;
+        const sandDesert = clamp01(
+          1.25 * gaussLonLat(warpLon, warpLat, 10, 23.5, 22, 8.5) +
+          1.20 * gaussLonLat(warpLon, warpLat, 46, 23, 10.5, 7.5) +
+          0.92 * gaussLonLat(warpLon, warpLat, 64, 33, 12.5, 7.5) +
+          1.05 * gaussLonLat(warpLon, warpLat, 94, 41, 16, 6.2) +
+          0.88 * gaussLonLat(warpLon, warpLat, -110, 31, 8.5, 7.0) +
+          0.85 * gaussLonLat(warpLon, warpLat, 19, -24, 6.5, 6.5) +
+          0.65 * gaussLonLat(warpLon, warpLat, -69, -23, 3.5, 8.5) +
+          0.55 * gaussLonLat(warpLon, warpLat, 66, 48, 17, 5.5)
+        );
+        const duneShade = 1.0 + 0.14 * nDune + 0.09 * nFine;
+        r = lerp(r, 214 * duneShade, sandDesert * 0.92);
+        g = lerp(g, 178 * duneShade, sandDesert * 0.92);
+        b = lerp(b, 114 * duneShade, sandDesert * 0.92);
+
+        const redCentre = clamp01(
+          1.25 * gaussLonLat(warpLon, warpLat, 131, -25.5, 13.5, 7.0) +
+          0.45 * gaussLonLat(warpLon, warpLat, 123, -24, 7.5, 6.0)
+        );
+        r = lerp(r, 186 * duneShade, redCentre * 0.90);
+        g = lerp(g, 92 * duneShade, redCentre * 0.90);
+        b = lerp(b, 50 * duneShade, redCentre * 0.90);
+
+        const iceSheet = clamp01(
+          1.5 * gaussLonLat(lonD, latD, -42, 72.5, 15, 8.5) +
+          (latD < -62 ? clamp01((-62 - latD) / 7.0) : 0) +
+          (latD > 74 ? clamp01((latD - 74) / 6.0) : 0)
+        );
+        const iceTint = 0.95 + 0.08 * nFine;
+        r = lerp(r, 236 * iceTint, iceSheet * 0.95);
+        g = lerp(g, 244 * iceTint, iceSheet * 0.95);
+        b = lerp(b, 252 * iceTint, iceSheet * 0.95);
+
+        if (elev > 0.22) {
+          const rockT = clamp01((elev - 0.22) / 0.45);
+          r = lerp(r, 128 + nFine * 18, rockT * 0.85);
+          g = lerp(g, 112 + nFine * 16, rockT * 0.85);
+          b = lerp(b, 92 + nFine * 14, rockT * 0.85);
+        }
+        if (elev > 0.56) {
+          const snowT = clamp01((elev - 0.56) / 0.34);
+          r = lerp(r, 242, snowT * 0.94);
+          g = lerp(g, 248, snowT * 0.94);
+          b = lerp(b, 254, snowT * 0.94);
+        }
+
+        const iL = (i + EARTH_TW - 1) % EARTH_TW;
+        const iR = (i + 1) % EARTH_TW;
+        const dLon = elevBuf[row + iR] - elevBuf[row + iL];
+        const dLat = elevBuf[jUp + i] - elevBuf[jDn + i];
+        const hill = 1.0 + Math.max(-0.34, Math.min(0.36, (-dLon * 2.1 + dLat * 1.6))) + nFine * 0.11;
+
+        const p4 = (row + i) << 2;
+        land[p4] = Math.max(0, Math.min(255, Math.round(r * hill)));
+        land[p4 + 1] = Math.max(0, Math.min(255, Math.round(g * hill)));
+        land[p4 + 2] = Math.max(0, Math.min(255, Math.round(b * hill)));
+        land[p4 + 3] = 255;
+      }
+    }
+    _earthLandPixels = land;
+
+    /* Seamless 512x256 Swirling Planetary Cloud Wisps Atlas */
+    const clouds = new Uint8ClampedArray(CLOUD_TW * CLOUD_TH * 4);
+    for (let j = 0; j < CLOUD_TH; j++) {
+      const lat = (0.5 - (j + 0.5) / CLOUD_TH) * Math.PI;
+      const cl = Math.cos(lat), sz = Math.sin(lat);
+      const bandWeight = 0.65 + 0.35 * Math.cos(lat * 3.0);
+      const row = j * CLOUD_TW;
+      for (let i = 0; i < CLOUD_TW; i++) {
+        const lon = ((i + 0.5) / CLOUD_TW - 0.5) * Math.PI * 2.0;
+        const sx = cl * Math.sin(lon), sy = cl * Math.cos(lon);
+        const wx = fbm3(sx * 3.6 + 1.1, sy * 3.6 - 2.3, sz * 3.6 + 0.8, 3);
+        const wy = fbm3(sx * 3.6 - 4.2, sy * 3.6 + 1.9, sz * 3.6 - 1.5, 3);
+        const cVal = fbm3((sx + 0.38 * wx) * 5.2, (sy + 0.38 * wy) * 5.2, (sz + 0.25 * wx) * 6.5, 4);
+        const density = clamp01((cVal * bandWeight - 0.14) * 2.35);
+        const alpha = Math.round(density * density * 145);
+        const p4 = (row + i) << 2;
+        clouds[p4] = 248;
+        clouds[p4 + 1] = 251;
+        clouds[p4 + 2] = 255;
+        clouds[p4 + 3] = alpha;
+      }
+    }
+    _earthCloudPixels = clouds;
+  }
+
+  let _earthTexCanvas = null;
+  let _earthTexImgData = null;
+  let _cloudTexCanvas = null;
+  let _cloudTexImgData = null;
+
+  /* =========================================================================
+   * Shared WebGL2 GPU Riemann Sphere Shader Pass (Full Native HiDPI 60 FPS!)
+   * Eliminates pixelation on Earth terrain, clouds, AND fast-preview color fields!
+   * Falls back cleanly to bilinear Canvas2D if WebGL2 is unavailable.
+   * ========================================================================= */
+  let _glState = null;
+  let _glFailed = false;
+
+  function ensureWebGLSphere() {
+    if (_glFailed) return null;
+    if (_glState) return _glState;
+    try {
+      const cvs = document.createElement("canvas");
+      const gl = cvs.getContext("webgl2", {
+        alpha: true,
+        antialias: false,
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: false,
+      });
+      if (!gl) { _glFailed = true; return null; }
+
+      const vsSrc = `#version 300 es
+        const vec2 P[3] = vec2[3](vec2(-1.0,-1.0), vec2(3.0,-1.0), vec2(-1.0,3.0));
+        out vec2 v_uv;
+        void main() {
+          vec2 p = P[gl_VertexID];
+          v_uv = p * 0.5 + 0.5;
+          gl_Position = vec4(p, 0.0, 1.0);
+        }`;
+
+      const fsSrc = `#version 300 es
+        precision highp float;
+        in vec2 v_uv;
+        out vec4 outColor;
+
+        uniform sampler2D u_tex;
+        uniform int u_mode; /* 0 = earth land + micro-relief, 1 = clouds, 2 = color field */
+        uniform vec2 u_visOrigin;
+        uniform vec2 u_visSize;
+        uniform vec2 u_center;
+        uniform float u_R;
+        uniform float u_zoom;
+        uniform float u_cy;
+        uniform float u_sy;
+        uniform float u_cp;
+        uniform float u_sp;
+        uniform float u_lonShift;
+        uniform float u_opacity;
+        uniform int u_mercMap;
+        uniform vec4 u_cfBounds; /* cx, cy, halfW, halfH */
+
+        const float PI = 3.14159265358979323846;
+        const float K_P = 0.72 / 3.8;
+        const float K2_P = K_P * K_P;
+        const float OMK2_P = 1.0 - K2_P;
+
+        float h31(vec3 p) {
+          p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+          p += dot(p, p.yxz + 33.33);
+          return fract((p.x + p.y) * p.z);
+        }
+        float vnoise(vec3 x) {
+          vec3 i = floor(x);
+          vec3 f = fract(x);
+          vec3 u = f * f * (3.0 - 2.0 * f);
+          float n000 = h31(i + vec3(0,0,0)), n100 = h31(i + vec3(1,0,0));
+          float n010 = h31(i + vec3(0,1,0)), n110 = h31(i + vec3(1,1,0));
+          float n001 = h31(i + vec3(0,0,1)), n101 = h31(i + vec3(1,0,1));
+          float n011 = h31(i + vec3(0,1,1)), n111 = h31(i + vec3(1,1,1));
+          float x00 = mix(n000, n100, u.x), x10 = mix(n010, n110, u.x);
+          float x01 = mix(n001, n101, u.x), x11 = mix(n011, n111, u.x);
+          return mix(mix(x00, x10, u.y), mix(x01, x11, u.y), u.z);
+        }
+        float fbmMicro(vec3 p) {
+          float s = 0.0, a = 0.5;
+          for (int i = 0; i < 4; i++) {
+            s += a * (vnoise(p) * 2.0 - 1.0);
+            p = p * 2.07 + vec3(3.1, -1.7, 2.3);
+            a *= 0.5;
+          }
+          return s;
+        }
+
+        void main() {
+          float sx = u_visOrigin.x + v_uv.x * u_visSize.x;
+          float sy = u_visOrigin.y + (1.0 - v_uv.y) * u_visSize.y;
+          float uN = (sx - u_center.x) / max(1.0, u_R);
+          float vN = (u_center.y - sy) / max(1.0, u_R);
+          float a = uN * uN + vN * vN;
+          float disc = 1.0 - a * OMK2_P;
+          if (disc <= 0.0) { outColor = vec4(0.0); return; }
+
+          float depth = (a * K_P + sqrt(disc)) / (1.0 + a * K2_P);
+          float invP = 1.0 - K_P * depth;
+          float x1 = uN * invP;
+          float scrY = vN * invP;
+          float y1 = depth * u_cp - scrY * u_sp;
+          float wz = depth * u_sp + scrY * u_cp;
+          float wx = x1 * u_cy + y1 * u_sy;
+          float wy = -x1 * u_sy + y1 * u_cy;
+
+          float rimAlpha = clamp(sqrt(disc) * u_R * 0.14, 0.0, 1.0);
+
+          if (u_mode == 0 || u_mode == 1) {
+            float lon = atan(wx, wy) + u_lonShift;
+            float lat = asin(clamp(wz, -1.0, 1.0));
+            vec2 texUV = vec2(fract(lon / (2.0 * PI) + 0.5), clamp(0.5 - lat / PI, 0.0005, 0.9995));
+            vec4 c = texture(u_tex, texUV);
+            if (u_mode == 0) {
+              /* Procedural zoom-adaptive 3D micro-relief & organic terrain shading (zero blocky zoom pixels!) */
+              float zBlend = clamp((u_zoom - 1.05) / 3.0, 0.0, 1.0);
+              if (zBlend > 0.005) {
+                vec3 p3 = vec3(wx, wy, wz);
+                float f1 = fbmMicro(p3 * 36.0);
+                float f2 = fbmMicro(p3 * 110.0) * clamp((u_zoom - 2.5) / 5.0, 0.0, 1.0);
+                float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+                float isSnow = smoothstep(0.74, 0.92, lum);
+                float shade = 1.0 + zBlend * (0.11 * f1 + 0.07 * f2) * (1.0 - 0.55 * isSnow);
+                /* Subtle alpine ridge brightening on rocky slopes */
+                float ridge = max(0.0, 1.0 - abs(f1)) * zBlend * 0.055 * (1.0 - isSnow);
+                c.rgb = clamp(c.rgb * shade + vec3(ridge * 0.9, ridge * 0.95, ridge), 0.0, 1.0);
+              }
+              outColor = vec4(c.rgb, c.a * rimAlpha);
+            } else {
+              float zBlend = clamp((u_zoom - 1.2) / 3.5, 0.0, 1.0);
+              float wisp = zBlend > 0.01 ? (0.86 + 0.28 * fbmMicro(vec3(wx, wy, wz) * 42.0)) : 1.0;
+              outColor = vec4(c.rgb, clamp(c.a * wisp, 0.0, 1.0) * u_opacity * rimAlpha);
+            }
+            return;
+          }
+
+          /* u_mode == 2: Color Field reprojection (Stereographic or Mercator UV) */
+          float cu, cv;
+          if (u_mercMap == 1) {
+            cu = atan(wx, wy);
+            float zc = clamp(wz, -0.996, 0.996);
+            cv = 0.5 * log((1.0 + zc) / (1.0 - zc));
+          } else {
+            float den = max(1e-5, 1.0 - wz);
+            cu = wx / den;
+            cv = wy / den;
+          }
+          vec2 cfUV = vec2(
+            (cu - u_cfBounds.x) / (2.0 * max(1e-12, u_cfBounds.z)) + 0.5,
+            0.5 - (cv - u_cfBounds.y) / (2.0 * max(1e-12, u_cfBounds.w))
+          );
+          if (cfUV.x < 0.0 || cfUV.x > 1.0 || cfUV.y < 0.0 || cfUV.y > 1.0) {
+            cfUV = clamp(cfUV, 0.0, 1.0);
+          }
+          vec4 c = texture(u_tex, cfUV);
+          outColor = vec4(c.rgb, c.a * u_opacity * rimAlpha);
+        }`;
+
+      const compile = (type, src) => {
+        const sh = gl.createShader(type);
+        gl.shaderSource(sh, src);
+        gl.compileShader(sh);
+        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+          gl.deleteShader(sh);
+          return null;
+        }
+        return sh;
+      };
+      const vs = compile(gl.VERTEX_SHADER, vsSrc);
+      const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+      if (!vs || !fs) { _glFailed = true; return null; }
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        _glFailed = true;
+        return null;
+      }
+
+      const makeTex = (wrapS) => {
+        const t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return t;
+      };
+
+      const locs = {};
+      for (const nm of ["u_tex", "u_mode", "u_visOrigin", "u_visSize", "u_center", "u_R", "u_zoom", "u_cy", "u_sy", "u_cp", "u_sp", "u_lonShift", "u_opacity", "u_mercMap", "u_cfBounds"]) {
+        locs[nm] = gl.getUniformLocation(prog, nm);
+      }
+
+      _glState = {
+        canvas: cvs,
+        gl,
+        prog,
+        locs,
+        vao: gl.createVertexArray(),
+        earthTex: makeTex(gl.REPEAT),
+        earthUploaded: false,
+        cloudTex: makeTex(gl.REPEAT),
+        cloudUploaded: false,
+        cfTex: makeTex(gl.CLAMP_TO_EDGE),
+        cfKey: "",
+      };
+      return _glState;
+    } catch (_) {
+      _glFailed = true;
+      return null;
+    }
+  }
+
+  function renderWebGLPass(ctx, visL, visT, visW, visH, cx, cy, R, mode, texObj, opacity, lonShift, cfMeta) {
+    const g = ensureWebGLSphere();
+    if (!g) return false;
+    const dpr = Math.min(2.0, window.devicePixelRatio || 1);
+    const pw = Math.max(32, Math.min(2048, Math.round(visW * dpr)));
+    const ph = Math.max(32, Math.min(2048, Math.round(visH * dpr)));
+    if (g.canvas.width !== pw || g.canvas.height !== ph) {
+      g.canvas.width = pw;
+      g.canvas.height = ph;
+    }
+    const { gl, prog, locs } = g;
+    gl.viewport(0, 0, pw, ph);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(prog);
+    gl.bindVertexArray(g.vao);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texObj);
+    gl.uniform1i(locs.u_tex, 0);
+    gl.uniform1i(locs.u_mode, mode);
+    gl.uniform2f(locs.u_visOrigin, visL, visT);
+    gl.uniform2f(locs.u_visSize, visW, visH);
+    gl.uniform2f(locs.u_center, cx, cy);
+    gl.uniform1f(locs.u_R, R);
+    gl.uniform1f(locs.u_zoom, sphere.zoom);
+    gl.uniform1f(locs.u_cy, _cy);
+    gl.uniform1f(locs.u_sy, _sy);
+    gl.uniform1f(locs.u_cp, _cp);
+    gl.uniform1f(locs.u_sp, _sp);
+    gl.uniform1f(locs.u_lonShift, lonShift || 0.0);
+    gl.uniform1f(locs.u_opacity, opacity);
+    if (cfMeta) {
+      gl.uniform1i(locs.u_mercMap, cfMeta.mapping === "mercator" ? 1 : 0);
+      gl.uniform4f(locs.u_cfBounds, cfMeta.cx || 0, cfMeta.cy || 0, cfMeta.halfW || 1, cfMeta.halfH || 1);
+    } else {
+      gl.uniform1i(locs.u_mercMap, 0);
+      gl.uniform4f(locs.u_cfBounds, 0, 0, 1, 1);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    ctx.drawImage(g.canvas, visL, visT, visW, visH);
+    return true;
+  }
+
+  function drawEquirectSphereLayer(ctx, cx, cy, R, rimR, srcPixels, tw, th, isAnimating, lonShift = 0.0, useCloudCanvas = false, opacity = 1.0) {
+    const cw = ctx.canvas ? (ctx.canvas.clientWidth || 640) : 640;
+    const ch = ctx.canvas ? (ctx.canvas.clientHeight || 480) : 480;
+    const visL = Math.max(0, Math.floor(cx - rimR));
+    const visT = Math.max(0, Math.floor(cy - rimR));
+    const visR = Math.min(cw, Math.ceil(cx + rimR));
+    const visB = Math.min(ch, Math.ceil(cy + rimR));
+    const visW = visR - visL, visH = visB - visT;
+    if (visW < 4 || visH < 4) return;
+
+    /* Fast Path: Native HiDPI WebGL2 Fragment Shader (bilinear + zoom-adaptive micro-detail!) */
+    const g = ensureWebGLSphere();
+    if (g) {
+      const gl = g.gl;
+      if (useCloudCanvas) {
+        if (!g.cloudUploaded) {
+          gl.bindTexture(gl.TEXTURE_2D, g.cloudTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, srcPixels);
+          g.cloudUploaded = true;
+        }
+        if (renderWebGLPass(ctx, visL, visT, visW, visH, cx, cy, R, 1, g.cloudTex, opacity, lonShift, null)) return;
+      } else {
+        if (!g.earthUploaded) {
+          gl.bindTexture(gl.TEXTURE_2D, g.earthTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, srcPixels);
+          g.earthUploaded = true;
+        }
+        if (renderWebGLPass(ctx, visL, visT, visW, visH, cx, cy, R, 0, g.earthTex, opacity, lonShift, null)) return;
+      }
+    }
+
+    /* Bilinear Canvas2D Fallback */
+    const maxEdge = (sphere.orbiting || isAnimating) ? (useCloudCanvas ? 140 : 200) : (useCloudCanvas ? 360 : 580);
+    const sc = Math.min(1.0, maxEdge / Math.max(visW, visH));
+    const szW = Math.max(64, Math.round(visW * sc));
+    const szH = Math.max(64, Math.round(visH * sc));
+
+    let cvs = useCloudCanvas ? _cloudTexCanvas : _earthTexCanvas;
+    let img = useCloudCanvas ? _cloudTexImgData : _earthTexImgData;
+    if (!cvs) cvs = document.createElement("canvas");
+    if (cvs.width !== szW || cvs.height !== szH) {
+      cvs.width = szW;
+      cvs.height = szH;
+      img = cvs.getContext("2d").createImageData(szW, szH);
+    }
+    if (useCloudCanvas) { _cloudTexCanvas = cvs; _cloudTexImgData = img; }
+    else { _earthTexCanvas = cvs; _earthTexImgData = img; }
+
+    const out = img.data;
+    const invR = 1.0 / Math.max(1, R);
+    const stepX = visW / szW, stepY = visH / szH;
+    const duX = stepX * invR;
+    const uStart = (visL + 0.5 * stepX - cx) * invR;
+    const cyA = _cy, syA = _sy, cpA = _cp, spA = _sp;
+    const kP = PERSP_K, k2P = kP * kP, omk2 = PERSP_ONE_MINUS_K2;
+    const inv2Pi = 0.5 / Math.PI, invPi = 1.0 / Math.PI;
+    const thM1 = th - 1;
+
+    let ptr = 0;
+    for (let py = 0; py < szH; py++) {
+      const vN = (cy - (visT + (py + 0.5) * stepY)) * invR;
+      const v2 = vN * vN;
+      let uN = uStart;
+      for (let px = 0; px < szW; px++, uN += duX, ptr += 4) {
+        const a = uN * uN + v2;
+        const disc = 1.0 - a * omk2;
+        if (disc < 0.0) { out[ptr + 3] = 0; continue; }
+        const depth = (a * kP + Math.sqrt(disc)) / (1.0 + a * k2P);
+        const invP = 1.0 - kP * depth;
+        const x1 = uN * invP, scrY = vN * invP;
+        const y1 = depth * cpA - scrY * spA;
+        const wz = depth * spA + scrY * cpA;
+        const wx = x1 * cyA + y1 * syA;
+        const wy = -x1 * syA + y1 * cyA;
+
+        let lon = Math.atan2(wx, wy) + lonShift;
+        if (lon > Math.PI) lon -= Math.PI * 2.0;
+        else if (lon < -Math.PI) lon += Math.PI * 2.0;
+        const lat = Math.asin(wz < -1.0 ? -1.0 : (wz > 1.0 ? 1.0 : wz));
+
+        const fx = ((lon * inv2Pi + 0.5) * tw) - 0.5;
+        const fy = ((0.5 - lat * invPi) * th) - 0.5;
+        const x0 = Math.floor(fx), y0 = Math.max(0, Math.min(thM1, Math.floor(fy)));
+        const ix0 = ((x0 % tw) + tw) % tw;
+        const ix1 = (ix0 + 1) % tw;
+        const iy1 = Math.min(thM1, y0 + 1);
+        const tx = fx - x0, ty = Math.max(0, Math.min(1, fy - y0));
+        const w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+        const i00 = (y0 * tw + ix0) << 2, i10 = (y0 * tw + ix1) << 2;
+        const i01 = (iy1 * tw + ix0) << 2, i11 = (iy1 * tw + ix1) << 2;
+        out[ptr] = (srcPixels[i00] * w00 + srcPixels[i10] * w10 + srcPixels[i01] * w01 + srcPixels[i11] * w11) | 0;
+        out[ptr + 1] = (srcPixels[i00 + 1] * w00 + srcPixels[i10 + 1] * w10 + srcPixels[i01 + 1] * w01 + srcPixels[i11 + 1] * w11) | 0;
+        out[ptr + 2] = (srcPixels[i00 + 2] * w00 + srcPixels[i10 + 2] * w10 + srcPixels[i01 + 2] * w01 + srcPixels[i11 + 2] * w11) | 0;
+        out[ptr + 3] = Math.round((srcPixels[i00 + 3] * w00 + srcPixels[i10 + 3] * w10 + srcPixels[i01 + 3] * w01 + srcPixels[i11 + 3] * w11) * opacity);
+      }
+    }
+    cvs.getContext("2d").putImageData(img, 0, 0);
+    ctx.drawImage(cvs, visL, visT, visW, visH);
   }
 
   let _texCanvas = null;
   let _texImgData = null;
 
-  /* 60 FPS inverse-projected C11 domain/bathymetry texture mapper onto the 3D Riemann Sphere!
-   * Uses exact perspective ray-sphere inverse, ATANH_LUT (zero Math.log), and 32-bit pixel writes! */
+  /* Native HiDPI Sphere Color Field renderer:
+   *  1) If `cf.nativeSphere` matches current (yaw, pitch, zoom), stamps the exact C11 ray-traced
+   *     4x-MSAA sphere buffer 1:1 with ZERO stretching or pixelation!
+   *  2) Otherwise (e.g. live 60 FPS spin/orbit), reprojects via WebGL2 GPU fragment shader
+   *     (with Canvas2D fallback) until the native C11 ray-traced pass settles! */
   function drawSphereColorField(ctx, cx, cy, R, rimR, cf, isAnimating = false) {
-    if (!cf || !cf.pixels || !cf.tw || !cf.th) return;
+    if (!cf) return;
     const op = Math.max(0, Math.min(1, Number(cf.opacity ?? 0.9)));
     if (op <= 0.005) return;
     const cw = ctx.canvas ? (ctx.canvas.clientWidth || 640) : 640;
     const ch = ctx.canvas ? (ctx.canvas.clientHeight || 480) : 480;
-    /* Clip rasterization strictly to the visible viewport rectangle so zooming up to 22x stays 60 FPS & razor sharp! */
+
+    if (cf.nativeSphere && cf.canvas &&
+        Math.abs((cf.yaw ?? 999) - sphere.yaw) < 1e-3 &&
+        Math.abs((cf.pitch ?? 999) - sphere.pitch) < 1e-3 &&
+        Math.abs((cf.zoom ?? 999) - sphere.zoom) < 1e-3) {
+      ctx.save();
+      ctx.globalAlpha = op;
+      ctx.drawImage(cf.canvas, 0, 0, cw, ch);
+      ctx.restore();
+      return;
+    }
+
+    if (!cf.pixels || !cf.tw || !cf.th) return;
     const visL = Math.max(0, Math.floor(cx - rimR));
     const visT = Math.max(0, Math.floor(cy - rimR));
     const visR = Math.min(cw, Math.ceil(cx + rimR));
@@ -531,7 +1135,22 @@
     const visW = visR - visL;
     const visH = visB - visT;
     if (visW < 4 || visH < 4) return;
-    const maxEdge = (sphere.orbiting || isAnimating) ? 128 : 340;
+
+    /* WebGL2 60 FPS GPU reprojection pass */
+    const g = ensureWebGLSphere();
+    if (g) {
+      const cfKey = `${cf.paramKey || ""}|${cf.tw}x${cf.th}|${cf.fast ? 1 : 0}|${cf.cx}|${cf.cy}|${cf.halfW}|${cf.halfH}|${cf.reqId || 0}`;
+      if (g.cfKey !== cfKey) {
+        const gl = g.gl;
+        gl.bindTexture(gl.TEXTURE_2D, g.cfTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, cf.tw, cf.th, 0, gl.RGBA, gl.UNSIGNED_BYTE, cf.pixels);
+        g.cfKey = cfKey;
+      }
+      if (renderWebGLPass(ctx, visL, visT, visW, visH, cx, cy, R, 2, g.cfTex, op, 0.0, cf)) return;
+    }
+
+    /* Canvas2D fallback */
+    const maxEdge = (sphere.orbiting || isAnimating) ? 144 : 420;
     const sc = Math.min(1.0, maxEdge / Math.max(visW, visH));
     const szW = Math.max(64, Math.round(visW * sc));
     const szH = Math.max(64, Math.round(visH * sc));
@@ -620,200 +1239,7 @@
     ctx.drawImage(_texCanvas, visL, visT, visW, visH);
   }
 
-  function renderCylinder(ctx, canvas, shapes, opts = {}) {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (w < 4 || h < 4) return;
-    updateFrameTrig();
-    const cx = w * 0.5, cy = h * 0.5;
-    const R = Math.min(w * 0.34, h * 0.36) * sphere.zoom;
-    const halfH = R * 1.05;
-    const isLight = typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
-
-    ctx.fillStyle = isLight ? "#eaeff5" : "#080c14";
-    ctx.fillRect(0, 0, w, h);
-
-    const hasSolidOcean = (shapes || []).some((s) => s && s.visible && s.closed && (s.isOcean || /^global ocean/i.test(s.label || "")) && Number(s.opacity ?? 0.22) >= 0.85);
-
-    /* Cylinder body clip & shaded tube backdrop */
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(cx - R, cy - halfH, R * 2, halfH * 2);
-    ctx.clip();
-
-    const bodyGrad = ctx.createLinearGradient(cx - R, cy, cx + R, cy);
-    if (hasSolidOcean) {
-      bodyGrad.addColorStop(0.0, "#042142");
-      bodyGrad.addColorStop(0.28, "#0b5494");
-      bodyGrad.addColorStop(0.50, "#1273ba");
-      bodyGrad.addColorStop(0.76, "#094378");
-      bodyGrad.addColorStop(1.0, "#031b36");
-    } else if (isLight) {
-      bodyGrad.addColorStop(0.0, "#cbd5e1");
-      bodyGrad.addColorStop(0.5, "#f8fafc");
-      bodyGrad.addColorStop(1.0, "#cbd5e1");
-    } else {
-      bodyGrad.addColorStop(0.0, "#0a101d");
-      bodyGrad.addColorStop(0.5, "#111c33");
-      bodyGrad.addColorStop(1.0, "#0a101d");
-    }
-    ctx.fillStyle = bodyGrad;
-    ctx.fillRect(cx - R, cy - halfH, R * 2, halfH * 2);
-
-    /* Optional C11 color field texture wrapped smoothly around the front cylinder wall! */
-    const cf = opts.colorField;
-    if (cf && cf.pixels && cf.tw && cf.th) {
-      const szW = Math.max(120, Math.min(240, Math.round(R * 1.3)));
-      const szH = Math.max(120, Math.min(240, Math.round(halfH * 1.3)));
-      if (!_texCanvas) _texCanvas = document.createElement("canvas");
-      if (_texCanvas.width !== szW || _texCanvas.height !== szH) {
-        _texCanvas.width = szW; _texCanvas.height = szH;
-        _texImgData = _texCanvas.getContext("2d").createImageData(szW, szH);
-      }
-      const out = _texImgData.data, src = cf.pixels, tw = cf.tw, th = cf.th;
-      const invHW = 0.5 / Math.max(1e-12, cf.halfW), invHH = 0.5 / Math.max(1e-12, cf.halfH);
-      const aByte = Math.round(Math.max(0, Math.min(1, Number(cf.opacity ?? 0.9))) * 255);
-      let ptr = 0;
-      for (let py = 0; py < szH; py++) {
-        const yn = 1.0 - (2.0 * (py + 0.5)) / szH;
-        const yMerc = yn * 2.55;
-        const rExp = Math.exp(yMerc);
-        for (let px = 0; px < szW; px++) {
-          const xn = (2.0 * (px + 0.5)) / szW - 1.0;
-          const depth = Math.sqrt(Math.max(0, 1.0 - xn * xn));
-          const wx = xn * _cy + depth * _sy;
-          const wy = -xn * _sy + depth * _cy;
-          const lon = Math.atan2(wx, wy);
-          const u = cf.mapping === "mercator" ? lon : rExp * Math.sin(lon);
-          const v = cf.mapping === "mercator" ? yMerc : rExp * Math.cos(lon);
-          const ix = Math.max(0, Math.min(tw - 1, Math.floor(((u - cf.cx) * invHW + 0.5) * tw)));
-          const iy = Math.max(0, Math.min(th - 1, Math.floor((0.5 - (v - cf.cy) * invHH) * th)));
-          const si = (iy * tw + ix) * 4;
-          out[ptr] = src[si]; out[ptr + 1] = src[si + 1]; out[ptr + 2] = src[si + 2];
-          out[ptr + 3] = Math.round((src[si + 3] * aByte) / 255);
-          ptr += 4;
-        }
-      }
-      _texCanvas.getContext("2d").putImageData(_texImgData, 0, 0);
-      ctx.drawImage(_texCanvas, cx - R, cy - halfH, R * 2, halfH * 2);
-    }
-
-    /* Cylinder latitude & meridian gridlines */
-    ctx.strokeStyle = hasSolidOcean ? "rgba(186,230,253,0.20)" : (isLight ? "rgba(71,85,105,0.22)" : "rgba(148,163,184,0.20)");
-    ctx.lineWidth = 1;
-    for (let lat = -60; lat <= 60; lat += 30) {
-      const ym = Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) / 2.45;
-      const sy = cy - ym * halfH;
-      ctx.beginPath(); ctx.moveTo(cx - R, sy); ctx.lineTo(cx + R, sy);
-      ctx.lineWidth = lat === 0 ? 1.5 : 0.9;
-      ctx.stroke();
-    }
-    for (let m = 0; m < 12; m++) {
-      const a = (m / 12) * Math.PI * 2;
-      const x1 = Math.sin(a) * _cy - Math.cos(a) * _sy;
-      const d = Math.sin(a) * _sy + Math.cos(a) * _cy;
-      if (d < 0) continue;
-      const sx = cx + x1 * R;
-      ctx.beginPath(); ctx.moveTo(sx, cy - halfH); ctx.lineTo(sx, cy + halfH);
-      ctx.lineWidth = (m % 3 === 0) ? 1.2 : 0.85;
-      ctx.stroke();
-    }
-
-    /* Project & draw front-facing polygons/curves onto the 3D cylinder */
-    for (const s of shapes || []) {
-      if (!s || !s.visible || s.isOcean || /^global ocean/i.test(s.label || "")) continue;
-      const pts = opts.getPts ? opts.getPts(s) : (s.boundary ? s.boundary.outPts : null);
-      if (!pts || pts.length < 2) continue;
-      const closed = opts.mode === "integral" ? false : Boolean(s.closed);
-      const op = s.opacity !== undefined ? Math.max(0, Math.min(1, Number(s.opacity))) : (closed ? 0.22 : 1.0);
-      if (op <= 0.001) continue;
-      const lw = s.lineWidth !== undefined ? Math.max(0, Number(s.lineWidth)) : 2.0;
-      const col = themeColor(s.primaryColor || s.color || "#38bdf8", { onDarkSurface: hasSolidOcean, solidFill: closed && op >= 0.85 });
-
-      /* Project each point onto cylinder; split segments wrapping behind the cylinder */
-      const segs = [];
-      let cur = [];
-      for (let i = 0; i < pts.length; i++) {
-        const q = pts[i];
-        if (!q || !Number.isFinite(q.x) || !Number.isFinite(q.y)) { if (cur.length >= 2) segs.push(cur); cur = []; continue; }
-        const c3 = cylProject(q.x, q.y);
-        const x1 = c3.x * _cy - c3.y * _sy;
-        const d = c3.x * _sy + c3.y * _cy;
-        if (d >= -0.05) {
-          const sp = { sx: cx + x1 * R, sy: cy - c3.z * halfH };
-          if (cur.length > 0 && Math.abs(sp.sx - cur[cur.length - 1].sx) > R * 0.95) {
-            if (cur.length >= 2) segs.push(cur);
-            cur = [sp];
-          } else {
-            cur.push(sp);
-          }
-        } else {
-          if (cur.length >= 2) segs.push(cur);
-          cur = [];
-        }
-      }
-      if (cur.length >= 2) segs.push(cur);
-
-      for (const seg of segs) {
-        ctx.beginPath();
-        for (let i = 0; i < seg.length; i++) {
-          if (i === 0) ctx.moveTo(seg[i].sx, seg[i].sy);
-          else ctx.lineTo(seg[i].sx, seg[i].sy);
-        }
-        if (closed && seg.length >= 3) {
-          ctx.closePath();
-          ctx.fillStyle = op >= 0.995 ? col : hexToRgba(col, op, { onDarkSurface: hasSolidOcean });
-          ctx.fill();
-        }
-        if (lw > 0) {
-          ctx.strokeStyle = col;
-          ctx.lineWidth = lw;
-          ctx.stroke();
-        }
-      }
-    }
-
-    /* Cylinder rim highlight & shadow */
-    const shade = ctx.createLinearGradient(cx - R, cy, cx + R, cy);
-    shade.addColorStop(0.0, "rgba(0,0,0,0.34)");
-    shade.addColorStop(0.22, "rgba(255,255,255,0.08)");
-    shade.addColorStop(0.55, "rgba(0,0,0,0.0)");
-    shade.addColorStop(1.0, "rgba(0,0,0,0.38)");
-    ctx.fillStyle = shade;
-    ctx.fillRect(cx - R, cy - halfH, R * 2, halfH * 2);
-    ctx.restore();
-
-    /* Crisp cylinder border frame */
-    ctx.save();
-    ctx.strokeStyle = isLight ? "rgba(2, 132, 199, 0.55)" : "rgba(125, 211, 252, 0.55)";
-    ctx.lineWidth = 1.6;
-    ctx.strokeRect(cx - R, cy - halfH, R * 2, halfH * 2);
-
-    /* Front-facing points/cities on the cylinder */
-    if (opts.mode !== "integral" && Array.isArray(opts.points)) {
-      ctx.font = '600 10px "JetBrains Mono", monospace';
-      for (const p of opts.points) {
-        if (!p || !p.visible || p.locked || !p.outPt) continue;
-        const c3 = cylProject(p.outPt.x, p.outPt.y);
-        const x1 = c3.x * _cy - c3.y * _sy;
-        const d = c3.x * _sy + c3.y * _cy;
-        if (d < 0.05) continue;
-        const sx = cx + x1 * R, sy = cy - c3.z * halfH;
-        ctx.fillStyle = p.color || "#fbbf24";
-        ctx.beginPath(); ctx.arc(sx, sy, 3.6, 0, Math.PI * 2); ctx.fill();
-        if (p.showLabel !== false && p.label) {
-          ctx.fillStyle = isLight ? "#0f172a" : "#f8fafc";
-          ctx.fillText(p.label, sx + 6, sy + 3);
-        }
-      }
-    }
-    ctx.restore();
-  }
-
   function render(ctx, canvas, shapes, opts = {}) {
-    if (opts && opts.surface === "cylinder") {
-      renderCylinder(ctx, canvas, shapes, opts);
-      return;
-    }
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     if (w < 4 || h < 4) return;
@@ -835,7 +1261,7 @@
     ctx.fill();
 
     /* First scan: check if a solid opaque ocean globe or opaque surface color field is present */
-    let hasSolidGlobe = Boolean(opts.colorField && opts.colorField.pixels && Number(opts.colorField.opacity ?? 0.9) >= 0.8);
+    let hasSolidGlobe = Boolean(opts.colorField && (opts.colorField.pixels || opts.colorField.canvas) && Number(opts.colorField.opacity ?? 0.9) >= 0.8);
     if (!hasSolidGlobe) {
       for (const s of shapes || []) {
         if (!s || !s.visible) continue;
@@ -935,17 +1361,54 @@
       }
     }
 
-    if (opts.colorField && opts.colorField.pixels) {
+    if (opts.colorField && (opts.colorField.pixels || opts.colorField.canvas)) {
       drawSphereColorField(ctx, cx, cy, R, rimR, opts.colorField, Boolean(opts.isAnimating));
     }
 
-    for (const lat of GRID.latitudes) drawWireArcPass(ctx, lat.pts, cx, cy, R, true, hasSolidGlobe ? "rgba(186,230,253,0.22)" : (isLight ? (lat.r === 1 ? "rgba(2,132,199,0.52)" : "rgba(71,85,105,0.28)") : lat.front), lat.lw);
-    for (const mer of GRID.meridians) drawWireArcPass(ctx, mer.pts, cx, cy, R, true, hasSolidGlobe ? "rgba(186,230,253,0.18)" : (isLight ? "rgba(71,85,105,0.28)" : mer.front), mer.lw);
+    /* Detect Earth Atlas globes (works for live examples AND saved JSON reloads!) so we apply
+     * our Continuous 768x384 3D Perlin/fBm Shaded Land Texture & Swirling Clouds! */
+    const isEarthGlobe = hasSolidGlobe && prepared.some((item) => item.shape && (
+      item.shape.isEarthLand ||
+      /^(North America|South America|Africa|Europe|Asia|Eurasia|Australia|Antarctica)$/i.test(item.shape.label || "")
+    ));
 
-    for (const item of prepared) {
-      if (item.op <= 0.001 || item.isOcean) continue;
-      if (item.closed) {
-        fillFrontPolygonOnSphere(ctx, item.chains3, cx, cy, R, rimR, item.color, item.op, false);
+    for (const lat of GRID.latitudes) drawWireArcPass(ctx, lat.pts, cx, cy, R, true, hasSolidGlobe ? "rgba(186,230,253,0.16)" : (isLight ? (lat.r === 1 ? "rgba(2,132,199,0.52)" : "rgba(71,85,105,0.28)") : lat.front), lat.lw);
+    for (const mer of GRID.meridians) drawWireArcPass(ctx, mer.pts, cx, cy, R, true, hasSolidGlobe ? "rgba(186,230,253,0.14)" : (isLight ? "rgba(71,85,105,0.28)" : mer.front), mer.lw);
+
+    if (isEarthGlobe) {
+      ensureEarthAtlases();
+      /* Clip ALL front-hemisphere Earth continents & islands in ONE clean path and stamp our
+       * continuous 768x384 3D Perlin/fBm hill-shaded climate, desert, rainforest & mountain-snow atlas! */
+      ctx.save();
+      ctx.beginPath();
+      let hasLandClip = false;
+      for (const item of prepared) {
+        if (item.op <= 0.001 || item.isOcean || !item.closed) continue;
+        if (item.shape.isEarthLake || /Lake|Caspian/i.test(item.shape.label || "")) continue;
+        if (traceFrontPolygonPath(ctx, item.chains3, cx, cy, R)) hasLandClip = true;
+      }
+      if (hasLandClip) {
+        ctx.clip("nonzero");
+        drawEquirectSphereLayer(ctx, cx, cy, R, rimR, _earthLandPixels, EARTH_TW, EARTH_TH, Boolean(opts.isAnimating), 0.0, false);
+      }
+      ctx.restore();
+
+      /* Crisp sapphire inland lakes & seas on top of the Perlin-textured continents */
+      for (const item of prepared) {
+        if (item.op <= 0.001 || item.isOcean || !item.closed) continue;
+        if (item.shape.isEarthLake || /Lake|Caspian/i.test(item.shape.label || "")) {
+          fillFrontPolygonOnSphere(ctx, item.chains3, cx, cy, R, rimR, item.color, item.op, false);
+        }
+      }
+
+      /* Delicate swirling translucent planetary cloud bands floating above ocean & continents */
+      drawEquirectSphereLayer(ctx, cx, cy, R, rimR, _earthCloudPixels, CLOUD_TW, CLOUD_TH, Boolean(opts.isAnimating), sphere.yaw * 0.14, true, 0.56);
+    } else {
+      for (const item of prepared) {
+        if (item.op <= 0.001 || item.isOcean) continue;
+        if (item.closed) {
+          fillFrontPolygonOnSphere(ctx, item.chains3, cx, cy, R, rimR, item.color, item.op, false);
+        }
       }
     }
     ctx.restore();
@@ -961,17 +1424,18 @@
       }
       if (item.lw > 0 || item.isHi) {
         const effLw = item.lw > 0 ? item.lw : 1.8;
-        if (item.lw > 0 && item.op < 0.85) {
+        if (item.lw > 0 && item.op < 0.85 && !item.shape.isBorder) {
           /* Outer soft glow for translucent/wireframe shapes */
           strokeHemisphereChains(ctx, item.chains, true, item.color, effLw + (item.isHi ? 6 : 4), (item.isHi ? 0.42 : 0.28) * item.strokeOp, dash);
         }
-        /* Core bright curve (also renders crisp white coastline highlight on hovered fill-only Earth layers!) */
-        strokeHemisphereChains(ctx, item.chains, true, item.isHi ? (isLight && !hasSolidGlobe ? "#0f172a" : "#ffffff") : item.color, item.isHi ? effLw + 0.8 : effLw, item.isHi ? 1.0 : item.strokeOp, dash);
+        /* Core bright curve (crisp cartographic stroke for political borders, or coastline highlight on hover) */
+        const borderLw = item.shape.isBorder ? Math.max(0.7, Math.min(2.1, effLw * (0.85 + 0.14 * Math.log2(Math.max(1, sphere.zoom))))) : effLw;
+        strokeHemisphereChains(ctx, item.chains, true, item.isHi ? (isLight && !hasSolidGlobe ? "#0f172a" : "#ffffff") : item.color, item.isHi ? borderLw + 0.8 : borderLw, item.isHi ? 1.0 : item.strokeOp, dash);
       }
 
-      /* Direction arrow along front hemisphere if available (skip when fill-only / zero stroke) */
+      /* Direction arrow along front hemisphere if available (skip when fill-only or political border) */
       const mainChain = item.chains[0];
-      if (item.lw > 0 && item.op < 0.85 && mainChain && mainChain.length >= 6) {
+      if (item.lw > 0 && item.op < 0.85 && !item.shape.isBorder && mainChain && mainChain.length >= 6) {
         const mid = Math.floor(mainChain.length * 0.5);
         const a = mainChain[mid - 1], b = mainChain[mid];
         if (a && b && 0.5 * (a.depth + b.depth) >= -0.02) {
@@ -1018,15 +1482,25 @@
       }
     }
 
-    /* Single combined 3D planetary sunlit shading, limb darkening & atmospheric rim + crisp outline (60 FPS!) */
+    /* Single combined 3D planetary sunlit shading, limb darkening & Rayleigh atmospheric halo (60 FPS!) */
     ctx.save();
     if (hasSolidGlobe) {
-      const shadeGrad = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.32, R * 0.05, cx, cy, rimR * 1.01);
-      shadeGrad.addColorStop(0.0, "rgba(255, 252, 240, 0.24)");
-      shadeGrad.addColorStop(0.35, "rgba(255, 255, 255, 0.03)");
-      shadeGrad.addColorStop(0.72, "rgba(4, 14, 30, 0.16)");
-      shadeGrad.addColorStop(0.91, "rgba(2, 10, 26, 0.44)");
-      shadeGrad.addColorStop(1.0, "rgba(56, 189, 248, 0.34)");
+      /* Outer soft Rayleigh blue space-horizon glow */
+      const atmo = ctx.createRadialGradient(cx, cy, rimR * 0.96, cx, cy, rimR * 1.07);
+      atmo.addColorStop(0.0, "rgba(56, 189, 248, 0.24)");
+      atmo.addColorStop(0.55, "rgba(14, 165, 233, 0.09)");
+      atmo.addColorStop(1.0, "rgba(14, 165, 233, 0.0)");
+      ctx.fillStyle = atmo;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rimR * 1.07, 0, Math.PI * 2);
+      ctx.fill();
+
+      const shadeGrad = ctx.createRadialGradient(cx - R * 0.36, cy - R * 0.34, R * 0.04, cx, cy, rimR * 1.01);
+      shadeGrad.addColorStop(0.0, "rgba(255, 250, 232, 0.22)");
+      shadeGrad.addColorStop(0.32, "rgba(255, 255, 255, 0.02)");
+      shadeGrad.addColorStop(0.70, "rgba(3, 12, 28, 0.18)");
+      shadeGrad.addColorStop(0.90, "rgba(2, 8, 22, 0.48)");
+      shadeGrad.addColorStop(1.0, "rgba(56, 189, 248, 0.40)");
       ctx.fillStyle = shadeGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, rimR, 0, Math.PI * 2);
@@ -1064,62 +1538,179 @@
       ctx.restore();
     }
 
-    /* Mapped non-landmark (unlocked) Domain Points & Labels on the 3D Riemann Sphere */
+    /* Mapped non-landmark (unlocked) Domain Points, Country Name Labels & Smart Collision-Free City/Capital Pins! */
     if (opts.mode !== "integral" && Array.isArray(opts.points)) {
-      ctx.font = '600 10.5px "JetBrains Mono", monospace';
+      const countryPts = [];
+      const visPts = [];
       for (const p of opts.points) {
         if (!p || !p.visible || p.locked || !p.outPt) continue;
         if (!Number.isFinite(p.outPt.x) || !Number.isFinite(p.outPt.y)) continue;
         const c = toCanvas(rotate3D(stereoProject(p.outPt.x, p.outPt.y)), cx, cy, R);
         const isFront = c.depth >= -0.04;
         if (hasSolidGlobe && !isFront) continue;
-        const col = p.color || "#34d399";
-        const sz = Math.max(3.5, Number(p.size) || 4.5);
         const pop = (p.opacity !== undefined && p.opacity !== null && Number.isFinite(Number(p.opacity)))
           ? Math.max(0, Math.min(1, Number(p.opacity)))
           : 1.0;
         if (pop <= 0.001) continue;
+        if (p.icon === "country_label") {
+          const tier = Math.max(1, Number(p.size) || 2);
+          countryPts.push({ p, c, isFront, pop, tier, col: p.color || "#f8fafc" });
+        } else {
+          const sz = Math.max(2.6, Number(p.size) || 4.0);
+          visPts.push({ p, c, isFront, pop, sz, col: p.color || "#34d399" });
+        }
+      }
+
+      const placedCountryBoxes = [];
+      const boxHitsList = (list, x0, y0, x1, y1, padPx) => {
+        for (let i = 0; i < list.length; i++) {
+          const b = list[i];
+          if (x0 < b[2] + padPx && x1 > b[0] - padPx && y0 < b[3] + padPx && y1 > b[1] - padPx) return true;
+        }
+        return false;
+      };
+
+      /* Pass 0: Cartographic Country Name Labels (no dot pin, zoom-tiered uppercase typography!) */
+      if (countryPts.length > 0) {
+        countryPts.sort((a, b) => (b.tier - a.tier) || (b.c.depth - a.c.depth));
+        const z = Math.max(0.5, sphere.zoom);
+        for (const item of countryPts) {
+          const { p, c, isFront, pop, tier } = item;
+          if (!isFront || p.showLabel === false || !p.label) continue;
+          if (hasSolidGlobe && c.depth < 0.14) continue;
+          /* Progressive zoom reveal: tier>=4 always, tier 3 at >=0.95x, tier 2 at >=1.45x, tier 1 at >=2.6x */
+          if (tier < 2 && z < 2.35) continue;
+          if (tier < 3 && z < 1.28) continue;
+          const fontPx = tier >= 4 ? 11.4 : tier >= 3 ? 10.2 : tier >= 2 ? 9.3 : 8.6;
+          const upLabel = p._upLabel || (p._upLabel = String(p.label).toUpperCase());
+          ctx.font = `700 ${fontPx}px "Inter", "JetBrains Mono", system-ui, sans-serif`;
+          if (p._cLblFont !== fontPx) {
+            p._cLblFont = fontPx;
+            p._cLblW = ctx.measureText(upLabel).width;
+          }
+          const tw = p._cLblW;
+          const x0 = c.sx - tw * 0.5, y0 = c.sy - fontPx * 0.55;
+          const x1 = c.sx + tw * 0.5, y1 = c.sy + fontPx * 0.55;
+          if (boxHitsList(placedCountryBoxes, x0, y0, x1, y1, 5.0)) continue;
+          placedCountryBoxes.push([x0, y0, x1, y1]);
+
+          const tierAlpha = tier >= 4 ? 0.94 : tier >= 3 ? 0.88 : Math.min(0.88, 0.45 + (z - 1.2) * 0.35);
+          ctx.save();
+          ctx.globalAlpha = Math.min(1.0, (0.35 + c.depth * 0.95) * tierAlpha * pop);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.lineJoin = "round";
+          ctx.lineWidth = 3.0;
+          ctx.strokeStyle = isLight && !hasSolidGlobe ? "rgba(255,255,255,0.88)" : "rgba(4, 11, 24, 0.78)";
+          ctx.strokeText(upLabel, c.sx, c.sy);
+          ctx.fillStyle = isLight && !hasSolidGlobe ? "#0f172a" : (p.color || "#f1f5f9");
+          ctx.fillText(upLabel, c.sx, c.sy);
+          ctx.restore();
+        }
+      }
+
+      /* Pass 1: Draw ALL glowing city/capital pins so dense regions sparkle naturally! */
+      const drawMiniStar = (cx0, cy0, rOut, rIn) => {
+        ctx.beginPath();
+        for (let k = 0; k < 10; k++) {
+          const ang = -Math.PI * 0.5 + (k * Math.PI) / 5;
+          const rr = (k & 1) === 0 ? rOut : rIn;
+          const px = cx0 + Math.cos(ang) * rr, py = cy0 + Math.sin(ang) * rr;
+          if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      };
+      for (const item of visPts) {
+        const { p, c, isFront, pop, sz, col } = item;
         ctx.save();
         ctx.globalAlpha = (isFront ? 1.0 : 0.22) * pop;
-        ctx.fillStyle = col;
-        ctx.strokeStyle = isLight ? "#ffffff" : "#080c14";
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.arc(c.sx, c.sy, isFront ? sz : sz * 0.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        if (isFront) {
-          ctx.fillStyle = "#ffffff";
+        if (isFront && hasSolidGlobe) {
+          /* Soft warm city-light halo */
+          ctx.fillStyle = hexToRgba(col, 0.34);
           ctx.beginPath();
-          ctx.arc(c.sx, c.sy, Math.max(1.3, sz * 0.36), 0, Math.PI * 2);
+          ctx.arc(c.sx, c.sy, sz + 2.8, 0, Math.PI * 2);
           ctx.fill();
         }
-
-        if (p.showLabel !== false && p.label) {
-          const lx = c.sx + sz + 5;
-          const ly = c.sy + 3.5;
+        ctx.fillStyle = col;
+        ctx.strokeStyle = isLight ? "#ffffff" : "#070c16";
+        ctx.lineWidth = 1.3;
+        if (p.icon === "star") {
+          const sr = isFront ? sz * 1.35 : sz * 1.05;
+          drawMiniStar(c.sx, c.sy, sr, sr * 0.45);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(c.sx, c.sy, isFront ? sz * 0.88 : sz * 0.72, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
           if (isFront) {
-            if (p._lblStr !== p.label) {
-              p._lblStr = p.label;
-              p._lblW = ctx.measureText(p.label).width;
-            }
-            const tw = p._lblW;
-            ctx.fillStyle = isLight ? "rgba(255, 255, 255, 0.86)" : "rgba(8, 12, 20, 0.78)";
-            ctx.strokeStyle = hexToRgba(col, 0.45);
-            ctx.lineWidth = 1;
+            ctx.fillStyle = "#ffffff";
             ctx.beginPath();
-            if (typeof ctx.roundRect === "function") {
-              ctx.roundRect(lx - 3, ly - 10.5, tw + 6, 14, 3.5);
-            } else {
-              ctx.rect(lx - 3, ly - 10.5, tw + 6, 14);
-            }
+            ctx.arc(c.sx, c.sy, Math.max(1.1, sz * 0.34), 0, Math.PI * 2);
             ctx.fill();
-            ctx.stroke();
           }
-          ctx.fillStyle = isFront ? (isLight ? "#0f172a" : "#f8fafc") : col;
-          ctx.fillText(p.label, lx, ly);
         }
+        ctx.restore();
+      }
+
+      /* Pass 2: Smart 4-direction collision-free city/capital label placement */
+      ctx.font = '600 10.2px "JetBrains Mono", monospace';
+      visPts.sort((a, b) => (b.sz - a.sz) || (b.c.depth - a.c.depth));
+      const placedBoxes = placedCountryBoxes.slice();
+      const pad = 2.5;
+      const boxHits = (x0, y0, x1, y1) => boxHitsList(placedBoxes, x0, y0, x1, y1, pad);
+
+      for (const item of visPts) {
+        const { p, c, isFront, pop, sz, col } = item;
+        if (p.showLabel === false || !p.label) continue;
+        if (hasSolidGlobe && c.depth < 0.08 && visPts.length > 12) continue; /* hide cramped limb labels */
+        if (p._lblStr !== p.label) {
+          p._lblStr = p.label;
+          p._lblW = ctx.measureText(p.label).width;
+        }
+        const tw = p._lblW;
+        const bw = tw + 7, bh = 13.5;
+        let chosen = null;
+        if (isFront && visPts.length > 6) {
+          const cands = [
+            [c.sx + sz + 4, c.sy - bh * 0.5],           /* right */
+            [c.sx - sz - 4 - bw, c.sy - bh * 0.5],      /* left */
+            [c.sx - bw * 0.5, c.sy - sz - 3 - bh],      /* top */
+            [c.sx - bw * 0.5, c.sy + sz + 3],           /* bottom */
+          ];
+          for (let k = 0; k < cands.length; k++) {
+            const x0 = cands[k][0], y0 = cands[k][1];
+            if (!boxHits(x0, y0, x0 + bw, y0 + bh)) {
+              chosen = [x0, y0, x0 + bw, y0 + bh];
+              break;
+            }
+          }
+          if (!chosen) continue; /* skip colliding label; pin still sparkles cleanly! */
+          placedBoxes.push(chosen);
+        } else {
+          const x0 = c.sx + sz + 4, y0 = c.sy - bh * 0.5;
+          chosen = [x0, y0, x0 + bw, y0 + bh];
+        }
+
+        const [bx, by] = chosen;
+        ctx.save();
+        ctx.globalAlpha = (isFront ? Math.min(1.0, 0.45 + c.depth * 0.9) : 0.22) * pop;
+        if (isFront) {
+          ctx.fillStyle = isLight ? "rgba(255, 255, 255, 0.88)" : "rgba(7, 11, 20, 0.78)";
+          ctx.strokeStyle = hexToRgba(col, 0.42);
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === "function") {
+            ctx.roundRect(bx, by, bw, bh, 3.5);
+          } else {
+            ctx.rect(bx, by, bw, bh);
+          }
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.fillStyle = isFront ? (isLight ? "#0f172a" : "#f8fafc") : col;
+        ctx.fillText(p.label, bx + 3.5, by + 10);
         ctx.restore();
       }
     }
@@ -1184,7 +1775,7 @@
       sphere.zoom = 1.0;
     },
     zoomBy(factor) {
-      sphere.zoom = Math.max(0.35, Math.min(22.0, sphere.zoom * factor));
+      sphere.zoom = Math.max(0.35, Math.min(48.0, sphere.zoom * factor));
     },
     onPointerDown(x, y) {
       sphere.orbiting = true;
@@ -1208,7 +1799,7 @@
     },
     onWheel(deltaY) {
       const f = deltaY < 0 ? 1.14 : 1 / 1.14;
-      sphere.zoom = Math.max(0.35, Math.min(22.0, sphere.zoom * f));
+      sphere.zoom = Math.max(0.35, Math.min(48.0, sphere.zoom * f));
     },
   };
   }

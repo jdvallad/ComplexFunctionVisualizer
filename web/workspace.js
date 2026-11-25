@@ -64,6 +64,8 @@
     compiledKind: null,
     dirty: false,
     compiling: false,
+    workspaceEpoch: 1,
+    cardDiagnostics: {},
 
     hasUnsavedWork: false,
     pendingNavAction: null,
@@ -189,6 +191,8 @@
 
   const stageComplex = document.getElementById("stage-complex");
   const stageReal = document.getElementById("stage-real");
+  const stageVector = document.getElementById("stage-vector");
+  const vectorDrawDock = document.getElementById("vector-draw-dock");
   const inputPlaneCard = document.getElementById("input-plane-card");
   const outputPlaneCard = document.getElementById("output-plane-card");
   const planesSplitter = document.getElementById("planes-splitter");
@@ -208,6 +212,7 @@
   const toolsTitle = document.getElementById("tools-popover-title");
   const toolsComplexBody = document.getElementById("tools-complex-body");
   const toolsRealBody = document.getElementById("tools-real-body");
+  const toolsVectorBody = document.getElementById("tools-vector-body");
   const toolsActiveDot = document.getElementById("tools-active-dot");
 
   /* Global Viewport & Camera Variables readable & dynamically writable from formulas/sliders */
@@ -286,14 +291,24 @@
   }
 
   function isRealMode() { return state.mode === "real"; }
-  function isContourMode() {
-    return !isRealMode() && Boolean(window.CFVComplex && window.CFVComplex.state && window.CFVComplex.state.contourMode);
+  function isVectorMode() { return state.mode === "vector"; }
+  function is2DMode() { return state.mode === "real" || state.mode === "vector"; }
+  function activeCanvasCtrl() {
+    if (state.mode === "real") return window.CFVReal;
+    if (state.mode === "vector") return window.CFVVector;
+    return window.CFVComplex;
   }
-  function normMode(m) { return m === "real" ? "real" : "map"; }
+  function isContourMode() {
+    return !isRealMode() && !isVectorMode() && Boolean(window.CFVComplex && window.CFVComplex.state && window.CFVComplex.state.contourMode);
+  }
+  function normMode(m) { return m === "real" ? "real" : m === "vector" ? "vector" : "map"; }
+  function bumpEpoch() { state.workspaceEpoch = (state.workspaceEpoch || 1) + 1; return state.workspaceEpoch; }
   function fnCards() { return state.cards.filter((c) => c.kind === "fn"); }
   function sliderCards() { return state.cards.filter((c) => c.kind === "slider"); }
   function varCards() { return state.cards.filter((c) => c.kind === "var"); }
-  function paramCards() { return state.cards.filter((c) => c.kind === "slider" || c.kind === "var"); }
+  function scalarVarCards() { return state.cards.filter((c) => c.kind === "var" && c.varKind !== "vec"); }
+  function vecVarCards() { return state.cards.filter((c) => c.kind === "var" && c.varKind === "vec"); }
+  function paramCards() { return state.cards.filter((c) => c.kind === "slider" || (c.kind === "var" && c.varKind !== "vec")); }
   function getImplicitViewportParamNames() {
     const explicit = new Set(paramCards().map((s) => s.name));
     const extra = [];
@@ -308,13 +323,28 @@
     return extra;
   }
   function getParamNames() {
-    return [...paramCards().map((s) => s.name), ...getImplicitViewportParamNames()].slice(0, 16);
+    const names = [...paramCards().map((s) => s.name)];
+    if (isVectorMode()) {
+      for (const vv of vecVarCards()) {
+        if (vv.name) {
+          names.push(`__cfvv_${vv.name}_x`, `__cfvv_${vv.name}_y`);
+        }
+      }
+    }
+    return [...names, ...getImplicitViewportParamNames()].slice(0, 32);
   }
   function getParamValues() {
     const vg = getViewportGlobals();
-    const explicit = paramCards().map((s) => Number(s.value) || 0);
+    const vals = paramCards().map((s) => Number(s.value) || 0);
+    if (isVectorMode()) {
+      for (const vv of vecVarCards()) {
+        if (vv.name) {
+          vals.push(Number(vv.vx) || 0, Number(vv.vy) || 0);
+        }
+      }
+    }
     const extra = getImplicitViewportParamNames().map((nm) => Number(vg[nm]) || 0);
-    return [...explicit, ...extra].slice(0, 16);
+    return [...vals, ...extra].slice(0, 32);
   }
   function getParamMap() {
     const m = getViewportGlobals();
@@ -388,9 +418,10 @@
     return false;
   }
 
-  /* Evaluate computed Variable cards (kind: "var") as functions of Sliders, Viewport Globals & earlier Variables */
+  /* Evaluate computed Variable cards (scalar & 2D vector!) as functions of Sliders, Matrices, Viewport Globals & earlier Variables */
   function resolveVariables(updateDom = true, applyViewport = true) {
     const ev = window.CFVComplex && window.CFVComplex.evalParamExpr;
+    const LA = isVectorMode() ? window.CFVLinAlg : null;
     const m = getViewportGlobals();
     const vpUpdates = {};
     for (const s of sliderCards()) {
@@ -398,12 +429,86 @@
       m[s.name] = val;
       if (VIEWPORT_GLOBALS.has(s.name)) vpUpdates[s.name] = val;
     }
+
+    /* In Vector Mode, build matrix & vector environment so Scalar Vars can evaluate 1x1 matrix formulas (e.g. R * u, det(M), [[5]])! */
+    const laEnv = {};
+    const matNames = new Set();
+    const rowNames = new Set();
+    const vecNames = new Set();
+    if (LA) {
+      let mSeq = 0;
+      for (const fc of fnCards()) {
+        if (fc.vecKind === "matrix") {
+          mSeq++;
+          const sym = `M${mSeq}`;
+          const mv = LA.evalExpr(fc.code, m, laEnv);
+          if (LA.isMat2(mv)) {
+            laEnv[sym] = mv; matNames.add(sym);
+            if (mSeq === 1) { laEnv.M = mv; laEnv.A = mv; matNames.add("M"); matNames.add("A"); }
+            if (mSeq === 2) { laEnv.B = mv; matNames.add("B"); }
+          } else if (LA.isRow2(mv)) {
+            laEnv[sym] = mv; rowNames.add(sym);
+            if (mSeq === 1) { laEnv.M = mv; laEnv.A = mv; rowNames.add("M"); rowNames.add("A"); }
+            if (mSeq === 2) { laEnv.B = mv; rowNames.add("B"); }
+          }
+        }
+      }
+    }
+
     const vars = varCards();
-    if (ev) {
-      for (const v of vars) {
-        if (v.expr && String(v.expr).trim()) {
-          const val = ev(v.expr, m);
-          if (Number.isFinite(val)) v.value = val;
+    for (const v of vars) {
+      v._dimErr = null;
+      const exprStr = String(v.expr || "").trim();
+      if (v.varKind === "vec" && LA) {
+        if (exprStr) {
+          const val = LA.evalExpr(exprStr, m, laEnv);
+          if (LA.isVec2(val) && Number.isFinite(val.x) && Number.isFinite(val.y)) {
+            v.vx = val.x;
+            v.vy = val.y;
+            laEnv[v.name] = val;
+            vecNames.add(v.name);
+          } else {
+            const chk = LA.transpileLinAlgToC11(exprStr, matNames, vecNames, rowNames);
+            if (chk && chk.error) {
+              v._dimErr = { title: chk.error, hint: chk.hint };
+            } else if (LA.isMat2(val) || LA.isRow2(val) || typeof val === "number") {
+              const got = LA.isMat2(val) ? "2×2 matrix" : LA.isRow2(val) ? "1×2 row matrix" : "1×1 scalar";
+              v._dimErr = {
+                title: `Dimension mismatch: Vector Variable '${v.name}' requires a 2×1 vector, got ${got}.`,
+                hint: `Write (x, y), [x, y], M * u, or T(R) to produce a 2×1 vector.`,
+              };
+            }
+          }
+        }
+        if (Number.isFinite(v.vx) && Number.isFinite(v.vy) && !laEnv[v.name]) {
+          laEnv[v.name] = LA.makeVec2(v.vx, v.vy);
+          vecNames.add(v.name);
+        }
+      } else {
+        if (exprStr) {
+          if (LA) {
+            const val = LA.evalExpr(exprStr, m, laEnv);
+            if (typeof val === "number" && Number.isFinite(val)) {
+              v.value = val;
+            } else {
+              const chk = LA.transpileLinAlgToC11(exprStr, matNames, vecNames, rowNames);
+              if (chk && chk.error) {
+                v._dimErr = { title: chk.error, hint: chk.hint };
+              } else if (LA.isMat2(val) || LA.isRow2(val) || LA.isVec2(val)) {
+                const got = LA.isMat2(val) ? "2×2 matrix" : LA.isRow2(val) ? "1×2 row matrix" : "2×1 vector";
+                v._dimErr = {
+                  title: `Dimension mismatch: Scalar Variable '${v.name}' requires a 1×1 scalar, got ${got}.`,
+                  hint: `Use a 1×1 expression like R * u, T(u) * M * u, det(M), tr(M), dot(u, w), or [[value]].`,
+                };
+              } else if (ev) {
+                const fv = ev(exprStr, m);
+                if (Number.isFinite(fv)) v.value = fv;
+              }
+            }
+          } else if (ev) {
+            const val = ev(exprStr, m);
+            if (Number.isFinite(val)) v.value = val;
+          }
         }
         const nv = Number(v.value) || 0;
         m[v.name] = nv;
@@ -414,11 +519,17 @@
     if (applyViewport && Object.keys(vpUpdates).length > 0) {
       vpRes = applyViewportGlobals(vpUpdates);
     }
-    /* Keep formula-bound points, guide lines, text boxes & shapes moving even when locked! */
+    /* Keep formula-bound points, guide lines, text boxes, shapes & linear algebra cards moving even when locked! */
     if (isRealMode()) {
       if (window.CFVReal && typeof window.CFVReal.rebuildFormulaElements === "function") {
         window.CFVReal.rebuildFormulaElements();
       }
+    } else if (isVectorMode()) {
+      if (window.CFVVector && typeof window.CFVVector.rebuildFormulaElements === "function") {
+        window.CFVVector.rebuildFormulaElements();
+      }
+      updateLinearAlgebraPreviews();
+      if (window.CFVVector && window.CFVVector.requestRender) window.CFVVector.requestRender(true);
     } else if (window.CFVComplex && typeof window.CFVComplex.rebuildFormulaShapes === "function") {
       window.CFVComplex.rebuildFormulaShapes();
     }
@@ -427,14 +538,30 @@
         const vStr = String(s.value);
         const bStr = Number(s.value.toFixed(4)).toString();
         if (s._rangeEl && s._rangeEl.value !== vStr) s._rangeEl.value = vStr;
-        if (s._valBadgeEl && s._valBadgeEl.textContent !== bStr) s._valBadgeEl.textContent = bStr;
+        if (s._valBadgeEl && document.activeElement !== s._valBadgeEl && s._valBadgeEl.value !== bStr) s._valBadgeEl.value = bStr;
         if (s._miniRangeEl && s._miniRangeEl.value !== vStr) s._miniRangeEl.value = vStr;
-        if (s._miniValBadgeEl && s._miniValBadgeEl.textContent !== bStr) s._miniValBadgeEl.textContent = bStr;
+        if (s._miniValBadgeEl && document.activeElement !== s._miniValBadgeEl && s._miniValBadgeEl.value !== bStr) s._miniValBadgeEl.value = bStr;
       }
       for (const v of vars) {
-        const pStr = Number.isFinite(v.value) ? `= ${Number(v.value.toFixed(4))}` : "= ?";
-        if (v._valPillEl && v._valPillEl.textContent !== pStr) v._valPillEl.textContent = pStr;
-        if (v._miniValPillEl && v._miniValPillEl.textContent !== pStr) v._miniValPillEl.textContent = pStr;
+        if (v.varKind === "vec") {
+          if (v._vecPreviewEl && LA) {
+            const vecObj = Number.isFinite(v.vx) && Number.isFinite(v.vy) ? LA.makeVec2(v.vx, v.vy) : null;
+            v._vecPreviewEl.innerHTML = LA.renderVectorLatexHtml(v.name || "u", vecObj, "", null);
+          }
+        } else {
+          const pStr = v._dimErr ? "= err" : (Number.isFinite(v.value) ? `= ${Number(v.value.toFixed(4))}` : "= ?");
+          if (v._valPillEl && v._valPillEl.textContent !== pStr) v._valPillEl.textContent = pStr;
+          if (v._miniValPillEl && v._miniValPillEl.textContent !== pStr) v._miniValPillEl.textContent = pStr;
+        }
+        if (v._varErrEl) {
+          if (v._dimErr) {
+            v._varErrEl.classList.remove("hidden");
+            v._varErrEl.innerHTML = `<div class="card-diag-explain-hdr"><span>${v._dimErr.title}</span><span class="card-diag-tip-btn" title="${String(v._dimErr.hint || "").replace(/"/g, "&quot;")}">?</span></div><div class="card-diag-hint">${v._dimErr.hint || ""}</div>`;
+          } else {
+            v._varErrEl.classList.add("hidden");
+            v._varErrEl.innerHTML = "";
+          }
+        }
       }
     }
     return vpRes;
@@ -782,9 +909,18 @@
   }
 
   /* Single Active Graphed Function + Auxiliary Helpers (Map & Integral Modes) */
+  function isScalarInputVecCard(c) {
+    return isVectorMode() && c && c.kind === "fn" && (c.vecKind === "curve" || c.vecKind === "s2s");
+  }
+
   function getActiveComplexCard() {
-    const fns = fnCards();
-    if (fns.length === 0) return null;
+    const fns = isVectorMode()
+      ? fnCards().filter((c) => !isScalarInputVecCard(c) && c.vecKind !== "vector")
+      : fnCards();
+    if (fns.length === 0) {
+      if (isVectorMode()) state.primaryCardId = null;
+      return null;
+    }
     const chosen = fns.find((c) => c.id === state.primaryCardId) || fns[0];
     state.primaryCardId = chosen.id;
     return chosen;
@@ -938,6 +1074,7 @@
       pi: primaryIdx,
       fn: fns.map((c) => ({
         t: c.title || "",
+        ...(c.name ? { nm: c.name } : {}),
         cd: c.code || "",
         col: c.color || "#38bdf8",
         w: normLineWidthWs(c.lineWidth, 2.2),
@@ -946,6 +1083,10 @@
         stp: c.step ? 1 : 0,
         lk: c.locked ? 1 : 0,
         v: c.visible !== false ? 1 : 0,
+        vk: c.vecKind || undefined,
+        ...(c.matDims ? { md: c.matDims } : {}),
+        ...(c.tMin !== undefined ? { tmin: c.tMin } : {}),
+        ...(c.tMax !== undefined ? { tmax: c.tMax } : {}),
         b: c.builtin || undefined,
       })),
       sl: sliderCards().map((s) => ({
@@ -961,15 +1102,18 @@
         n: v.name,
         l: v.label || "",
         ex: String(v.expr || "0"),
+        ...(v.varKind === "vec" ? { vk: "vec" } : {}),
       })),
       c: isRealMode()
         ? (window.CFVReal && window.CFVReal.exportSnapshot ? window.CFVReal.exportSnapshot() : null)
-        : (window.CFVComplex && window.CFVComplex.exportSnapshot ? window.CFVComplex.exportSnapshot() : null),
+        : isVectorMode()
+          ? (window.CFVVector && window.CFVVector.exportSnapshot ? window.CFVVector.exportSnapshot() : null)
+          : (window.CFVComplex && window.CFVComplex.exportSnapshot ? window.CFVComplex.exportSnapshot() : null),
     };
   }
 
   function syncUrl(push = false, withStateHash = false) {
-    const base = state.mode === "real" ? "/real" : "/map";
+    const base = state.mode === "real" ? "/real" : state.mode === "vector" ? "/vector" : "/map";
     const qs = new URLSearchParams();
     if (!state.activeProjectIsCustom && state.activeProjectId && !withStateHash) {
       qs.set("ex", state.activeProjectId);
@@ -1072,7 +1216,7 @@
     const params = new URLSearchParams(window.location.search);
     const exParam = params.get("ex");
     const presetParam = params.get("preset");
-    const modeFromPath = path === "/real" ? "real" : "map";
+    const modeFromPath = path === "/real" ? "real" : path === "/vector" ? "vector" : "map";
     const contourFromPath = path === "/integral";
 
     if (exParam) {
@@ -1182,13 +1326,13 @@
     if (snap.format === "cfv_project_v1" || Array.isArray(snap.cards)) {
       return JSON.parse(JSON.stringify(snap));
     }
-    const rawMode = snap.m === "real" || snap.m === "integral" ? snap.m : "map";
-    const mode = rawMode === "real" ? "real" : "map";
+    const rawMode = snap.m === "real" || snap.m === "vector" || snap.m === "integral" ? snap.m : "map";
+    const mode = rawMode === "real" ? "real" : rawMode === "vector" ? "vector" : "map";
     const pi = typeof snap.pi === "number" ? snap.pi : 0;
     const out = {
       mode,
       ...(snap.desc ? { description: snap.desc } : {}),
-      splitPct: mode === "real" ? undefined : (typeof snap.sp === "number" ? snap.sp : 50),
+      splitPct: mode === "real" || mode === "vector" ? undefined : (typeof snap.sp === "number" ? snap.sp : 50),
       ...(snap.ly ? {
         layout: {
           sidebarCollapsed: Boolean(snap.ly.sb),
@@ -1201,7 +1345,12 @@
       } : {}),
       cards: (snap.fn || []).map((c, idx) => ({
         title: c.t || `Function ${idx + 1}`,
+        ...(c.nm ? { name: c.nm } : {}),
         code: c.cd || "",
+        ...(c.vk ? { vecKind: c.vk } : {}),
+        ...(c.md ? { matDims: c.md } : {}),
+        ...(c.tmin !== undefined ? { tMin: c.tmin } : {}),
+        ...(c.tmax !== undefined ? { tMax: c.tmax } : {}),
         color: c.col || COLORS[idx % COLORS.length],
         lineWidth: normLineWidthWs(c.w, 2.2),
         opacity: normOpacityWs(c.op, 1.0),
@@ -1224,9 +1373,25 @@
         name: v.n || "R",
         label: v.l || "",
         expr: String(v.ex ?? "0"),
+        ...(v.vk === "vec" ? { varKind: "vec" } : {}),
       })),
     };
     const c = snap.c || {};
+    if (mode === "vector") {
+      out.view = c.view || { xmin: -5, xmax: 5, ymin: -3.6, ymax: 3.6 };
+      out.squareAspect = c.squareAspect !== undefined ? Boolean(c.squareAspect) : true;
+      out.heatmap = c.heatmap || "none";
+      out.showArrows = c.showArrows !== undefined ? Boolean(c.showArrows) : false;
+      out.showStreamlines = c.showStreamlines !== undefined ? Boolean(c.showStreamlines) : false;
+      out.showEquipotentials = c.showEquipotentials !== undefined ? Boolean(c.showEquipotentials) : false;
+      out.showParticles = c.showParticles !== undefined ? Boolean(c.showParticles) : false;
+      out.showTransformGrid = c.showTransformGrid !== undefined ? Boolean(c.showTransformGrid) : false;
+      if (Array.isArray(c.shapes)) out.shapes = JSON.parse(JSON.stringify(c.shapes));
+      if (Array.isArray(c.points)) out.points = JSON.parse(JSON.stringify(c.points));
+      if (Array.isArray(c.lines)) out.lines = JSON.parse(JSON.stringify(c.lines));
+      if (Array.isArray(c.texts)) out.texts = JSON.parse(JSON.stringify(c.texts));
+      return out;
+    }
     if (mode === "real") {
       if (Array.isArray(c.sh) && c.sh.length > 0) {
         out.shapes = c.sh.map((s) => {
@@ -1437,22 +1602,24 @@
       ? snapshotToReadableState(baseObj.baseState)
       : (baseObj || {});
     const rawMode =
-      obj.mode === "real" || obj.mode === "integral" || obj.mode === "map"
+      obj.mode === "real" || obj.mode === "vector" || obj.mode === "integral" || obj.mode === "map"
         ? obj.mode
-        : (base.mode === "real" || base.mode === "integral" || base.mode === "map" ? base.mode : state.mode);
-    const mode = rawMode === "real" ? "real" : "map";
+        : (base.mode === "real" || base.mode === "vector" || base.mode === "integral" || base.mode === "map" ? base.mode : state.mode);
+    const mode = rawMode === "real" ? "real" : rawMode === "vector" ? "vector" : "map";
 
     const rawCards = Array.isArray(obj.cards) ? obj.cards : (Array.isArray(base.cards) ? base.cards : []);
     const visIdx = Array.isArray(obj.visibleFnIndices) ? obj.visibleFnIndices : null;
     let primaryIdx = typeof obj.activeFnIndex === "number" ? obj.activeFnIndex : 0;
     const fn = rawCards.map((c, idx) => {
       const isObj = typeof c === "object" && c !== null;
-      const code = typeof c === "string" ? c : (c.code || (mode === "real" ? "sin(x)" : "c_zeta(s)"));
+      const vk = isObj ? (c.vecKind || c.vk || (mode === "vector" ? (c.kind === "potential" || c.kind === "matrix" || c.kind === "vector" ? c.kind : "field") : undefined)) : (mode === "vector" ? "field" : undefined);
+      const code = typeof c === "string" ? c : (c.code || (mode === "real" ? "sin(x)" : mode === "vector" ? "fx = -y; fy = x;" : "c_zeta(s)"));
       if (typeof obj.activeFnIndex !== "number" && isObj && c.active === true) primaryIdx = idx;
       const vis = visIdx ? visIdx.includes(idx) : (isObj && c.visible !== undefined ? Boolean(c.visible) : true);
       return {
         t: (isObj && c.title) ? c.title : `Function ${idx + 1}`,
         cd: code,
+        ...(vk ? { vk } : {}),
         col: (isObj && c.color) ? c.color : COLORS[idx % COLORS.length],
         w: isObj ? normLineWidthWs(c.lineWidth, 2.2) : 2.2,
         op: isObj ? normOpacityWs(c.opacity, 1.0) : 1.0,
@@ -1593,7 +1760,22 @@
     const layerRefs = Array.isArray(obj.layerOrder) ? obj.layerOrder : (Array.isArray(base.layerOrder) ? base.layerOrder : undefined);
 
     let cSnap = null;
-    if (mode === "real") {
+    if (mode === "vector") {
+      cSnap = {
+        view: obj.view || vpObj.view || base.view || { xmin: -5, xmax: 5, ymin: -3.6, ymax: 3.6 },
+        squareAspect: obj.squareAspect !== undefined ? Boolean(obj.squareAspect) : (base.squareAspect !== undefined ? Boolean(base.squareAspect) : true),
+        heatmap: obj.heatmap || base.heatmap || "phi",
+        showArrows: obj.showArrows !== undefined ? Boolean(obj.showArrows) : (base.showArrows !== undefined ? Boolean(base.showArrows) : true),
+        showStreamlines: obj.showStreamlines !== undefined ? Boolean(obj.showStreamlines) : (base.showStreamlines !== undefined ? Boolean(base.showStreamlines) : true),
+        showEquipotentials: obj.showEquipotentials !== undefined ? Boolean(obj.showEquipotentials) : (base.showEquipotentials !== undefined ? Boolean(base.showEquipotentials) : true),
+        showParticles: obj.showParticles !== undefined ? Boolean(obj.showParticles) : (base.showParticles !== undefined ? Boolean(base.showParticles) : true),
+        showTransformGrid: obj.showTransformGrid !== undefined ? Boolean(obj.showTransformGrid) : (base.showTransformGrid !== undefined ? Boolean(base.showTransformGrid) : true),
+        shapes: Array.isArray(obj.shapes) ? JSON.parse(JSON.stringify(obj.shapes)) : (Array.isArray(base.shapes) ? JSON.parse(JSON.stringify(base.shapes)) : []),
+        points: Array.isArray(obj.points) ? JSON.parse(JSON.stringify(obj.points)) : (Array.isArray(base.points) ? JSON.parse(JSON.stringify(base.points)) : []),
+        lines: Array.isArray(obj.lines) ? JSON.parse(JSON.stringify(obj.lines)) : (Array.isArray(base.lines) ? JSON.parse(JSON.stringify(base.lines)) : []),
+        texts: Array.isArray(obj.texts) ? JSON.parse(JSON.stringify(obj.texts)) : (Array.isArray(base.texts) ? JSON.parse(JSON.stringify(base.texts)) : []),
+      };
+    } else if (mode === "real") {
       const vwObj = vpObj.view || { xmin: -10, xmax: 10, ymin: -10, ymax: 10 };
       const vw = Array.isArray(vwObj)
         ? [Number(vwObj[0]), Number(vwObj[1]), Number(vwObj[2]), Number(vwObj[3])]
@@ -1879,20 +2061,26 @@
       { id: "cat_physics", name: "Physics Simulations" },
       { id: "cat_curves_art", name: "Curves, Epicycles & Automata" },
     ],
+    vector: [
+      { id: "cat_vec_linalg", name: "Linear Algebra & 2×2 Transformations" },
+      { id: "cat_vec_physics", name: "Electromagnetism & Fluid Dynamics" },
+      { id: "cat_vec_ode", name: "Phase Planes, Curl Noise & Gradients" },
+    ],
   };
 
   function isBuiltinFolderId(id) {
     if (!id || id === "my" || id === "examples") return true;
     return BUILTIN_CATEGORY_FOLDERS.map.some((f) => f.id === id) ||
-      BUILTIN_CATEGORY_FOLDERS.real.some((f) => f.id === id);
+      BUILTIN_CATEGORY_FOLDERS.real.some((f) => f.id === id) ||
+      BUILTIN_CATEGORY_FOLDERS.vector.some((f) => f.id === id);
   }
 
   function defaultCategoryFolderForMode(mode) {
-    return mode === "real" ? "cat_calculus" : "cat_complex_analysis";
+    return mode === "real" ? "cat_calculus" : mode === "vector" ? "cat_vec_physics" : "cat_complex_analysis";
   }
 
   function resolveExampleFolderId(ex) {
-    const mode = ex && ex.mode === "real" ? "real" : "map";
+    const mode = ex && ex.mode === "real" ? "real" : ex && ex.mode === "vector" ? "vector" : "map";
     const cats = BUILTIN_CATEGORY_FOLDERS[mode];
     if (ex && ex.folder && cats.some((f) => f.id === ex.folder)) return ex.folder;
     if (mode === "map" && ex && (ex.contourMode || ex.mode === "integral")) return "cat_contours";
@@ -1906,7 +2094,7 @@
           .map((f) => ({
             id: String(f.id),
             name: String(f.name).trim(),
-            mode: f.mode === "real" ? "real" : "map",
+            mode: f.mode === "real" ? "real" : f.mode === "vector" ? "vector" : "map",
           }))
       : [];
     const exampleRenames = raw && raw.exampleRenames && typeof raw.exampleRenames === "object"
@@ -2691,8 +2879,8 @@
     try {
       closeItemSettings();
       closeExamplesDropdown();
-      const rawTargetMode = snap.m === "real" || snap.m === "integral" ? snap.m : "map";
-      const targetMode = rawTargetMode === "real" ? "real" : "map";
+      const rawTargetMode = snap.m === "real" || snap.m === "vector" || snap.m === "integral" ? snap.m : "map";
+      const targetMode = rawTargetMode === "real" ? "real" : rawTargetMode === "vector" ? "vector" : "map";
 
       if (meta) {
         state.activeProjectId = meta.projectId ?? null;
@@ -2727,8 +2915,9 @@
       const fns = (snap.fn || []).map((c, idx) => ({
         id: state.nextCardId++,
         kind: "fn",
+        vecKind: c.vk || "field",
         title: c.t || `Function ${idx + 1}`,
-        code: c.cd || (targetMode === "real" ? "sin(x)" : "c_zeta(s)"),
+        code: c.cd || (targetMode === "real" ? "sin(x)" : targetMode === "vector" ? "fx = -y; fy = x;" : "c_zeta(s)"),
         color: c.col || COLORS[idx % COLORS.length],
         lineWidth: normLineWidthWs(c.w, 2.2),
         opacity: normOpacityWs(c.op, 1.0),
@@ -2792,6 +2981,12 @@
         if (snap.c) window.CFVReal.restoreSnapshot(snap.c);
         else window.CFVReal.scheduleSample(true);
         resolveVariables(true, true);
+      } else if (targetMode === "vector") {
+        if (window.CFVVector) {
+          if (snap.c) window.CFVVector.restoreSnapshot(snap.c);
+          else window.CFVVector.onWorkspaceCompiled();
+        }
+        resolveVariables(true, true);
       } else {
         const wantContour = snap.c && snap.c.cm !== undefined ? Boolean(snap.c.cm) : (rawTargetMode === "integral");
         window.CFVComplex.setContourMode(wantContour, { silent: true });
@@ -2799,7 +2994,8 @@
         else await window.CFVComplex.recomputeAll(1.0);
         resolveVariables(true, true);
       }
-      renderDomainCards();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
       syncUrl(pushHistory, true);
       return true;
     } finally {
@@ -2930,8 +3126,9 @@
       }
     }
 
-    if (complexDrawDock) complexDrawDock.classList.toggle("hidden", isReal);
+    if (complexDrawDock) complexDrawDock.classList.toggle("hidden", isReal || isVectorMode());
     if (realDrawDock) realDrawDock.classList.toggle("hidden", !isReal);
+    if (vectorDrawDock) vectorDrawDock.classList.toggle("hidden", !isVectorMode());
     if (!isReal && realPolyDockEl) realPolyDockEl.classList.add("hidden");
     if (sidebarToolsTitle) {
       sidebarToolsTitle.textContent = "Tools & Elements";
@@ -3003,6 +3200,9 @@
     else if (panel === "output") state.outputHidden = !visible;
     else if (panel === "real") state.realHidden = !visible;
     applyLayoutVisibility();
+    if (visible && !isRealMode() && !isVectorMode() && window.CFVComplex) {
+      window.CFVComplex.recomputeAll(1.0);
+    }
     notifyStateChanged(false, false);
   }
 
@@ -3079,13 +3279,221 @@
     }
   }
 
+  function parseCardDiagnostics(diagText) {
+    const map = {};
+    if (!diagText) return map;
+    const re = /cfv_card_(\d+):(\d+):(\d+):\s*(error|warning):\s*(.+)/g;
+    let m;
+    while ((m = re.exec(diagText)) !== null) {
+      const slot = Number(m[1]);
+      if (!map[slot]) map[slot] = [];
+      map[slot].push(`Line ${m[2]} (${m[4]}): ${m[5].trim()}`);
+    }
+    return map;
+  }
+
+  function defaultCardName(c, fnIndex) {
+    if (c.name && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.name)) return c.name;
+    if (isVectorMode()) {
+      const vk = c.vecKind || "field";
+      if (vk === "matrix") {
+        const mSeq = fnCards().slice(0, fnIndex + 1).filter((q) => q.vecKind === "matrix").length;
+        return `M${mSeq}`;
+      }
+      if (vk === "potential") return `f${fnIndex + 1}`;
+      if (vk === "curve") return `gamma${fnIndex + 1}`;
+      if (vk === "s2s") return `g${fnIndex + 1}`;
+      return `F${fnIndex + 1}`;
+    }
+    return `f${fnIndex + 1}`;
+  }
+
+  function usedIdentifiersExcept(exceptCardId) {
+    const used = new Set();
+    const fns = fnCards();
+    fns.forEach((fc, idx) => {
+      if (fc.id !== exceptCardId) used.add(defaultCardName(fc, idx));
+    });
+    for (const s of sliderCards()) {
+      if (s.id !== exceptCardId && s.name) used.add(s.name);
+    }
+    for (const v of varCards()) {
+      if (v.id !== exceptCardId && v.name) used.add(v.name);
+    }
+    return used;
+  }
+
+  function highlightCardDependents(symbolName, on) {
+    if (!symbolName) return;
+    const re = new RegExp(`\\b${symbolName}\\b`);
+    document.querySelectorAll(".expr-card.dep-highlight").forEach((el) => el.classList.remove("dep-highlight"));
+    if (!on) return;
+    document.querySelectorAll("#fn-cards .expr-card, #domain-cards .expr-card").forEach((el) => {
+      const exprs = el.dataset.depExpr || "";
+      if (exprs && re.test(exprs)) el.classList.add("dep-highlight");
+    });
+  }
+
+  function defaultVectorCodeForKind(vk) {
+    if (vk === "potential") return "-0.5 * (x*x + y*y)";
+    if (vk === "matrix") return "[[1, 0.5], [0, 1]]";
+    if (vk === "vector") return "[2, 1]";
+    if (vk === "curve") return "(cos(t), sin(t))";
+    if (vk === "s2s") return "sin(t)";
+    const hasMat = fnCards().some((c) => c.vecKind === "matrix");
+    return hasMat ? "M * v" : "fx = -y;\nfy = x;";
+  }
+
+  function evalLinearAlgebraState() {
+    const LA = window.CFVLinAlg;
+    const out = { matrices: [], vectors: [], activeMatrix: null, env: {} };
+    if (!LA || !isVectorMode()) return out;
+    const pm = getParamMap();
+    const env = {};
+    /* Inject all Vec Var cards first so matrices and later formulas can reference them! */
+    for (const vv of vecVarCards()) {
+      if (vv.name && Number.isFinite(vv.vx) && Number.isFinite(vv.vy)) {
+        env[vv.name] = LA.makeVec2(vv.vx, vv.vy);
+      }
+    }
+    let mSeq = 0, vSeq = 0;
+    const fns = fnCards();
+    for (let i = 0; i < fns.length; i++) {
+      const c = fns[i];
+      const vk = c.vecKind || "field";
+      if (vk === "matrix") {
+        mSeq++;
+        const sym = defaultCardName(c, i);
+        const val = LA.evalExpr(c.code, pm, env);
+        const isRow = LA.isRow2(val);
+        const info = LA.isMat2(val) ? LA.analyzeMat2(val) : (isRow ? val : null);
+        if (info) {
+          c.matDims = isRow ? "1x2" : "2x2";
+          env[sym] = val;
+          env[`M${mSeq}`] = val;
+          if (mSeq === 1) { env.A = val; env.M = val; }
+          if (mSeq === 2) env.B = val;
+        }
+        const rec = { id: c.id, slot: i, seq: mSeq, sym, card: c, title: c.title || sym, color: c.color || "#a78bfa", visible: c.id === state.primaryCardId, isRow, info: LA.isMat2(val) ? LA.analyzeMat2(val) : null, rawVal: val };
+        out.matrices.push(rec);
+        if (rec.info) {
+          if (c.id === state.primaryCardId || !out.activeMatrix) out.activeMatrix = rec;
+        }
+      } else if (vk === "vector") {
+        vSeq++;
+        const sym = `v${vSeq}`;
+        const val = LA.evalExpr(c.code, pm, env);
+        const vec = LA.isVec2(val) && Number.isFinite(val.x) && Number.isFinite(val.y) ? val : null;
+        if (vec) {
+          env[sym] = vec;
+          if (vSeq === 1) env.v = vec;
+        }
+        const editable = Boolean(LA.parseVectorCellsFromCode(c.code)) && !c.locked;
+        out.vectors.push({ id: c.id, slot: i, seq: vSeq, sym, card: c, title: c.title || sym, color: c.color || "#38bdf8", visible: c.visible !== false, vec, editable });
+      }
+    }
+    const A = out.activeMatrix && out.activeMatrix.info ? out.activeMatrix : null;
+    for (const vr of out.vectors) {
+      vr.mapped = (A && vr.vec) ? LA.matVec(A.info, vr.vec) : null;
+      vr.matSym = A ? A.sym : "";
+    }
+    out.env = env;
+    return out;
+  }
+
+  function updateLinearAlgebraPreviews() {
+    if (!isVectorMode() || !window.CFVLinAlg) return;
+    const LA = window.CFVLinAlg;
+    const la = evalLinearAlgebraState();
+    for (const mr of la.matrices) {
+      const box = mr.card._laPreviewEl;
+      if (box) {
+        box.innerHTML = LA.renderMatrixLatexHtml(mr.sym, mr.isRow ? mr.rawVal : mr.info);
+        const eigPill = box.querySelector(".la-pill.eig");
+        if (eigPill && mr.info) {
+          eigPill.title = "Click to preview/drop unit eigenvector(s) on canvas!";
+          eigPill.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            if (window.CFVVector && window.CFVVector.dropEigenvectorPreview) {
+              window.CFVVector.dropEigenvectorPreview(mr.info, mr.sym);
+            }
+          });
+        }
+      }
+    }
+    for (const vr of la.vectors) {
+      const box = vr.card._laPreviewEl;
+      if (box) box.innerHTML = LA.renderVectorLatexHtml(vr.sym, vr.vec, vr.matSym || "A", vr.mapped);
+      if (vr.card._vecInputs && vr.vec) {
+        const [ix, iy] = vr.card._vecInputs;
+        if (document.activeElement !== ix && document.activeElement !== iy) {
+          const cells = LA.parseVectorCellsFromCode(vr.card.code);
+          if (cells) { ix.value = cells[0]; iy.value = cells[1]; }
+        }
+      }
+    }
+  }
+
+  function setVectorCardCoords(cardId, nx, ny, commit = false) {
+    const c = state.cards.find((q) => q.id === cardId && q.vecKind === "vector");
+    if (!c || c.locked) return;
+    const fmt = (v) => String(Number(v.toFixed(3)));
+    c.code = `[${fmt(nx)}, ${fmt(ny)}]`;
+    if (c._codeEl && document.activeElement !== c._codeEl) c._codeEl.value = c.code;
+    updateLinearAlgebraPreviews();
+    if (commit) notifyStateChanged(true, true);
+  }
+
+  function normalizeVectorCardCode(raw, isPotential) {
+    const s = String(raw || "").trim();
+    if (!s) return isPotential ? "0.0" : "fx = 0.0; fy = 0.0;";
+    if (isPotential) return s;
+    /* Support clean tuple shorthand `(P, Q)` in addition to full C11 statements `fx = ...; fy = ...;` */
+    if (!s.includes(";") && s.startsWith("(") && s.endsWith(")")) {
+      const inner = s.slice(1, -1);
+      let depth = 0, splitIdx = -1;
+      for (let i = 0; i < inner.length; i++) {
+        const ch = inner[i];
+        if (ch === "(") depth++;
+        else if (ch === ")") depth--;
+        else if (ch === "," && depth === 0) { splitIdx = i; break; }
+      }
+      if (splitIdx > 0) {
+        const p = inner.slice(0, splitIdx).trim();
+        const q = inner.slice(splitIdx + 1).trim();
+        return `fx = (${p}); fy = (${q});`;
+      }
+    }
+    return s;
+  }
+
   async function compileWorkspace(silentIfDisabled = false, skipRefresh = false) {
     const fns = fnCards();
     const realMode = isRealMode();
+    const vecMode = isVectorMode();
     const compiledCodes = [];
+    const compiledNames = [];
+    const vecCardKinds = [];
+    const staticDimExplanations = {};
+    const laSnapshot = vecMode ? evalLinearAlgebraState() : null;
+
+    /* Pre-collect named functions for Vector Calculus operators & named calls! */
+    const fnMetaMap = new Map();
+    if (vecMode) {
+      fns.forEach((fc, idx) => {
+        const nm = defaultCardName(fc, idx);
+        const vk = fc.vecKind || "field";
+        fnMetaMap.set(nm, {
+          kind: vk,
+          label: vk === "field" ? "ℝ² → ℝ²" : vk === "potential" ? "ℝ² → ℝ" : vk === "curve" ? "ℝ → ℝ²" : vk === "s2s" ? "ℝ → ℝ" : "Matrix",
+        });
+      });
+    }
 
     fns.forEach((c, i) => {
       c.slot = i;
+      const cardName = defaultCardName(c, i);
+      compiledNames.push(cardName);
       if (realMode) {
         const parsed = analyzeRealCode(c.code);
         c.realKind = parsed.realKind;
@@ -3094,6 +3502,98 @@
         c.tMin = parsed.tMin;
         c.tMax = parsed.tMax;
         compiledCodes.push(parsed.cCode);
+      } else if (vecMode) {
+        const LA = window.CFVLinAlg;
+        const vk = c.vecKind || "field";
+        const matNames = new Set();
+        const rowNames = new Set();
+        let mCnt = 0;
+        for (let k = 0; k < i; k++) {
+          if (fns[k].vecKind === "matrix") {
+            mCnt++;
+            const isR = fns[k].matDims === "1x2";
+            const targetSet = isR ? rowNames : matNames;
+            targetSet.add(`M${mCnt}`);
+            const kName = defaultCardName(fns[k], k);
+            if (kName) targetSet.add(kName);
+            if (mCnt === 1) { targetSet.add("M"); targetSet.add("A"); }
+            if (mCnt === 2) targetSet.add("B");
+          }
+        }
+        const vecNames = new Set(["v"]);
+        for (const vv of vecVarCards()) { if (vv.name) vecNames.add(vv.name); }
+
+        if (vk === "matrix") {
+          const res = LA && LA.matrixCodeToC11 ? LA.matrixCodeToC11(c.code, matNames, vecNames, rowNames, fnMetaMap) : { ok: true, type: "mat", code: "meye()" };
+          const isRow = res.type === "row" || c.matDims === "1x2";
+          c.matDims = isRow ? "1x2" : "2x2";
+          c.realKind = "matrix";
+          c.relationBadge = isRow ? "M 1×2" : "M 2×2";
+          if (!res.ok && res.error) {
+            staticDimExplanations[i] = { title: res.error, hint: res.hint };
+            c.compiledCode = String(c.code || "meye()");
+          } else {
+            c.compiledCode = res.code;
+          }
+          compiledCodes.push(c.compiledCode);
+          vecCardKinds.push(isRow ? 3 : 2);
+        } else if (vk === "curve") {
+          const res = LA && LA.curveFnCodeToC11 ? LA.curveFnCodeToC11(c.code, matNames, vecNames, rowNames, fnMetaMap) : { ok: true, code: "vec(cos(t), sin(t))" };
+          c.realKind = "curve";
+          c.relationBadge = "ℝ → ℝ²";
+          if (!res.ok && res.error) {
+            staticDimExplanations[i] = { title: res.error, hint: res.hint };
+            c.compiledCode = String(c.code || "vec(cos(t), sin(t))");
+          } else {
+            c.compiledCode = res.code;
+          }
+          compiledCodes.push(c.compiledCode);
+          vecCardKinds.push(4);
+        } else if (vk === "s2s") {
+          const res = LA && LA.scalarFnCodeToC11 ? LA.scalarFnCodeToC11(c.code, matNames, vecNames, rowNames, fnMetaMap) : { ok: true, code: String(c.code || "0.0") };
+          c.realKind = "s2s";
+          c.relationBadge = "ℝ → ℝ";
+          if (!res.ok && res.error) {
+            staticDimExplanations[i] = { title: res.error, hint: res.hint };
+            c.compiledCode = String(c.code || "0.0");
+          } else {
+            c.compiledCode = res.code;
+          }
+          compiledCodes.push(c.compiledCode);
+          vecCardKinds.push(5);
+        } else if (vk === "vector") {
+          const vr = laSnapshot && laSnapshot.vectors.find((v) => v.id === c.id);
+          const v = vr && vr.vec;
+          c.realKind = "vector";
+          c.relationBadge = "v 2D";
+          c.compiledCode = v ? `fx = (${v.x}); fy = (${v.y});` : "fx = 0.0; fy = 0.0;";
+          compiledCodes.push(c.compiledCode);
+          vecCardKinds.push(0);
+        } else if (vk === "potential") {
+          const res = LA && LA.scalarFnCodeToC11 ? LA.scalarFnCodeToC11(c.code, matNames, vecNames, rowNames, fnMetaMap) : { ok: true, code: normalizeVectorCardCode(c.code, true) };
+          c.realKind = "potential";
+          c.relationBadge = "ℝ² → ℝ";
+          if (!res.ok && res.error) {
+            staticDimExplanations[i] = { title: res.error, hint: res.hint };
+            c.compiledCode = String(c.code || "0.0");
+          } else {
+            c.compiledCode = res.code;
+          }
+          compiledCodes.push(c.compiledCode);
+          vecCardKinds.push(1);
+        } else {
+          const res = LA && LA.vectorFnCodeToC11 ? LA.vectorFnCodeToC11(c.code, matNames, vecNames, rowNames, fnMetaMap) : { ok: true, code: normalizeVectorCardCode(c.code, false) };
+          c.realKind = "field";
+          c.relationBadge = "ℝ² → ℝ²";
+          if (!res.ok && res.error) {
+            staticDimExplanations[i] = { title: res.error, hint: res.hint };
+            c.compiledCode = String(c.code || "fx = 0.0; fy = 0.0;");
+          } else {
+            c.compiledCode = res.code;
+          }
+          compiledCodes.push(c.compiledCode);
+          vecCardKinds.push(0);
+        }
       } else {
         c.realKind = "fn";
         c.compiledCode = c.code;
@@ -3111,6 +3611,7 @@
 
     if (fns.length === 0) {
       state.compiledKind = null;
+      state.cardDiagnostics = {};
       setStatus("ok", "Blank · Click + Fn or pick a Project");
       if (!skipRefresh) refreshActiveStage(false);
       return { ok: true, message: "No function cards to compile." };
@@ -3129,7 +3630,7 @@
       }
     }
 
-    const kind = realMode ? "real" : "complex";
+    const kind = realMode ? "real" : vecMode ? "vector" : "complex";
     try {
       const res = await fetch("/api/workspace/compile", {
         method: "POST",
@@ -3137,24 +3638,46 @@
         body: JSON.stringify({
           kind,
           cards: compiledCodes,
+          card_names: compiledNames,
+          ...(vecMode ? { card_kinds: vecCardKinds } : {}),
           param_names: getParamNames(),
         }),
       });
       const data = await res.json();
-      if (res.ok && data.ok) {
+      if (res.ok && data.ok && Object.keys(staticDimExplanations).length === 0) {
+        const hadErrs = Object.keys(state.cardDiagnostics || {}).length > 0 || Object.keys(state.cardDimExplanations || {}).length > 0;
         state.compiledKind = kind;
         state.dirty = false;
+        state.cardDiagnostics = {};
+        state.cardDimExplanations = {};
+        bumpEpoch();
         const msStr = data.elapsed_ms < 2 ? "cached (0ms)" : `${data.elapsed_ms.toFixed(0)}ms`;
         const msg = `Compiled ${fns.length} card${fns.length === 1 ? "" : "s"} · ${msStr}`;
         setStatus("ok", `✓ ${msg}`);
+        if (hadErrs) renderFnCards();
         if (!skipRefresh) {
           refreshActiveStage(false);
           notifyStateChanged(true, true);
         }
         return { ok: true, message: msg };
       } else {
-        const diag = data.diagnostics || "Compilation failed";
-        setStatus("err", "Compile error (click to inspect)", diag);
+        const diag = data.diagnostics || (Object.values(staticDimExplanations)[0]?.title || "Compilation failed");
+        state.cardDiagnostics = parseCardDiagnostics(diag);
+        const explanations = { ...staticDimExplanations };
+        if (window.CFVLinAlg && window.CFVLinAlg.explainC11Error) {
+          for (const [slotKey, errs] of Object.entries(state.cardDiagnostics)) {
+            if (!explanations[slotKey]) {
+              const ex = window.CFVLinAlg.explainC11Error(errs.join("\n"));
+              if (ex) explanations[slotKey] = ex;
+            }
+          }
+        }
+        state.cardDimExplanations = explanations;
+        const firstEx = Object.values(explanations)[0];
+        const statusLabel = firstEx ? `⚠ ${firstEx.title}` : "Compile error (highlighted on card)";
+        setStatus("err", statusLabel, diag);
+        if (firstEx && compileStatusText) compileStatusText.title = `${firstEx.title}\n${firstEx.hint || ""}`;
+        renderFnCards();
         return { ok: false, message: diag };
       }
     } catch (err) {
@@ -3168,10 +3691,13 @@
 
   function refreshActiveStage(fastSlider = false) {
     if (isRealMode()) {
-      /* During slider animation use immediate single-flight fetch (no artificial debounce lag!) */
       window.CFVReal.scheduleSample(true);
+    } else if (isVectorMode()) {
+      if (window.CFVVector) {
+        if (fastSlider) window.CFVVector.onParamsChanged();
+        else window.CFVVector.onWorkspaceCompiled();
+      }
     } else {
-      /* Preserve full polygon/curve fidelity (qScale = 1.0) during slider movement */
       window.CFVComplex.recomputeAll(1.0, Boolean(fastSlider));
     }
   }
@@ -3205,11 +3731,14 @@
       const isAuxComplex = !realMode && c.kind === "fn" && c.id !== state.primaryCardId;
 
       const row = document.createElement("div");
+      const cardErrs = c.kind === "fn" && state.cardDiagnostics ? state.cardDiagnostics[fnSeq] : null;
+      const cardDimExp = c.kind === "fn" && state.cardDimExplanations ? state.cardDimExplanations[fnSeq] : null;
       row.className =
         "expr-card" +
         (c.kind === "fn" ? " fn-card" : c.kind === "var" ? " var-card" : " slider-card") +
         (isActiveComplex ? " active-primary" : "") +
         (isAuxComplex ? " aux-card" : "") +
+        ((cardErrs && cardErrs.length) || cardDimExp ? " has-compile-err" : "") +
         (c.locked ? " locked-item" : "") +
         (c.collapsed ? " collapsed" : "");
       let allowRowDrag = false;
@@ -3282,20 +3811,29 @@
 
       if (c.kind === "fn") {
         const dot = document.createElement("button");
-        const dotOn = realMode ? c.visible : isActiveComplex;
+        const isScalarInHelper = isScalarInputVecCard(c);
+        /* Real mode supports multi-curve toggles; Complex & Vector use clean single-active selection! */
+        const isMultiVis = realMode;
+        const dotOn = isScalarInHelper ? false : (isMultiVis ? c.visible : isActiveComplex);
         dot.className = "expr-vis-dot" + (dotOn ? "" : " off");
         dot.style.setProperty("--card-color", c.color);
-        dot.title = realMode
-          ? "Click to show/hide curve · Shift+click for style settings"
-          : (isActiveComplex ? "Active graphed function · Shift+click for style settings" : "Click to graph this function (instead of auxiliary)");
+        dot.title = isScalarInHelper
+          ? "Callable helper function (scalar input ℝ → ℝ / ℝ → ℝ² — not graphed on the 2D field plane)"
+          : isVectorMode()
+            ? (isActiveComplex ? "Active selected function/matrix (graphed by matching top-bar overlays)" : "Click to select this function/matrix as active")
+            : realMode
+              ? "Click to show/hide curve · Shift+click for style settings"
+              : (isActiveComplex ? "Active graphed function · Shift+click for style settings" : "Click to graph this function (instead of auxiliary)");
         dot.addEventListener("click", (ev) => {
           if (ev.shiftKey) { openItemSettings("fn", c.id, dot); return; }
-          if (realMode) {
+          if (isScalarInHelper) return;
+          if (isMultiVis) {
             c.visible = !c.visible;
           } else {
             state.primaryCardId = c.id;
           }
           renderFnCards();
+          if (isVectorMode() && window.CFVVector && window.CFVVector.syncToolbarUI) window.CFVVector.syncToolbarUI();
           refreshActiveStage(false);
           notifyStateChanged(true, true);
         });
@@ -3311,21 +3849,158 @@
         const fnNum = fnSeq;
         const head = document.createElement("div");
         head.className = "expr-head";
+        const cardSym = defaultCardName(c, fnNum - 1);
+        row.dataset.depExpr = String(c.code || "");
+        row.addEventListener("pointerenter", () => highlightCardDependents(cardSym, true));
+        row.addEventListener("pointerleave", () => highlightCardDependents(cardSym, false));
 
         const parsed = realMode ? analyzeRealCode(c.code) : { badge: null };
-        const fnTag = document.createElement("span");
-        fnTag.className = "expr-fn-tag";
-        if (parsed.badge) {
-          fnTag.textContent = parsed.badge;
-          fnTag.style.color = parsed.badge === "param" ? "#34d399" : "#fb7185";
-          fnTag.style.background = parsed.badge === "param" ? "rgba(52,211,153,0.14)" : "rgba(251,113,133,0.14)";
-        } else {
-          fnTag.textContent = realMode ? `f${fnNum}(x)` : `f${fnNum}(z)`;
+        const isImplicitReal = realMode && parsed.realKind === "implicit";
+
+        /* Editable Validated Function / Matrix Name across Complex, Real & Vector Modes! */
+        if (!isImplicitReal) {
+          const nameIn = document.createElement("input");
+          nameIn.type = "text";
+          nameIn.className = "fn-name-input";
+          nameIn.spellcheck = false;
+          nameIn.value = cardSym;
+          nameIn.disabled = Boolean(c.locked);
+          nameIn.title = "Function/Matrix identifier name (used to call this card in formulas & Image Elements)";
+          nameIn.style.width = `${Math.max(30, Math.min(82, cardSym.length * 8 + 14))}px`;
+          nameIn.addEventListener("input", () => {
+            const raw = nameIn.value.trim();
+            nameIn.style.width = `${Math.max(30, Math.min(82, raw.length * 8 + 14))}px`;
+            const chk = window.CFVLinAlg && window.CFVLinAlg.validateIdentifierName
+              ? window.CFVLinAlg.validateIdentifierName(raw, usedIdentifiersExcept(c.id))
+              : { ok: /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(raw), error: "Invalid identifier" };
+            nameIn.classList.toggle("name-err", !chk.ok);
+            nameIn.title = chk.ok ? `Callable as ${raw}` : `Invalid name: ${chk.error}`;
+          });
+          nameIn.addEventListener("change", () => {
+            const raw = nameIn.value.trim();
+            const chk = window.CFVLinAlg && window.CFVLinAlg.validateIdentifierName
+              ? window.CFVLinAlg.validateIdentifierName(raw, usedIdentifiersExcept(c.id))
+              : { ok: /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(raw), error: "Invalid identifier" };
+            if (chk.ok) {
+              c.name = raw;
+              nameIn.classList.remove("name-err");
+              renderFnCards();
+              resolveVariables(true);
+              compileWorkspace(false, false);
+              notifyStateChanged(true, true);
+            } else {
+              setStatus("err", `⚠ ${chk.error}`, chk.error);
+              nameIn.value = cardSym;
+              nameIn.classList.remove("name-err");
+            }
+          });
+          head.appendChild(nameIn);
         }
-        fnTag.title = realMode
-          ? "Supports parametric (x(t), y(t)), y=f(x), vertical x=c, x=g(y), and implicit LHS=RHS"
-          : `Callable in other cards as f${fnNum}(z)`;
-        head.appendChild(fnTag);
+
+        if (isVectorMode()) {
+          const curVk = c.vecKind || "field";
+          const sigEl = document.createElement("span");
+          sigEl.className = "fn-sig-args";
+          sigEl.textContent =
+            curVk === "matrix" ? "=" :
+            curVk === "curve" || curVk === "s2s" ? "(t) =" : "(x, y) =";
+          head.appendChild(sigEl);
+
+          if (curVk === "matrix" && !c.locked) {
+            const dimSel = document.createElement("select");
+            dimSel.className = "la-dim-sel";
+            dimSel.title = "Resize matrix (2×1 auto-converts to Vector Variable; 1×1 auto-converts to Scalar Variable)";
+            const curDims = c.matDims === "1x2" ? "1x2" : "2x2";
+            for (const [dv, dl] of [["2x2", "2×2"], ["1x2", "1×2"], ["2x1", "2×1 → Vec"], ["1x1", "1×1 → Scalar"]]) {
+              const o = document.createElement("option");
+              o.value = dv; o.textContent = dl;
+              if (dv === curDims) o.selected = true;
+              dimSel.appendChild(o);
+            }
+            dimSel.addEventListener("change", (ev) => {
+              ev.stopPropagation();
+              const nextD = dimSel.value;
+              const cells = window.CFVLinAlg && window.CFVLinAlg.parseMatrixCellsFromCode ? window.CFVLinAlg.parseMatrixCellsFromCode(c.code) : null;
+              const a = cells ? cells[0] : "1", b = cells ? (cells[1] ?? "0") : "0";
+              const cc = cells ? (cells[2] ?? "0") : "0", d = cells ? (cells[3] ?? "1") : "1";
+              if (nextD === "2x1") convertMatrixCardToVar(c, "vec", [a, cc !== "0" ? cc : b]);
+              else if (nextD === "1x1") convertMatrixCardToVar(c, "scalar", [a]);
+              else if (nextD === "1x2") {
+                c.matDims = "1x2"; c.code = `[[${a}, ${b}]]`; c._laCodeMode = false;
+                renderFnCards(); resolveVariables(true); compileWorkspace(false, false); notifyStateChanged(true, true);
+              } else {
+                c.matDims = "2x2"; c.code = `[[${a}, ${b}], [${cc}, ${d}]]`; c._laCodeMode = false;
+                renderFnCards(); resolveVariables(true); compileWorkspace(false, false); notifyStateChanged(true, true);
+              }
+            });
+            head.appendChild(dimSel);
+          } else if (curVk !== "matrix" && curVk !== "vector") {
+            /* Non-destructive 4-type Function Signature Selector (preserves code per type!) */
+            const typeSel = document.createElement("select");
+            typeSel.className = "vec-fn-type-sel";
+            typeSel.disabled = Boolean(c.locked);
+            typeSel.title = "Function signature (code is saved per signature so switching never loses work!)";
+            const typeOpts = [
+              ["field", "ℝ² → ℝ²"],
+              ["potential", "ℝ² → ℝ"],
+              ["curve", "ℝ → ℝ²"],
+              ["s2s", "ℝ → ℝ"],
+            ];
+            for (const [tv, tl] of typeOpts) {
+              const o = document.createElement("option");
+              o.value = tv; o.textContent = tl;
+              if (tv === curVk) o.selected = true;
+              typeSel.appendChild(o);
+            }
+            typeSel.style.color =
+              curVk === "potential" ? "#fde047" :
+              curVk === "curve" ? "#c4b5fd" :
+              curVk === "s2s" ? "#7dd3fc" : "#6ee7b7";
+            typeSel.addEventListener("change", (ev) => {
+              ev.stopPropagation();
+              if (c.locked) return;
+              const prevVk = c.vecKind || "field";
+              const nextVk = typeSel.value;
+              if (prevVk === nextVk) return;
+              if (!c._codeByKind) c._codeByKind = {};
+              c._codeByKind[prevVk] = c.code;
+              c.vecKind = nextVk;
+              c.code = c._codeByKind[nextVk] !== undefined ? c._codeByKind[nextVk] : defaultVectorCodeForKind(nextVk);
+              if (nextVk === "curve") {
+                if (c.tMin === undefined) c.tMin = 0;
+                if (c.tMax === undefined) c.tMax = 6.283185;
+              }
+              renderFnCards();
+              if (window.CFVVector && window.CFVVector.syncToolbarUI) window.CFVVector.syncToolbarUI();
+              compileWorkspace(false, false);
+              notifyStateChanged(true, true);
+            });
+            head.appendChild(typeSel);
+          }
+        } else {
+          const sigEl = document.createElement("span");
+          sigEl.className = "fn-sig-args";
+          if (realMode) {
+            sigEl.textContent = isImplicitReal ? "" : parsed.realKind === "parametric" ? "(t) =" : parsed.badge === "x(y)" ? "(y) =" : "(x) =";
+          } else {
+            const usesS = /\bs\b/.test(String(c.code || "")) && !/\bz\b/.test(String(c.code || ""));
+            sigEl.textContent = usesS ? "(s) =" : "(z) =";
+          }
+          if (sigEl.textContent) head.appendChild(sigEl);
+
+          if (realMode) {
+            const fnTag = document.createElement("span");
+            fnTag.className = "expr-fn-tag";
+            fnTag.textContent =
+              parsed.realKind === "implicit" ? "Implicit" :
+              parsed.realKind === "parametric" ? "γ(t) ∈ ℝ²" :
+              parsed.badge === "x(y)" ? "x = g(y)" :
+              parsed.badge === "x=c" ? "x = c" : "y = f(x)";
+            fnTag.style.color = parsed.realKind === "parametric" ? "#34d399" : parsed.realKind === "implicit" ? "#fb7185" : "#7dd3fc";
+            fnTag.style.background = parsed.realKind === "parametric" ? "rgba(52,211,153,0.14)" : parsed.realKind === "implicit" ? "rgba(251,113,133,0.14)" : "rgba(56,189,248,0.12)";
+            head.appendChild(fnTag);
+          }
+        }
 
         const titleIn = document.createElement("input");
         titleIn.className = "expr-title-input";
@@ -3338,16 +4013,21 @@
         head.appendChild(titleIn);
 
         if (!realMode) {
+          const isScalarInHelper = isScalarInputVecCard(c);
           const actBtn = document.createElement("button");
-          actBtn.className = "active-fn-btn" + (isActiveComplex ? " graphed" : "");
-          actBtn.textContent = isActiveComplex ? "★ Graphed" : "Aux";
-          actBtn.title = isActiveComplex
-            ? "Currently graphed function (only 1 active in Map/Integral mode)"
-            : `Auxiliary helper callable as f${fnNum}(z) — click to graph this function instead`;
+          actBtn.className = "active-fn-btn" + (isActiveComplex && !isScalarInHelper ? " graphed" : "");
+          actBtn.textContent = isScalarInHelper ? "Helper" : (isActiveComplex ? "★ Graphed" : "Aux");
+          actBtn.disabled = isScalarInHelper;
+          actBtn.title = isScalarInHelper
+            ? "Scalar-input helper function (callable in other expressions; not graphed as a 2D field)"
+            : isActiveComplex
+              ? "Currently active graphed function/matrix"
+              : "Auxiliary card — click to select & graph this card instead";
           actBtn.addEventListener("click", () => {
-            if (state.primaryCardId === c.id) return;
+            if (isScalarInHelper || state.primaryCardId === c.id) return;
             state.primaryCardId = c.id;
             renderFnCards();
+            if (isVectorMode() && window.CFVVector && window.CFVVector.syncToolbarUI) window.CFVVector.syncToolbarUI();
             refreshActiveStage(false);
             notifyStateChanged(true, true);
           });
@@ -3355,7 +4035,7 @@
         }
 
         const minBtn = document.createElement("button");
-        minBtn.className = "expr-mini-btn";
+        minBtn.className = "expr-mini-btn card-min-btn" + (c.collapsed ? " active" : "");
         minBtn.textContent = c.collapsed ? "▸" : "▾";
         minBtn.title = c.collapsed ? "Expand card" : "Minimize card";
         minBtn.addEventListener("click", (ev) => {
@@ -3364,7 +4044,7 @@
           renderFnCards();
           notifyStateChanged(true, true);
         });
-        head.appendChild(minBtn);
+        head.insertBefore(minBtn, head.firstChild);
 
         const lockBtn = document.createElement("button");
         lockBtn.className = "expr-mini-btn" + (c.locked ? " locked" : "");
@@ -3409,6 +4089,127 @@
         }
         body.appendChild(head);
 
+        const isVecLA = isVectorMode() && (c.vecKind === "matrix" || c.vecKind === "vector");
+        if (isVecLA && window.CFVLinAlg) {
+          const LA = window.CFVLinAlg;
+          const isMat = c.vecKind === "matrix";
+          const preview = document.createElement("div");
+          preview.className = "la-preview-box";
+          c._laPreviewEl = preview;
+          body.appendChild(preview);
+
+          const edRow = document.createElement("div");
+          edRow.className = "la-editor-row";
+
+          const parsedCells = isMat ? LA.parseMatrixCellsFromCode(c.code) : LA.parseVectorCellsFromCode(c.code);
+          const isRowGrid = isMat && (c.matDims === "1x2" || (parsedCells && parsedCells.rows === 1 && parsedCells.cols === 2));
+          const showCode = Boolean(c._laCodeMode) || !parsedCells || (isMat && parsedCells && (parsedCells.rows === 1 && parsedCells.cols === 1 || parsedCells.rows === 2 && parsedCells.cols === 1));
+
+          const codeIn = document.createElement("input");
+          codeIn.type = "text";
+          codeIn.spellcheck = false;
+          codeIn.className = "la-cell-in flex-1" + (showCode ? "" : " hidden");
+          codeIn.style.textAlign = "left";
+          codeIn.readOnly = Boolean(c.locked);
+          codeIn.value = c.code;
+          codeIn.placeholder = isMat ? "[[1, 0.5], [0, 1]]  |  [[1, 2]]  |  rot(t)  |  M1 * M2" : "[2, 1]  |  M1 * v1  |  v1 + v2";
+          c._codeEl = codeIn;
+          codeIn.addEventListener("input", () => {
+            c.code = codeIn.value;
+            updateLinearAlgebraPreviews();
+            resolveVariables(true);
+            if (window.CFVVector) window.CFVVector.requestRender(true);
+            notifyStateChanged(false, true);
+          });
+          const commitMatrixCode = () => {
+            if (isMat && !c.locked) {
+              const pc = LA.parseMatrixCellsFromCode(c.code);
+              if (pc && pc.rows === 2 && pc.cols === 1) { convertMatrixCardToVar(c, "vec", pc); return; }
+              if (pc && pc.rows === 1 && pc.cols === 1) { convertMatrixCardToVar(c, "scalar", pc); return; }
+            }
+            compileWorkspace(false, false);
+          };
+          codeIn.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); commitMatrixCode(); }
+          });
+
+          const gridWrap = document.createElement("div");
+          gridWrap.className = "la-grid-edit" + (showCode ? " hidden" : "");
+          const brL = document.createElement("span"); brL.className = "la-br la-br-l";
+          const brR = document.createElement("span"); brR.className = "la-br la-br-r";
+          const inputsBox = document.createElement("div");
+          inputsBox.className = isRowGrid ? "la-vec-inputs" : (isMat ? "la-grid-inputs" : "la-vec-inputs");
+          if (isRowGrid) inputsBox.style.gridTemplateColumns = "1fr 1fr";
+
+          const cellVals = parsedCells || (isRowGrid ? ["1", "0"] : isMat ? ["1", "0", "0", "1"] : ["2", "1"]);
+          const cellEls = cellVals.map((val, ci) => {
+            const inp = document.createElement("input");
+            inp.type = "text";
+            inp.spellcheck = false;
+            inp.className = "la-cell-in";
+            inp.readOnly = Boolean(c.locked);
+            inp.value = val;
+            inp.placeholder = isRowGrid ? ["a", "b"][ci] : isMat ? ["a", "b", "c", "d"][ci] : ["vx", "vy"][ci];
+            inp.addEventListener("input", () => {
+              const vs = cellEls.map((el) => el.value.trim() || "0");
+              c.code = isRowGrid
+                ? `[[${vs[0]}, ${vs[1]}]]`
+                : isMat
+                  ? `[[${vs[0]}, ${vs[1]}], [${vs[2]}, ${vs[3]}]]`
+                  : `[${vs[0]}, ${vs[1]}]`;
+              codeIn.value = c.code;
+              updateLinearAlgebraPreviews();
+              resolveVariables(true);
+              if (window.CFVVector) window.CFVVector.requestRender(true);
+              notifyStateChanged(false, true);
+            });
+            inp.addEventListener("keydown", (e) => {
+              if (e.key === "Enter") { e.preventDefault(); compileWorkspace(false, false); }
+            });
+            inputsBox.appendChild(inp);
+            return inp;
+          });
+          if (!isMat) c._vecInputs = cellEls;
+          gridWrap.appendChild(brL);
+          gridWrap.appendChild(inputsBox);
+          gridWrap.appendChild(brR);
+
+          const modeBtn = document.createElement("button");
+          modeBtn.type = "button";
+          modeBtn.className = "la-mode-toggle" + (showCode ? " active" : "");
+          modeBtn.textContent = showCode ? "Cells" : "</>";
+          modeBtn.title = showCode ? "Convert current values into editable cell grid" : "Switch to formula expression (e.g. rot(t), M1*M2)";
+          modeBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            if (showCode && isMat && !parsedCells) {
+              /* Snapshot evaluated formula matrix (e.g. rot(t)) cleanly into editable literal cells! */
+              const la = evalLinearAlgebraState();
+              const mr = la.matrices.find((m) => m.id === c.id);
+              const f = (v) => String(Number((Number(v) || 0).toFixed(4)));
+              if (mr && mr.isRow && mr.rawVal) {
+                c.code = `[[${f(mr.rawVal.a)}, ${f(mr.rawVal.b)}]]`;
+                c.matDims = "1x2";
+              } else if (mr && mr.info) {
+                c.code = `[[${f(mr.info.a)}, ${f(mr.info.b)}], [${f(mr.info.c)}, ${f(mr.info.d)}]]`;
+                c.matDims = "2x2";
+              } else {
+                c.code = c.matDims === "1x2" ? "[[1, 0]]" : "[[1, 0], [0, 1]]";
+              }
+              c._laCodeMode = false;
+              renderFnCards();
+              compileWorkspace(false, false);
+              notifyStateChanged(true, true);
+              return;
+            }
+            c._laCodeMode = !showCode;
+            renderFnCards();
+          });
+
+          edRow.appendChild(gridWrap);
+          edRow.appendChild(codeIn);
+          edRow.appendChild(modeBtn);
+          body.appendChild(edRow);
+        } else {
         const codeArea = document.createElement("textarea");
         codeArea.className = "expr-code fn-code";
         codeArea.spellcheck = false;
@@ -3417,15 +4218,20 @@
         codeArea.rows = Math.min(8, Math.max(1, c.code.split("\n").length));
         codeArea.placeholder = realMode
           ? "(cos(t), sin(t)) for t in [0, 2*pi]  |  x*x+y*y = 16  |  x = 5  |  sin(x)"
-          : "e.g. c_zeta(s)  |  f1(z) + 1.0";
+          : isVectorMode()
+            ? (c.vecKind === "potential" ? "-0.5 * (x*x + y*y)   or   return sin(x)*cos(y);" : "M * v   |   (-y, x)   |   fx = -y; fy = x;")
+            : "e.g. c_zeta(s)  |  f1(z) + 1.0";
         codeArea.addEventListener("input", () => {
           c.code = codeArea.value;
           codeArea.rows = Math.min(8, Math.max(1, c.code.split("\n").length));
           if (realMode) {
             const p = analyzeRealCode(c.code);
-            fnTag.textContent = p.badge || `f${fnNum}(x)`;
-            fnTag.style.color = p.badge === "param" ? "#34d399" : p.badge ? "#fb7185" : "";
-            fnTag.style.background = p.badge === "param" ? "rgba(52,211,153,0.14)" : p.badge ? "rgba(251,113,133,0.14)" : "";
+            const ft = head.querySelector(".expr-fn-tag");
+            if (ft) {
+              ft.textContent = p.badge || `f${fnNum}(x)`;
+              ft.style.color = p.badge === "param" ? "#34d399" : p.badge ? "#fb7185" : "";
+              ft.style.background = p.badge === "param" ? "rgba(52,211,153,0.14)" : p.badge ? "rgba(251,113,133,0.14)" : "";
+            }
           }
           state.dirty = true;
           setStatus("dirty", "Edited · Press Ctrl+Enter or Compile");
@@ -3444,26 +4250,88 @@
           }
         });
         body.appendChild(codeArea);
+        }
+        if (cardDimExp) {
+          const exEl = document.createElement("div");
+          exEl.className = "card-diag-explain";
+          const hdr = document.createElement("div");
+          hdr.className = "card-diag-explain-hdr";
+          const msgSpan = document.createElement("span");
+          msgSpan.textContent = `⚠ ${cardDimExp.title}`;
+          const tipBtn = document.createElement("span");
+          tipBtn.className = "card-diag-tip-btn";
+          tipBtn.textContent = "? Explain";
+          tipBtn.title = `${cardDimExp.title}\n\nHow to fix: ${cardDimExp.hint || "Check matrix/vector dimensions."}`;
+          hdr.appendChild(msgSpan);
+          hdr.appendChild(tipBtn);
+          exEl.appendChild(hdr);
+          if (cardDimExp.hint) {
+            const hintEl = document.createElement("div");
+            hintEl.className = "card-diag-hint";
+            hintEl.textContent = cardDimExp.hint;
+            exEl.appendChild(hintEl);
+          }
+          body.appendChild(exEl);
+        }
+        if (cardErrs && cardErrs.length > 0) {
+          const dEl = document.createElement("div");
+          dEl.className = "card-diag-badge";
+          dEl.title = cardDimExp ? `${cardDimExp.title}\n${cardDimExp.hint || ""}` : "Raw C11 compiler diagnostic";
+          dEl.textContent = cardErrs.slice(0, 3).join("\n");
+          body.appendChild(dEl);
+        }
       } else if (c.kind === "var") {
-        /* Computed Variable Card (e.g. R = 2.2 + 18*t*t) */
+        /* Computed Variable Card — unified Scalar / 2D Vector switcher in Vector Mode! */
+        const isVecVar = c.varKind === "vec";
+        row.dataset.depExpr = String(c.expr || "");
         const vrow = document.createElement("div");
         vrow.className = "var-card-row";
 
-        const vTag = document.createElement("span");
-        const isVpVar = VIEWPORT_GLOBALS.has(c.name);
-        vTag.className = "var-tag" + (isVpVar ? " vp-var" : "");
-        vTag.textContent = isVpVar ? "view" : "var";
-        vTag.title = isVpVar
-          ? "Global Viewport / Camera Variable — updates viewport directly at 60 FPS!"
-          : "Computed Variable";
-        vrow.appendChild(vTag);
+        if (isVectorMode()) {
+          const vkSel = document.createElement("select");
+          vkSel.className = "var-kind-sel" + (isVecVar ? " is-vec" : "");
+          vkSel.title = "Switch variable type between Scalar (ℝ) and 2D Vector (ℝ²)";
+          for (const [val, lbl] of [["scalar", "var ℝ"], ["vec", "vec ℝ²"]]) {
+            const o = document.createElement("option");
+            o.value = val; o.textContent = lbl;
+            if ((isVecVar ? "vec" : "scalar") === val) o.selected = true;
+            vkSel.appendChild(o);
+          }
+          vkSel.addEventListener("change", (ev) => {
+            ev.stopPropagation();
+            const nextK = vkSel.value;
+            if ((c.varKind === "vec" ? "vec" : "scalar") === nextK) return;
+            if (!c._exprByKind) c._exprByKind = {};
+            c._exprByKind[isVecVar ? "vec" : "scalar"] = c.expr;
+            c.varKind = nextK;
+            c.expr = c._exprByKind[nextK] !== undefined ? c._exprByKind[nextK] : (nextK === "vec" ? "[1, 0]" : "1.0");
+            if (nextK === "vec" && c.name === "v") c.name = "u";
+            resolveVariables(true);
+            renderFnCards();
+            compileWorkspace(true, false);
+            notifyStateChanged(true, true);
+          });
+          vrow.appendChild(vkSel);
+        } else {
+          const vTag = document.createElement("span");
+          const isVpVar = VIEWPORT_GLOBALS.has(c.name);
+          vTag.className = "var-tag" + (isVpVar ? " vp-var" : "");
+          vTag.textContent = isVpVar ? "view" : "var";
+          vTag.title = isVpVar
+            ? "Global Viewport / Camera Variable — updates viewport directly at 60 FPS!"
+            : "Scalar Variable";
+          vrow.appendChild(vTag);
+        }
 
         const nameIn = document.createElement("input");
         nameIn.className = "slider-name-input";
         nameIn.value = c.name;
-        nameIn.title = "Variable name (use sphere_yaw, sphere_pitch, sphere_zoom, in_cx/cy/r, out_cx/cy/r, real_xmin/xmax/ymin/ymax to control viewports!)";
+        nameIn.title = isVecVar
+          ? "Vector variable name (e.g. u, w, a — avoid 'v' which is the input coordinate (x,y))"
+          : "Variable name (use sphere_yaw, sphere_pitch, sphere_zoom, in_cx/cy/r, out_cx/cy/r, real_xmin/xmax/ymin/ymax to control viewports!)";
         nameIn.addEventListener("change", () => {
-          c.name = nameIn.value.replace(/[^a-zA-Z0-9_]/g, "") || "R";
+          c.name = nameIn.value.replace(/[^a-zA-Z0-9_]/g, "") || (isVecVar ? "u" : "R");
+          if (isVecVar && c.name === "v") c.name = "u";
           nameIn.value = c.name;
           renderFnCards();
           resolveVariables(true);
@@ -3481,9 +4349,11 @@
         exprIn.className = "var-expr-input";
         exprIn.type = "text";
         exprIn.spellcheck = false;
-        exprIn.value = String(c.expr || "");
-        exprIn.placeholder = "e.g. 2.2 + 18*t*t or -0.58 + spin";
-        exprIn.title = "Expression referencing sliders, viewport globals & earlier variables";
+        exprIn.value = String(c.expr || (isVecVar ? "[1, 0]" : ""));
+        exprIn.placeholder = isVecVar ? "[1, 0]  |  (cos(t), sin(t))  |  M * w" : isVectorMode() ? "e.g. 2*t  |  det(M)  |  R * u  |  [[5]]" : "e.g. 2.2 + 18*t*t or -0.58 + spin";
+        exprIn.title = isVecVar
+          ? "2×1 Vector formula: [x, y], (x, y), M * w, u1 + u2, T(R)"
+          : "Scalar expression (in Vector mode, 1×1 matrix formulas like R * u, T(u)*M*u, det(M), [[5]] evaluate as scalars!)";
         c._exprEl = exprIn;
         exprIn.addEventListener("input", () => {
           c.expr = exprIn.value;
@@ -3491,9 +4361,10 @@
           resolveVariables(true);
           if (isRealMode() && (c.name === "R" || c.name === "W" || c.name === "H") && window.CFVReal && window.CFVReal.getActiveGridDims) {
             window.CFVReal.getActiveGridDims();
-            renderDomainCards();
+            if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
           }
-          if (paramsRequireServerRecompute([c.name])) {
+          if (isVectorMode() || paramsRequireServerRecompute([c.name])) {
             refreshActiveStage(true);
           } else if (isRealMode()) {
             window.CFVReal.requestRender();
@@ -3504,14 +4375,16 @@
         });
         vrow.appendChild(exprIn);
 
-        const valPill = document.createElement("span");
-        valPill.className = "var-val-pill";
-        valPill.textContent = Number.isFinite(c.value) ? `= ${Number(c.value.toFixed(4))}` : "= ?";
-        c._valPillEl = valPill;
-        vrow.appendChild(valPill);
+        if (!isVecVar) {
+          const valPill = document.createElement("span");
+          valPill.className = "var-val-pill";
+          valPill.textContent = c._dimErr ? "= err" : (Number.isFinite(c.value) ? `= ${Number(c.value.toFixed(4))}` : "= ?");
+          c._valPillEl = valPill;
+          vrow.appendChild(valPill);
+        }
 
         const vMinBtn = document.createElement("button");
-        vMinBtn.className = "expr-mini-btn";
+        vMinBtn.className = "expr-mini-btn card-min-btn" + (c.collapsed ? " active" : "");
         vMinBtn.textContent = c.collapsed ? "▸" : "▾";
         vMinBtn.title = c.collapsed ? "Expand variable" : "Minimize variable";
         vMinBtn.addEventListener("click", (ev) => {
@@ -3520,14 +4393,16 @@
           renderFnCards();
           notifyStateChanged(true, true);
         });
-        vrow.appendChild(vMinBtn);
+        vrow.insertBefore(vMinBtn, vrow.firstChild);
 
         const delBtn = document.createElement("button");
         delBtn.className = "expr-mini-btn";
         delBtn.textContent = "×";
         delBtn.title = "Delete variable";
-        delBtn.addEventListener("click", () => {
+        delBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
           state.cards = state.cards.filter((q) => q.id !== c.id);
+          resolveVariables(true);
           renderFnCards();
           compileWorkspace(true, false);
           notifyStateChanged(true, true);
@@ -3535,6 +4410,14 @@
         vrow.appendChild(delBtn);
         body.appendChild(vrow);
 
+        if (isVecVar && window.CFVLinAlg && !c.collapsed) {
+          const vp = document.createElement("div");
+          vp.className = "la-preview-box";
+          const vecObj = Number.isFinite(c.vx) && Number.isFinite(c.vy) ? window.CFVLinAlg.makeVec2(c.vx, c.vy) : null;
+          vp.innerHTML = window.CFVLinAlg.renderVectorLatexHtml(c.name || "u", vecObj, "", null);
+          c._vecPreviewEl = vp;
+          body.appendChild(vp);
+        }
         if (c.label && !c.collapsed) {
           const sub = document.createElement("div");
           sub.className = "var-sub-label var-body";
@@ -3545,6 +4428,13 @@
           exprIn.style.display = "none";
           eq.style.display = "none";
         }
+        const errBox = document.createElement("div");
+        errBox.className = "card-diag-explain" + (c._dimErr ? "" : " hidden");
+        if (c._dimErr) {
+          errBox.innerHTML = `<div class="card-diag-explain-hdr"><span>${c._dimErr.title}</span><span class="card-diag-tip-btn" title="${String(c._dimErr.hint || "").replace(/"/g, "&quot;")}">?</span></div><div class="card-diag-hint">${c._dimErr.hint || ""}</div>`;
+        }
+        c._varErrEl = errBox;
+        body.appendChild(errBox);
       } else {
         /* Independent Desmos Parameter Slider Card */
         const top = document.createElement("div");
@@ -3568,9 +4458,30 @@
         eq.textContent = "=";
         top.appendChild(eq);
 
-        const valBadge = document.createElement("span");
-        valBadge.className = "slider-val-badge";
-        valBadge.textContent = Number(c.value.toFixed(4)).toString();
+        const valBadge = document.createElement("input");
+        valBadge.type = "text";
+        valBadge.className = "slider-val-badge slider-val-input";
+        valBadge.value = Number(c.value.toFixed(4)).toString();
+        valBadge.title = "Type a number and press Enter to set slider value directly";
+        const commitSliderVal = () => {
+          const parsedVal = Number(valBadge.value.trim());
+          if (Number.isFinite(parsedVal)) {
+            c.value = parsedVal;
+            if (parsedVal < c.min) { c.min = parsedVal; if (c._rangeEl) c._rangeEl.min = String(c.min); }
+            if (parsedVal > c.max) { c.max = parsedVal; if (c._rangeEl) c._rangeEl.max = String(c.max); }
+            if (c._rangeEl) c._rangeEl.value = String(c.value);
+            if (c._miniRangeEl) { c._miniRangeEl.min = String(c.min); c._miniRangeEl.max = String(c.max); c._miniRangeEl.value = String(c.value); }
+            if (c._miniValBadgeEl) c._miniValBadgeEl.value = Number(c.value.toFixed(4)).toString();
+            valBadge.value = Number(c.value.toFixed(4)).toString();
+            resolveVariables(true);
+            refreshActiveStage(false);
+            notifyStateChanged(true, true);
+          } else {
+            valBadge.value = Number(c.value.toFixed(4)).toString();
+          }
+        };
+        valBadge.addEventListener("change", commitSliderVal);
+        valBadge.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); valBadge.blur(); } });
         c._valBadgeEl = valBadge;
         top.appendChild(valBadge);
 
@@ -3580,7 +4491,7 @@
         top.appendChild(lbl);
 
         const sMinBtn = document.createElement("button");
-        sMinBtn.className = "expr-mini-btn";
+        sMinBtn.className = "expr-mini-btn card-min-btn" + (c.collapsed ? " active" : "");
         sMinBtn.textContent = c.collapsed ? "▸" : "▾";
         sMinBtn.title = c.collapsed ? "Expand slider" : "Minimize slider";
         sMinBtn.addEventListener("click", (ev) => {
@@ -3589,7 +4500,7 @@
           renderFnCards();
           notifyStateChanged(true, true);
         });
-        top.appendChild(sMinBtn);
+        top.insertBefore(sMinBtn, top.firstChild);
 
         const delBtn = document.createElement("button");
         delBtn.className = "expr-mini-btn";
@@ -3663,11 +4574,12 @@
         /* Scrubbing sliders stays cleanly inside the active preset (markDirty = false)! */
         range.addEventListener("input", () => {
           c.value = Number(range.value);
-          valBadge.textContent = Number(c.value.toFixed(4)).toString();
+          valBadge.value = Number(c.value.toFixed(4)).toString();
           resolveVariables(true);
           if (isRealMode() && (c.name === "R" || c.name === "W" || c.name === "H") && window.CFVReal && window.CFVReal.getActiveGridDims) {
             window.CFVReal.getActiveGridDims();
-            renderDomainCards();
+            if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
           }
           if (paramsRequireServerRecompute([c.name])) {
             refreshActiveStage(true);
@@ -3682,7 +4594,8 @@
           resolveVariables(true);
           if (isRealMode() && (c.name === "R" || c.name === "W" || c.name === "H") && window.CFVReal && window.CFVReal.getActiveGridDims) {
             window.CFVReal.getActiveGridDims();
-            renderDomainCards();
+            if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
           }
           if (paramsRequireServerRecompute([c.name])) {
             refreshActiveStage(false);
@@ -3720,6 +4633,7 @@
       fnCardsEl.appendChild(row);
     });
     renderMiniSliders();
+    if (isVectorMode()) updateLinearAlgebraPreviews();
   }
 
   function syncSliderPlayUI(c) {
@@ -3766,9 +4680,26 @@
       eq.textContent = "=";
       top.appendChild(eq);
 
-      const valBadge = document.createElement("span");
-      valBadge.className = "mini-slider-val";
-      valBadge.textContent = Number(c.value.toFixed(4)).toString();
+      const valBadge = document.createElement("input");
+      valBadge.type = "text";
+      valBadge.className = "mini-slider-val slider-val-input";
+      valBadge.value = Number(c.value.toFixed(4)).toString();
+      valBadge.title = "Type a number and press Enter to set value directly";
+      valBadge.addEventListener("change", () => {
+        const parsedVal = Number(valBadge.value.trim());
+        if (Number.isFinite(parsedVal)) {
+          c.value = parsedVal;
+          if (parsedVal < c.min) c.min = parsedVal;
+          if (parsedVal > c.max) c.max = parsedVal;
+          valBadge.value = Number(c.value.toFixed(4)).toString();
+          resolveVariables(true);
+          refreshActiveStage(false);
+          notifyStateChanged(true, true);
+        } else {
+          valBadge.value = Number(c.value.toFixed(4)).toString();
+        }
+      });
+      valBadge.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); valBadge.blur(); } });
       c._miniValBadgeEl = valBadge;
       top.appendChild(valBadge);
 
@@ -3842,7 +4773,8 @@
         resolveVariables(true);
         if (isRealMode() && (c.name === "R" || c.name === "W" || c.name === "H") && window.CFVReal && window.CFVReal.getActiveGridDims) {
           window.CFVReal.getActiveGridDims();
-          renderDomainCards();
+          if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
         }
         if (paramsRequireServerRecompute([c.name])) {
           refreshActiveStage(true);
@@ -3857,7 +4789,8 @@
         resolveVariables(true);
         if (isRealMode() && (c.name === "R" || c.name === "W" || c.name === "H") && window.CFVReal && window.CFVReal.getActiveGridDims) {
           window.CFVReal.getActiveGridDims();
-          renderDomainCards();
+          if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
         }
         if (paramsRequireServerRecompute([c.name])) {
           refreshActiveStage(false);
@@ -3920,7 +4853,8 @@
           resolveVariables(true);
           if (isRealMode() && (v.name === "R" || v.name === "W" || v.name === "H") && window.CFVReal && window.CFVReal.getActiveGridDims) {
             window.CFVReal.getActiveGridDims();
-            renderDomainCards();
+            if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
           }
           if (paramsRequireServerRecompute([v.name])) {
             refreshActiveStage(true);
@@ -3942,12 +4876,294 @@
    * TAB 2 (Unlocked Domain Shapes) & TAB 3 (Locked Landmarks)
    * ------------------------------------------------------------------------- */
 
+  /* =========================================================================
+   * Standardized Left-Gutter Card Hide/Show & Active Dot Builder
+   * Used uniformly across Functions, Matrices, Shapes, Points, Guide Lines & Text!
+   * ========================================================================= */
+  function buildCardGutter(opts) {
+    const gutter = document.createElement("div");
+    gutter.className = "expr-gutter";
+    if (opts.withGrip) {
+      const grip = document.createElement("span");
+      grip.className = "drag-grip";
+      grip.textContent = "⋮⋮";
+      grip.title = "Drag to reorder card";
+      if (opts.onGripDown) grip.addEventListener("pointerdown", opts.onGripDown);
+      if (opts.onGripUp) grip.addEventListener("pointerup", opts.onGripUp);
+      gutter.appendChild(grip);
+    }
+    const num = document.createElement("span");
+    num.className = "expr-num";
+    num.textContent = String(opts.seqNum);
+    gutter.appendChild(num);
+
+    if (opts.showDot !== false) {
+      const dot = document.createElement("button");
+      const isOn = opts.isOn !== false;
+      dot.className = "expr-vis-dot" + (isOn ? "" : " off");
+      dot.style.setProperty("--card-color", opts.color || "#38bdf8");
+      if (opts.glyph) {
+        dot.style.display = "grid";
+        dot.style.placeItems = "center";
+        dot.style.fontSize = opts.glyphSize || "10px";
+        dot.style.fontWeight = "700";
+        dot.style.color = isOn ? "#061019" : (opts.color || "#38bdf8");
+        dot.textContent = opts.glyph;
+      }
+      dot.title = opts.title || "Click to show/hide · Shift+click for style settings";
+      dot.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (ev.shiftKey && opts.onShiftClick) { opts.onShiftClick(dot); return; }
+        if (opts.onToggle) opts.onToggle(ev);
+      });
+      gutter.appendChild(dot);
+    }
+    return gutter;
+  }
+
+  function refreshElementVisibility(kind) {
+    const ac = activeCanvasCtrl();
+    if (isVectorMode() && window.CFVVector) {
+      if (kind === "point") window.CFVVector.onWorkspaceCompiled();
+      else {
+        if (window.CFVVector.updateIntegralPanel) window.CFVVector.updateIntegralPanel();
+        window.CFVVector.requestRender(true);
+      }
+    } else if (isRealMode() && window.CFVReal) {
+      window.CFVReal.requestRender();
+    } else if (window.CFVComplex) {
+      if (kind === "point") window.CFVComplex.recomputePoints();
+      else {
+        window.CFVComplex.updateIntegralPanel();
+        window.CFVComplex.requestRender();
+      }
+    } else if (ac && ac.requestRender) {
+      ac.requestRender();
+    }
+  }
+
+  /* =========================================================================
+   * Interactive f(·) Image Tool — Select 1 or Many Elements -> Press Enter!
+   * Supports Smart Output Typing (1 Vec -> Vec, 1 Pt -> Pt, Many -> Image)
+   * & "Edit Domain" Re-Selection Workflow across Complex, Real & Vector Modes!
+   * ========================================================================= */
+  function isImagePickerActive() {
+    return Boolean(state.imagePicker && state.imagePicker.active);
+  }
+
+  function getActiveStageCardEl() {
+    if (isVectorMode()) return document.getElementById("vector-plane-card");
+    if (isRealMode()) return document.getElementById("real-plane-card");
+    return document.getElementById("input-plane-card");
+  }
+
+  function updateImagePickerBanner() {
+    const ip = state.imagePicker;
+    if (!ip || !ip.active || !ip.bannerEl) return;
+    const ac = activeCanvasCtrl();
+    const sIds = ac && ac.state && ac.state.selectedShapeIds ? ac.state.selectedShapeIds.size : (ac && ac.state && ac.state.selectedShapeId !== null ? 1 : 0);
+    const pIds = ac && ac.state && ac.state.selectedPointIds ? ac.state.selectedPointIds.size : (ac && ac.state && ac.state.selectedPointId !== null ? 1 : 0);
+    const total = sIds + pIds;
+    const txtEl = ip.bannerEl.querySelector(".ipb-text");
+    if (txtEl) {
+      const modeTitle = ip.editTarget ? "Edit Image Domain" : "New Image f(·)";
+      txtEl.textContent = `${modeTitle}: ${total} selected · Shift+click or box-select · Press Enter`;
+    }
+  }
+
+  function cancelImageDomainPicker() {
+    if (state.imagePicker && state.imagePicker.bannerEl) {
+      state.imagePicker.bannerEl.remove();
+    }
+    state.imagePicker = null;
+    document.querySelectorAll("[data-image-tool]").forEach((b) => b.classList.remove("active"));
+    const ac = activeCanvasCtrl();
+    if (ac && ac.requestRender) ac.requestRender();
+  }
+
+  function getDefaultImageMappingInfo() {
+    const fns = fnCards();
+    const prim = fns.find((c) => c.id === state.primaryCardId) || fns[0];
+    if (isVectorMode()) {
+      const valid = fns.find((c) => c.id === state.primaryCardId && (c.vecKind === "field" || (c.vecKind === "matrix" && c.matDims !== "1x2")))
+        || fns.find((c) => c.vecKind === "field" || (c.vecKind === "matrix" && c.matDims !== "1x2"));
+      if (valid) {
+        const nm = defaultCardName(valid, fns.indexOf(valid));
+        return { fnCardId: valid.id, expr: valid.vecKind === "matrix" ? `${nm} * v` : `${nm}(v)`, labelPrefix: nm };
+      }
+      return { fnCardId: null, expr: "M * v", labelPrefix: "T" };
+    }
+    if (prim) {
+      const nm = defaultCardName(prim, fns.indexOf(prim));
+      return { fnCardId: prim.id, expr: isRealMode() ? `${nm}(x)` : `${nm}(z)`, labelPrefix: nm };
+    }
+    return { fnCardId: null, expr: isRealMode() ? "f1(x)" : "f1(z)", labelPrefix: "f" };
+  }
+
+  async function commitImageDomainPicker() {
+    const ip = state.imagePicker;
+    if (!ip || !ip.active) return;
+    const ac = activeCanvasCtrl();
+    if (!ac || !ac.state) { cancelImageDomainPicker(); return; }
+    const sSet = ac.state.selectedShapeIds && ac.state.selectedShapeIds.size > 0
+      ? [...ac.state.selectedShapeIds]
+      : (ac.state.selectedShapeId !== null ? [ac.state.selectedShapeId] : []);
+    const pSet = ac.state.selectedPointIds && ac.state.selectedPointIds.size > 0
+      ? [...ac.state.selectedPointIds]
+      : (ac.state.selectedPointId !== null ? [ac.state.selectedPointId] : []);
+
+    const sources = [];
+    for (const sid of sSet) {
+      if (ip.editTarget && ip.editTarget.kind === "shape" && ip.editTarget.id === sid) continue;
+      if ((ac.state.shapes || []).some((s) => s.id === sid)) sources.push({ kind: "shape", id: sid });
+    }
+    for (const pid of pSet) {
+      if (ip.editTarget && ip.editTarget.kind === "point" && ip.editTarget.id === pid) continue;
+      if ((ac.state.points || []).some((p) => p.id === pid)) sources.push({ kind: "point", id: pid });
+    }
+    if (sources.length === 0) {
+      const txtEl = ip.bannerEl && ip.bannerEl.querySelector(".ipb-text");
+      if (txtEl) txtEl.textContent = "Select at least 1 element on the canvas first, then press Enter!";
+      return;
+    }
+
+    const editTarget = ip.editTarget;
+    cancelImageDomainPicker();
+
+    if (editTarget) {
+      if (editTarget.kind === "shape") {
+        const s = (ac.state.shapes || []).find((q) => q.id === editTarget.id);
+        if (s && s.imageOf) {
+          s.imageOf.sources = sources;
+          s.imageOf.sourceKind = sources.length === 1 ? sources[0].kind : "multi";
+          s.imageOf.sourceId = sources[0].id;
+          if (sources.length > 1) s.kind = "image";
+        }
+      } else if (editTarget.kind === "point") {
+        const p = (ac.state.points || []).find((q) => q.id === editTarget.id);
+        if (p && p.imageOf) {
+          p.imageOf.sources = sources;
+          p.imageOf.sourceKind = sources[0].kind;
+          p.imageOf.sourceId = sources[0].id;
+        }
+      }
+      if (ac.recomputeImageElements) await ac.recomputeImageElements();
+      else if (ac.recomputeAll) await ac.recomputeAll(1.0);
+      if (ac.requestRender) ac.requestRender(true);
+      renderDomainCards();
+      notifyStateChanged(true, true);
+      return;
+    }
+
+    const def = getDefaultImageMappingInfo();
+    if (ac.createImageFromSources) {
+      await ac.createImageFromSources(sources, def);
+    } else if (sources.length === 1 && sources[0].kind === "point" && ac.createImageOfPoint) {
+      const pt = await ac.createImageOfPoint(sources[0].id, def.fnCardId);
+      if (pt && pt.imageOf) { pt.imageOf.sources = sources; pt.imageOf.expr = def.expr; }
+    } else if (sources.length >= 1 && sources[0].kind === "shape" && ac.createImageOfShape) {
+      const img = await ac.createImageOfShape(sources[0].id, def.fnCardId);
+      if (img && img.imageOf) {
+        img.imageOf.sources = sources;
+        img.imageOf.expr = def.expr;
+        if (sources.length > 1) {
+          img.kind = "image";
+          img.imageOf.sourceKind = "multi";
+          img.label = `${def.labelPrefix}(${sources.length} items)`;
+        }
+        if (ac.recomputeImageElements) await ac.recomputeImageElements();
+      }
+    }
+    renderDomainCards();
+    notifyStateChanged(true, true);
+  }
+
+  function startImageDomainPicker(editTarget = null) {
+    cancelImageDomainPicker();
+    const ac = activeCanvasCtrl();
+    const host = getActiveStageCardEl();
+    if (!ac || !host) return;
+    if (ac.setTool) ac.setTool("move");
+    if (editTarget && ac.state) {
+      const target = editTarget.kind === "point"
+        ? (ac.state.points || []).find((p) => p.id === editTarget.id)
+        : (ac.state.shapes || []).find((s) => s.id === editTarget.id);
+      if (ac.state.selectedShapeIds) ac.state.selectedShapeIds.clear();
+      if (ac.state.selectedPointIds) ac.state.selectedPointIds.clear();
+      ac.state.selectedShapeId = null;
+      ac.state.selectedPointId = null;
+      const srcs = target && target.imageOf
+        ? (Array.isArray(target.imageOf.sources) && target.imageOf.sources.length > 0
+            ? target.imageOf.sources
+            : [{ kind: target.imageOf.sourceKind || "shape", id: target.imageOf.sourceId }])
+        : [];
+      for (const sr of srcs) {
+        if (sr.kind === "point") {
+          if (ac.state.selectedPointIds) ac.state.selectedPointIds.add(sr.id);
+          ac.state.selectedPointId = sr.id;
+        } else {
+          if (ac.state.selectedShapeIds) ac.state.selectedShapeIds.add(sr.id);
+          ac.state.selectedShapeId = sr.id;
+        }
+      }
+      if (ac.requestRender) ac.requestRender();
+    }
+
+    const banner = document.createElement("div");
+    banner.className = "image-pick-banner";
+    banner.innerHTML = `<span class="ipb-text"></span><button type="button" class="ipb-apply">Apply (Enter)</button><button type="button" class="ipb-cancel">Cancel (Esc)</button>`;
+    banner.querySelector(".ipb-apply").addEventListener("click", (ev) => { ev.stopPropagation(); commitImageDomainPicker(); });
+    banner.querySelector(".ipb-cancel").addEventListener("click", (ev) => { ev.stopPropagation(); cancelImageDomainPicker(); });
+    host.appendChild(banner);
+
+    state.imagePicker = { active: true, mode: state.mode, editTarget, bannerEl: banner };
+    document.querySelectorAll("[data-image-tool]").forEach((b) => b.classList.add("active"));
+    updateImagePickerBanner();
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (!state.imagePicker || !state.imagePicker.active) return;
+    const tag = (e.target && e.target.tagName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (e.key === "Enter") { e.preventDefault(); commitImageDomainPicker(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancelImageDomainPicker(); }
+  });
+
+  function resolveFnCardByNameOrId(expr, fnCardId) {
+    const fns = fnCards();
+    const s = String(expr || "").trim();
+    if (s) {
+      const m = s.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:\(|\*|$)/);
+      if (m) {
+        const nm = m[1];
+        const hit = fns.find((c, idx) => defaultCardName(c, idx) === nm || `f${idx + 1}` === nm || `F${idx + 1}` === nm || `T${idx + 1}` === nm || (c.vecKind === "matrix" && (nm === "M" || nm === "A")));
+        if (hit) return hit;
+      }
+    }
+    if (fnCardId !== null && fnCardId !== undefined) {
+      const hit = fns.find((c) => c.id === fnCardId);
+      if (hit) return hit;
+    }
+    return fns.find((c) => c.id === state.primaryCardId) || fns[0] || null;
+  }
+
   function iconGlyph(iconId) {
     const f = ICONS.find((i) => i.id === iconId);
     return f ? f.glyph : "●";
   }
 
   function formatShapeBadge(s) {
+    if (isVectorMode()) {
+      if (!s.integral || !s.integral.ok) return null;
+      const w = Number(s.integral.work);
+      const fl = Number(s.integral.flux);
+      if (!Number.isFinite(w) || !Number.isFinite(fl)) return null;
+      const fmt = (v) => (Math.abs(v) < 0.005 ? "0" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2));
+      return {
+        text: s.closed ? `∮W:${fmt(w)} Φ:${fmt(fl)}` : `W:${fmt(w)} Φ:${fmt(fl)}`,
+        neg: w < -1e-3,
+      };
+    }
     if (isContourMode()) {
       if (!s.integral) return { text: "…", neg: false };
       if (s.integral.singular) return { text: "pole!", neg: true };
@@ -3965,8 +5181,9 @@
   }
 
   function buildShapeCard(s, seqNum, isReal = false) {
+    const ac = activeCanvasCtrl();
     const selected = isReal
-      ? (window.CFVReal && s.id === window.CFVReal.state.selectedShapeId)
+      ? Boolean(ac && ac.state && s.id === ac.state.selectedShapeId)
       : (window.CFVComplex.isShapeSelected
           ? window.CFVComplex.isShapeSelected(s.id)
           : s.id === window.CFVComplex.state.selectedShapeId);
@@ -3974,38 +5191,26 @@
     row.className = "expr-card" + (selected ? " selected-item" : "") + (s.locked ? " locked-item" : "");
     row.addEventListener("click", (ev) => {
       if (ev.target.tagName === "INPUT" || ev.target.tagName === "BUTTON" || ev.target.tagName === "SELECT") return;
-      if (isReal) { window.CFVReal.selectShape(s.id); return; }
+      if (isReal) { const ac = activeCanvasCtrl(); if (ac && ac.selectShape) ac.selectShape(s.id); return; }
       if (ev.shiftKey) window.CFVComplex.selectShape(s.id, { range: true });
       else if (ev.ctrlKey || ev.metaKey) window.CFVComplex.selectShape(s.id, { toggle: true });
       else window.CFVComplex.selectShape(s.id);
     });
 
-    const gutter = document.createElement("div");
-    gutter.className = "expr-gutter";
-    const num = document.createElement("span");
-    num.className = "expr-num";
-    num.textContent = String(seqNum);
-    gutter.appendChild(num);
-
-    const dot = document.createElement("button");
-    dot.className = "expr-vis-dot" + (s.visible ? "" : " off");
-    dot.style.setProperty("--card-color", s.color);
-    dot.title = "Show/hide shape · Shift+click for style settings";
-    dot.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (ev.shiftKey) { openItemSettings("shape", s.id, dot); return; }
-      s.visible = !s.visible;
-      if (isReal) {
-        window.CFVReal.requestRender();
-      } else {
-        window.CFVComplex.updateIntegralPanel();
-        window.CFVComplex.requestRender();
-      }
-      renderDomainCards();
-      notifyStateChanged(true, true);
-    });
-    gutter.appendChild(dot);
-    row.appendChild(gutter);
+    row.appendChild(buildCardGutter({
+      seqNum,
+      color: s.color,
+      isOn: s.visible !== false,
+      title: "Click to show/hide element · Shift+click for style settings",
+      onShiftClick: (dot) => openItemSettings("shape", s.id, dot),
+      onToggle: () => {
+        s.visible = s.visible === false;
+        refreshElementVisibility("shape");
+        if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
+        notifyStateChanged(true, true);
+      },
+    }));
 
     const body = document.createElement("div");
     body.className = "expr-body";
@@ -4031,28 +5236,48 @@
     titleIn.disabled = Boolean(s.locked);
     titleIn.addEventListener("input", () => {
       s.label = titleIn.value;
-      if (!isReal) window.CFVComplex.updateIntegralPanel();
+      const ac = activeCanvasCtrl();
+      if (ac && ac.updateIntegralPanel) ac.updateIntegralPanel();
       notifyStateChanged(false, true);
     });
     head.appendChild(titleIn);
 
-    if (!isReal) {
-      const fxBtn = document.createElement("button");
-      fxBtn.className = "expr-mini-btn fx-btn" + (s.formula ? " active" : "");
-      fxBtn.textContent = "fx";
-      fxBtn.title = s.formula ? "Detach variable formula (make static)" : "Bind to slider variables (works even when locked!)";
-      fxBtn.addEventListener("click", async (ev) => {
-        ev.stopPropagation();
-        if (s.formula) {
-          s.formula = null;
-        } else {
-          s.formula = window.CFVComplex.createDefaultFormulaForShape(s);
-          await window.CFVComplex.rebuildShapeFromFormula(s);
+    const fxBtn = document.createElement("button");
+    fxBtn.className = "expr-mini-btn fx-btn" + (s.formula ? " active" : "");
+    fxBtn.textContent = "fx";
+    fxBtn.title = s.formula ? "Detach variable formula (make static)" : "Bind shape to slider/variable formulas (works in Complex, Real & Vector modes!)";
+    fxBtn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const ctrl = activeCanvasCtrl();
+      if (s.formula) {
+        s.formula = null;
+      } else {
+        s.formula = window.CFVGeom
+          ? window.CFVGeom.createDefaultFormulaForShape(s)
+          : (ctrl && ctrl.createDefaultFormulaForShape ? ctrl.createDefaultFormulaForShape(s) : { kind: "circle", cx: "0", cy: "0", r: "1" });
+        if (ctrl && ctrl.rebuildShapeFromFormula) await ctrl.rebuildShapeFromFormula(s);
+        else if (window.CFVGeom) {
+          const r = window.CFVGeom.evalShapeFormula(s.formula, getParamMap());
+          if (r) { s.rawPts = r.rawPts; s.closed = r.closed; }
+          if (ctrl && ctrl.requestRender) ctrl.requestRender();
         }
-        renderDomainCards();
-        notifyStateChanged(true, true);
+      }
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
+      notifyStateChanged(true, true);
+    });
+    head.appendChild(fxBtn);
+
+    if ((isVectorMode() || !isReal) && ac && typeof ac.createImageOfShape === "function") {
+      const imgBtn = document.createElement("button");
+      imgBtn.className = "expr-mini-btn img-btn";
+      imgBtn.textContent = "f(·)";
+      imgBtn.title = "Create live Image Element f(this) on the same plane";
+      imgBtn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        await ac.createImageOfShape(s.id);
       });
-      head.appendChild(fxBtn);
+      head.appendChild(imgBtn);
     }
 
     const lockBtn = document.createElement("button");
@@ -4062,10 +5287,10 @@
     lockBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       s.locked = !s.locked;
-      renderDomainCards();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
       refreshSettingsIfTarget("shape", s.id);
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(true, true);
     });
     if (s.locked) {
@@ -4095,8 +5320,8 @@
       delBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         closeItemSettings();
-        if (isReal) window.CFVReal.deleteShape(s.id);
-        else window.CFVComplex.deleteShape(s.id);
+        const ac = activeCanvasCtrl();
+        if (ac && ac.deleteShape) ac.deleteShape(s.id);
       });
       head.appendChild(delBtn);
     }
@@ -4105,10 +5330,18 @@
     const meta = document.createElement("div");
     meta.className = "shape-meta-row";
     const leftMeta = document.createElement("span");
-    leftMeta.textContent = `${s.closed ? "Closed" : "Open"}${s.locked ? " · Locked" : ""}`;
+    if (s.kind === "vector" && s.rawPts && s.rawPts.length >= 2) {
+      const a = s.rawPts[0], b = s.rawPts[s.rawPts.length - 1];
+      const vx = b.x - a.x, vy = b.y - a.y;
+      const atOrigin = Math.hypot(a.x, a.y) < 1e-3;
+      const anc = atOrigin ? "" : ` @ (${a.x.toFixed(1)}, ${a.y.toFixed(1)})`;
+      leftMeta.textContent = `⟨${vx.toFixed(2)}, ${vy.toFixed(2)}⟩${anc}${s.anchorPointId ? " · pinned" : ""}`;
+    } else {
+      leftMeta.textContent = `${s.closed ? "Closed" : "Open"}${s.locked ? " · Locked" : ""}`;
+    }
     meta.appendChild(leftMeta);
 
-    const badge = isReal ? null : formatShapeBadge(s);
+    const badge = (isReal && !isVectorMode()) ? null : formatShapeBadge(s);
     if (badge) {
       const pill = document.createElement("span");
       pill.className = "shape-val-pill" + (badge.neg ? " neg" : "");
@@ -4117,6 +5350,65 @@
       meta.appendChild(pill);
     }
     body.appendChild(meta);
+
+    if (s.imageOf) {
+      const imRow = document.createElement("div");
+      imRow.className = "img-of-row";
+      const imTag = document.createElement("span");
+      imTag.className = "img-of-tag";
+      imTag.textContent = "Im =";
+      imRow.appendChild(imTag);
+
+      const fnSel = document.createElement("select");
+      fnSel.className = "img-of-sel";
+      fnSel.title = "Function or Matrix card that produces this Image Element";
+      const fns = fnCards();
+      let mSeq = 0;
+      fns.forEach((fc, idx) => {
+        if (fc.vecKind === "vector") return;
+        const opt = document.createElement("option");
+        opt.value = String(fc.id);
+        let prefix = `f${idx + 1}`;
+        if (isVectorMode()) {
+          if (fc.vecKind === "matrix") { mSeq++; prefix = `M${mSeq}`; }
+          else if (fc.vecKind === "potential") prefix = `∇φ${idx + 1}`;
+          else prefix = `F${idx + 1}`;
+        }
+        opt.textContent = `${prefix}: ${fc.title || prefix}`;
+        if (s.imageOf.fnCardId === fc.id) opt.selected = true;
+        fnSel.appendChild(opt);
+      });
+      fnSel.addEventListener("change", async (ev) => {
+        ev.stopPropagation();
+        s.imageOf.fnCardId = Number(fnSel.value);
+        if (ac && ac.recomputeImageElements) await ac.recomputeImageElements(1.0);
+        if (ac && ac.requestRender) ac.requestRender();
+        notifyStateChanged(true, true);
+      });
+      imRow.appendChild(fnSel);
+
+      if (isVectorMode() && s.kind === "vector") {
+        const ancSel = document.createElement("select");
+        ancSel.className = "img-of-sel";
+        ancSel.style.maxWidth = "96px";
+        ancSel.title = "Where to anchor the transformed output arrow";
+        for (const [val, lbl] of [["same_tail", "@ Input Tail"], ["origin", "@ Origin"], ["mapped_tail", "Map Tail→Tip"]]) {
+          const o = document.createElement("option");
+          o.value = val;
+          o.textContent = lbl;
+          if ((s.imageOf.anchorMode || "origin") === val) o.selected = true;
+          ancSel.appendChild(o);
+        }
+        ancSel.addEventListener("change", async (ev) => {
+          ev.stopPropagation();
+          s.imageOf.anchorMode = ancSel.value;
+          if (ac && ac.recomputeImageElements) await ac.recomputeImageElements(1.0);
+          notifyStateChanged(true, true);
+        });
+        imRow.appendChild(ancSel);
+      }
+      body.appendChild(imRow);
+    }
 
     if (s.formula) {
       const f = s.formula;
@@ -4132,6 +5424,7 @@
       for (const [val, lbl] of [
         ["arc", "Arc (cx, cy, r, a0, a1)"],
         ["line", "Line (x0, y0 → x1, y1)"],
+        ["vector", "Vector (x0, y0 → vx, vy)"],
         ["circle", "Circle (cx, cy, r)"],
         ["rect", "Rect (x0, y0 → x1, y1)"],
         ["parametric", "Parametric (x(u), y(u))"],
@@ -4142,16 +5435,31 @@
         if (f.kind === val) opt.selected = true;
         kindSel.appendChild(opt);
       }
+      const rebuildCurFormulaShape = async () => {
+        const ctrl = activeCanvasCtrl();
+        if (ctrl && ctrl.rebuildShapeFromFormula) {
+          await ctrl.rebuildShapeFromFormula(s);
+        } else if (window.CFVGeom) {
+          const r = window.CFVGeom.evalShapeFormula(s.formula, getParamMap());
+          if (r && r.rawPts.length >= 2) {
+            s.rawPts = r.rawPts;
+            if (s.formula.kind !== "parametric") s.closed = r.closed;
+          }
+          if (ctrl && ctrl.requestRender) ctrl.requestRender();
+        }
+      };
       kindSel.addEventListener("change", async () => {
         const nk = kindSel.value;
         s.kind = nk === "parametric" ? "path" : nk;
         if (nk === "arc") s.formula = { kind: "arc", cx: f.cx ?? "0", cy: f.cy ?? "0", r: f.r ?? "R", a0: f.a0 ?? "0", a1: f.a1 ?? "pi" };
         else if (nk === "circle") s.formula = { kind: "circle", cx: f.cx ?? "0", cy: f.cy ?? "0", r: f.r ?? "1" };
         else if (nk === "line") s.formula = { kind: "line", x0: f.x0 ?? "-1", y0: f.y0 ?? "0", x1: f.x1 ?? "1", y1: f.y1 ?? "0" };
+        else if (nk === "vector") s.formula = { kind: "vector", x0: f.x0 ?? "0", y0: f.y0 ?? "0", vx: f.vx ?? "2", vy: f.vy ?? "1" };
         else if (nk === "rect") s.formula = { kind: "rect", x0: f.x0 ?? "-1", y0: f.y0 ?? "-1", x1: f.x1 ?? "1", y1: f.y1 ?? "1" };
         else s.formula = { kind: "parametric", xExpr: f.xExpr ?? "cos(u)", yExpr: f.yExpr ?? "sin(u)", u0: f.u0 ?? "0", u1: f.u1 ?? "2*pi", closed: Boolean(s.closed) };
-        await window.CFVComplex.rebuildShapeFromFormula(s);
-        renderDomainCards();
+        await rebuildCurFormulaShape();
+        if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
         notifyStateChanged(true, true);
       });
       kindField.appendChild(kindLbl);
@@ -4162,6 +5470,7 @@
         circle: [["cx", "cx", false], ["cy", "cy", false], ["r", "r", true]],
         arc: [["cx", "cx", false], ["cy", "cy", false], ["r", "r", true], ["a0", "θ₀", false], ["a1", "θ₁", false]],
         line: [["x0", "x₀", false], ["y0", "y₀", false], ["x1", "x₁", false], ["y1", "y₁", false]],
+        vector: [["x0", "x₀", false], ["y0", "y₀", false], ["vx", "vx", false], ["vy", "vy", false]],
         rect: [["x0", "x₀", false], ["y0", "y₀", false], ["x1", "x₁", false], ["y1", "y₁", false]],
         parametric: [["xExpr", "x(u)", true], ["yExpr", "y(u)", true], ["u0", "u₀", false], ["u1", "u₁", false]],
       };
@@ -4178,7 +5487,7 @@
         inp.value = String(f[key] ?? "");
         inp.addEventListener("input", () => {
           s.formula[key] = inp.value;
-          window.CFVComplex.rebuildShapeFromFormula(s);
+          rebuildCurFormulaShape();
           notifyStateChanged(false, true);
         });
         fld.appendChild(sp);
@@ -4193,45 +5502,32 @@
   }
 
   function buildGuideLineCard(ln, seqNum, isReal) {
-    const selected = isReal
-      ? ln.id === window.CFVReal.state.selectedLineId
-      : ln.id === window.CFVComplex.state.selectedLineId;
+    const ac = activeCanvasCtrl();
+    const selected = Boolean(ac && ac.state && ln.id === ac.state.selectedLineId);
 
     const row = document.createElement("div");
     row.className = "expr-card" + (selected ? " selected-item" : "") + (ln.locked ? " locked-item" : "");
     row.addEventListener("click", (ev) => {
       if (ev.target.tagName === "INPUT" || ev.target.tagName === "BUTTON") return;
-      if (isReal) window.CFVReal.selectGuideLine(ln.id);
-      else window.CFVComplex.selectGuideLine(ln.id);
+      if (ac && ac.selectGuideLine) ac.selectGuideLine(ln.id);
     });
 
-    const gutter = document.createElement("div");
-    gutter.className = "expr-gutter";
-    const num = document.createElement("span");
-    num.className = "expr-num";
-    num.textContent = String(seqNum);
-    gutter.appendChild(num);
-
-    const dot = document.createElement("button");
-    dot.className = "expr-vis-dot" + (ln.visible ? "" : " off");
-    dot.style.setProperty("--card-color", ln.color);
-    dot.style.display = "grid";
-    dot.style.placeItems = "center";
-    dot.style.fontSize = "11px";
-    dot.style.color = ln.visible ? "#061019" : ln.color;
-    dot.textContent = ln.orientation === "horizontal" ? "―" : "│";
-    dot.title = "Show/hide guide line · Shift+click for settings";
-    dot.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (ev.shiftKey) { openItemSettings("guide_line", ln.id, dot); return; }
-      ln.visible = !ln.visible;
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
-      renderDomainCards();
-      notifyStateChanged(true, true);
-    });
-    gutter.appendChild(dot);
-    row.appendChild(gutter);
+    row.appendChild(buildCardGutter({
+      seqNum,
+      color: ln.color,
+      isOn: ln.visible !== false,
+      glyph: ln.orientation === "horizontal" ? "―" : "│",
+      glyphSize: "11px",
+      title: "Click to show/hide guide line · Shift+click for style settings",
+      onShiftClick: (dot) => openItemSettings("guide_line", ln.id, dot),
+      onToggle: () => {
+        ln.visible = ln.visible === false;
+        refreshElementVisibility("guide_line");
+        if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
+        notifyStateChanged(true, true);
+      },
+    }));
 
     const body = document.createElement("div");
     body.className = "expr-body";
@@ -4253,8 +5549,7 @@
     titleIn.disabled = Boolean(ln.locked);
     titleIn.addEventListener("input", () => {
       ln.label = titleIn.value;
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(false, true);
     });
     head.appendChild(titleIn);
@@ -4266,7 +5561,8 @@
     lockBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       ln.locked = !ln.locked;
-      renderDomainCards();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
       refreshSettingsIfTarget("guide_line", ln.id);
       notifyStateChanged(true, true);
     });
@@ -4297,8 +5593,7 @@
       delBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         closeItemSettings();
-        if (isReal) window.CFVReal.deleteGuideLine(ln.id);
-        else window.CFVComplex.deleteGuideLine(ln.id);
+        if (ac && ac.deleteGuideLine) ac.deleteGuideLine(ln.id);
       });
       head.appendChild(delBtn);
     }
@@ -4318,9 +5613,9 @@
     axisBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       ln.orientation = ln.orientation === "horizontal" ? "vertical" : "horizontal";
-      renderDomainCards();
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(true, true);
     });
     valRow.appendChild(axisBtn);
@@ -4347,8 +5642,7 @@
       } else {
         return;
       }
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(false, true);
     });
     valRow.appendChild(valIn);
@@ -4365,8 +5659,9 @@
   }
 
   function buildPointCard(p, seqNum, isReal) {
+    const ac = activeCanvasCtrl();
     const selected = isReal
-      ? p.id === window.CFVReal.state.selectedPointId
+      ? Boolean(ac && ac.state && p.id === ac.state.selectedPointId)
       : (window.CFVComplex.isPointSelected
           ? window.CFVComplex.isPointSelected(p.id)
           : p.id === window.CFVComplex.state.selectedPointId);
@@ -4375,38 +5670,26 @@
     row.className = "expr-card" + (selected ? " selected-item" : "") + (p.locked ? " locked-item" : "");
     row.addEventListener("click", (ev) => {
       if (ev.target.tagName === "INPUT" || ev.target.tagName === "BUTTON") return;
-      if (isReal) window.CFVReal.selectPoint(p.id);
+      if (isReal) { if (ac && ac.selectPoint) ac.selectPoint(p.id); }
       else if (ev.ctrlKey || ev.metaKey || ev.shiftKey) window.CFVComplex.selectPoint(p.id, { toggle: true });
       else window.CFVComplex.selectPoint(p.id);
     });
 
-    const gutter = document.createElement("div");
-    gutter.className = "expr-gutter";
-    const num = document.createElement("span");
-    num.className = "expr-num";
-    num.textContent = String(seqNum);
-    gutter.appendChild(num);
-
-    const dot = document.createElement("button");
-    dot.className = "expr-vis-dot" + (p.visible ? "" : " off");
-    dot.style.setProperty("--card-color", p.color);
-    dot.style.display = "grid";
-    dot.style.placeItems = "center";
-    dot.style.fontSize = "10px";
-    dot.style.color = p.visible ? "#061019" : p.color;
-    dot.textContent = iconGlyph(p.icon);
-    dot.title = "Show/hide point · Shift+click for style settings";
-    dot.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (ev.shiftKey) { openItemSettings("point", p.id, dot); return; }
-      p.visible = !p.visible;
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.recomputePoints();
-      renderDomainCards();
-      notifyStateChanged(true, true);
-    });
-    gutter.appendChild(dot);
-    row.appendChild(gutter);
+    row.appendChild(buildCardGutter({
+      seqNum,
+      color: p.color,
+      isOn: p.visible !== false,
+      glyph: iconGlyph(p.icon),
+      title: "Click to show/hide point · Shift+click for style settings",
+      onShiftClick: (dot) => openItemSettings("point", p.id, dot),
+      onToggle: () => {
+        p.visible = p.visible === false;
+        refreshElementVisibility("point");
+        if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
+        notifyStateChanged(true, true);
+      },
+    }));
 
     const body = document.createElement("div");
     body.className = "expr-body";
@@ -4428,11 +5711,22 @@
     titleIn.disabled = Boolean(p.locked);
     titleIn.addEventListener("input", () => {
       p.label = titleIn.value;
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(false, true);
     });
     head.appendChild(titleIn);
+
+    if ((isVectorMode() || !isReal) && ac && typeof ac.createImageOfPoint === "function") {
+      const imgBtn = document.createElement("button");
+      imgBtn.className = "expr-mini-btn img-btn";
+      imgBtn.textContent = "f(·)";
+      imgBtn.title = "Create live Image Point f(this) on the same plane";
+      imgBtn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        await ac.createImageOfPoint(p.id);
+      });
+      head.appendChild(imgBtn);
+    }
 
     const lockBtn = document.createElement("button");
     lockBtn.className = "expr-mini-btn" + (p.locked ? " locked" : "");
@@ -4441,7 +5735,8 @@
     lockBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       p.locked = !p.locked;
-      renderDomainCards();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
       refreshSettingsIfTarget("point", p.id);
       if (!isReal) window.CFVComplex.requestRender();
       notifyStateChanged(true, true);
@@ -4473,8 +5768,7 @@
       delBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         closeItemSettings();
-        if (isReal) window.CFVReal.deletePoint(p.id);
-        else window.CFVComplex.deletePoint(p.id);
+        if (ac && ac.deletePoint) ac.deletePoint(p.id);
       });
       head.appendChild(delBtn);
     }
@@ -4509,8 +5803,10 @@
           if (Number.isFinite(ev)) p.x = ev;
         }
       }
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.recomputePoints();
+      if (isReal) {
+        if (ac && ac.requestRender) ac.requestRender();
+        if (isVectorMode() && window.CFVVector) window.CFVVector.onWorkspaceCompiled();
+      } else window.CFVComplex.recomputePoints();
       notifyStateChanged(false, true);
     });
 
@@ -4541,8 +5837,10 @@
           if (Number.isFinite(ev)) p.y = ev;
         }
       }
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.recomputePoints();
+      if (isReal) {
+        if (ac && ac.requestRender) ac.requestRender();
+        if (isVectorMode() && window.CFVVector) window.CFVVector.onWorkspaceCompiled();
+      } else window.CFVComplex.recomputePoints();
       notifyStateChanged(false, true);
     });
 
@@ -4556,49 +5854,36 @@
   }
 
   function buildTextCard(tb, seq, isReal) {
+    const ac = activeCanvasCtrl();
     const row = document.createElement("div");
-    const selId = isReal ? window.CFVReal.state.selectedTextId : window.CFVComplex.state.selectedTextId;
+    const selId = ac && ac.state ? ac.state.selectedTextId : null;
     const isSel = selId === tb.id;
     row.className = "expr-card point-card text-card" + (isSel ? " selected" : "") + (tb.visible === false ? " hidden-card" : "") + (tb.locked ? " locked-card" : "");
     row.dataset.textId = String(tb.id);
     row.addEventListener("click", (ev) => {
       if (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA" || ev.target.tagName === "SELECT" || ev.target.tagName === "BUTTON") return;
-      if (isReal) window.CFVReal.selectTextBox(tb.id);
-      else window.CFVComplex.selectTextBox(tb.id);
+      if (ac && ac.selectTextBox) ac.selectTextBox(tb.id);
     });
     row.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
       openItemSettingsAt("text", tb.id, ev.clientX, ev.clientY);
     });
 
-    const gutter = document.createElement("div");
-    gutter.className = "expr-gutter";
-    const num = document.createElement("span");
-    num.className = "expr-num";
-    num.textContent = String(seq);
-    const dot = document.createElement("button");
-    dot.className = "expr-vis-dot" + (tb.visible === false ? " off" : "");
-    dot.dataset.settingsTrigger = "1";
-    dot.style.setProperty("--card-color", tb.color || "#38bdf8");
-    dot.style.display = "grid";
-    dot.style.placeItems = "center";
-    dot.style.fontSize = "10px";
-    dot.style.fontWeight = "700";
-    dot.style.color = tb.visible === false ? (tb.color || "#38bdf8") : "#061019";
-    dot.textContent = "T";
-    dot.title = "Show/hide text box · Shift+click for style settings";
-    dot.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (ev.shiftKey) { openItemSettings("text", tb.id, dot); return; }
-      tb.visible = tb.visible === false;
-      renderDomainCards();
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
-      notifyStateChanged(true, true);
-    });
-    gutter.appendChild(num);
-    gutter.appendChild(dot);
-    row.appendChild(gutter);
+    row.appendChild(buildCardGutter({
+      seqNum: seq,
+      color: tb.color || "#38bdf8",
+      isOn: tb.visible !== false,
+      glyph: "T",
+      title: "Click to show/hide text box · Shift+click for style settings",
+      onShiftClick: (dot) => openItemSettings("text", tb.id, dot),
+      onToggle: () => {
+        tb.visible = tb.visible === false;
+        refreshElementVisibility("text");
+        if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
+        notifyStateChanged(true, true);
+      },
+    }));
 
     const body = document.createElement("div");
     body.className = "expr-body";
@@ -4619,8 +5904,7 @@
     titleIn.placeholder = "Note title…";
     titleIn.addEventListener("input", () => {
       tb.title = titleIn.value;
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(false, true);
     });
     head.appendChild(titleIn);
@@ -4632,7 +5916,8 @@
     lockBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       tb.locked = !tb.locked;
-      renderDomainCards();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
       notifyStateChanged(true, true);
     });
     if (tb.locked) {
@@ -4662,8 +5947,7 @@
       delBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         closeItemSettings();
-        if (isReal) window.CFVReal.deleteTextBox(tb.id);
-        else window.CFVComplex.deleteTextBox(tb.id);
+        if (ac && ac.deleteTextBox) ac.deleteTextBox(tb.id);
       });
       head.appendChild(delBtn);
     }
@@ -4714,8 +5998,7 @@
       tb.text = textArea.value;
       updatePreview();
       autoSizeTa();
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(false, true);
     });
     body.appendChild(previewEl);
@@ -4746,9 +6029,9 @@
         tb.nx = 0.04;
         tb.ny = 0.72;
       }
-      renderDomainCards();
-      if (isReal) window.CFVReal.requestRender();
-      else window.CFVComplex.requestRender();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
+      if (ac && ac.requestRender) ac.requestRender();
       notifyStateChanged(true, true);
     });
     controls.appendChild(anchorSel);
@@ -4797,8 +6080,7 @@
             if (Number.isFinite(ev)) tb.x = ev;
           }
         }
-        if (isReal) window.CFVReal.requestRender();
-        else window.CFVComplex.requestRender();
+        if (ac && ac.requestRender) ac.requestRender();
         notifyStateChanged(false, true);
       });
       const ly = document.createElement("span");
@@ -4819,8 +6101,7 @@
             if (Number.isFinite(ev)) tb.y = ev;
           }
         }
-        if (isReal) window.CFVReal.requestRender();
-        else window.CFVComplex.requestRender();
+        if (ac && ac.requestRender) ac.requestRender();
         notifyStateChanged(false, true);
       });
       wRow.appendChild(lx);
@@ -4837,9 +6118,9 @@
   function renderDomainCards() {
     domainCardsEl.innerHTML = "";
     const isReal = isRealMode();
-    const ordered = isReal
-      ? (window.CFVReal && window.CFVReal.getOrderedElements ? window.CFVReal.getOrderedElements() : [])
-      : (window.CFVComplex && window.CFVComplex.getOrderedElements ? window.CFVComplex.getOrderedElements() : []);
+    const isVec = isVectorMode();
+    const ctrl = activeCanvasCtrl();
+    const ordered = ctrl && ctrl.getOrderedElements ? ctrl.getOrderedElements() : [];
 
     const realPolys = isReal && window.CFVReal && window.CFVReal.state ? (window.CFVReal.state.polygons || []) : [];
     const domainTotal = ordered.length + (realPolys.length > 0 ? 1 : 0);
@@ -4886,15 +6167,17 @@
     }
 
     let dragElFrom = -1;
+    const is2D = isReal || isVec;
     ordered.forEach((el, idx) => {
       const card =
-        el.kind === "shape" ? buildShapeCard(el.item, seq++, isReal) :
-        el.kind === "guide_line" ? buildGuideLineCard(el.item, seq++, isReal) :
-        el.kind === "text" ? buildTextCard(el.item, seq++, isReal) :
-        buildPointCard(el.item, seq++, isReal);
+        el.kind === "shape" ? buildShapeCard(el.item, seq++, is2D) :
+        el.kind === "guide_line" ? buildGuideLineCard(el.item, seq++, is2D) :
+        el.kind === "text" ? buildTextCard(el.item, seq++, is2D) :
+        buildPointCard(el.item, seq++, is2D);
 
       const item = el.item;
-      /* Universal Minimize/Restore (▾/▸) + Hide/Show Eye (👁) + Vertical Card Resizing for EVERY element card! */
+      /* Universal Minimize/Restore (▾/▸) + Vertical Card Resizing for EVERY element card!
+         Visibility show/hide is ALWAYS standardized on the left-gutter color dot (no duplicate eyeball icon). */
       const head = card.querySelector(".expr-head");
       if (head) {
         const minBtn = document.createElement("button");
@@ -4904,29 +6187,73 @@
         minBtn.addEventListener("click", (ev) => {
           ev.stopPropagation();
           item.collapsed = !item.collapsed;
-          renderDomainCards();
+          if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
           notifyStateChanged(true, true);
         });
         head.insertBefore(minBtn, head.firstChild);
+      }
 
-        const visBtn = document.createElement("button");
-        const isVis = item.visible !== false;
-        visBtn.className = "expr-mini-btn vis-eye-btn" + (isVis ? "" : " is-hidden");
-        visBtn.textContent = isVis ? "👁" : "◌";
-        visBtn.title = isVis ? "Hide element (saved in preset)" : "Show hidden element";
-        visBtn.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          item.visible = item.visible === false;
-          if (el.kind === "point" && !isReal) window.CFVComplex.recomputePoints();
-          else if (el.kind === "shape" && !isReal) { window.CFVComplex.updateIntegralPanel(); window.CFVComplex.requestRender(); }
-          else if (isReal) window.CFVReal.requestRender();
-          else window.CFVComplex.requestRender();
-          renderDomainCards();
-          notifyStateChanged(true, true);
-        });
-        const gearEl = head.querySelector('[data-settings-trigger="1"]');
-        if (gearEl) head.insertBefore(visBtn, gearEl);
-        else head.appendChild(visBtn);
+      /* Smart Image Element Controls: editable mapping expression + "Edit Domain" re-selection! */
+      if (item.imageOf) {
+        const srcs = Array.isArray(item.imageOf.sources) && item.imageOf.sources.length > 0
+          ? item.imageOf.sources
+          : [{ kind: item.imageOf.sourceKind || el.kind, id: item.imageOf.sourceId }];
+        const curExpr = item.imageOf.expr || (() => {
+          const fc = resolveFnCardByNameOrId("", item.imageOf.fnCardId);
+          if (!fc) return isVec ? "M * v" : "f1(z)";
+          const nm = defaultCardName(fc, fnCards().indexOf(fc));
+          return isVec ? (fc.vecKind === "matrix" ? `${nm} * v` : `${nm}(v)`) : (isReal ? `${nm}(x)` : `${nm}(z)`);
+        })();
+        item.imageOf.expr = curExpr;
+        card.dataset.depExpr = curExpr;
+
+        const bodyEl = card.querySelector(".expr-body");
+        if (bodyEl && !item.collapsed) {
+          const imgBar = document.createElement("div");
+          imgBar.className = "var-card-row";
+          imgBar.style.marginTop = "4px";
+          const fLbl = document.createElement("span");
+          fLbl.className = "expr-fn-tag";
+          fLbl.textContent = "f(·)";
+          fLbl.style.color = "#fde047";
+          fLbl.style.background = "rgba(250,204,21,0.14)";
+          imgBar.appendChild(fLbl);
+
+          const exprIn = document.createElement("input");
+          exprIn.type = "text";
+          exprIn.className = "var-expr-input";
+          exprIn.spellcheck = false;
+          exprIn.value = curExpr;
+          exprIn.placeholder = isVec ? "M * v  |  F1(v)  |  rot(t) * v" : "f1(z)";
+          exprIn.title = "Mapping formula applied to the selected domain elements (press Enter to apply)";
+          const applyImgExpr = async () => {
+            item.imageOf.expr = exprIn.value.trim();
+            card.dataset.depExpr = item.imageOf.expr;
+            const fc = resolveFnCardByNameOrId(item.imageOf.expr, item.imageOf.fnCardId);
+            if (fc) item.imageOf.fnCardId = fc.id;
+            const ac = activeCanvasCtrl();
+            if (ac && ac.recomputeImageElements) await ac.recomputeImageElements();
+            else if (ac && ac.recomputeAll) await ac.recomputeAll(1.0);
+            if (ac && ac.requestRender) ac.requestRender(true);
+            notifyStateChanged(true, true);
+          };
+          exprIn.addEventListener("change", applyImgExpr);
+          exprIn.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); exprIn.blur(); } });
+          imgBar.appendChild(exprIn);
+
+          const editDomBtn = document.createElement("button");
+          editDomBtn.type = "button";
+          editDomBtn.className = "mini-hdr-btn sfn-hdr-btn";
+          editDomBtn.textContent = `Edit Domain (${srcs.length})`;
+          editDomBtn.title = "Re-enter canvas selection mode to add or remove elements in this image's domain";
+          editDomBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            startImageDomainPicker({ kind: el.kind, id: item.id });
+          });
+          imgBar.appendChild(editDomBtn);
+          bodyEl.appendChild(imgBar);
+        }
       }
 
       if (item.collapsed) {
@@ -5024,8 +6351,7 @@
         const fromIdx = dragElFrom;
         dragElFrom = -1;
         if (toIdx !== fromIdx) {
-          if (isReal && window.CFVReal.reorderElement) window.CFVReal.reorderElement(fromIdx, toIdx);
-          else if (!isReal && window.CFVComplex.reorderElement) window.CFVComplex.reorderElement(fromIdx, toIdx);
+          if (ctrl && ctrl.reorderElement) ctrl.reorderElement(fromIdx, toIdx);
         }
       });
       card.addEventListener("dragend", () => {
@@ -5062,7 +6388,9 @@
   }
 
   function syncShapeBadges() {
-    for (const s of window.CFVComplex.state.shapes) {
+    const ctrl = activeCanvasCtrl();
+    const shapes = ctrl && ctrl.state && Array.isArray(ctrl.state.shapes) ? ctrl.state.shapes : [];
+    for (const s of shapes) {
       const el = sidebar.querySelector(`[data-shape-badge="${s.id}"]`);
       if (!el) continue;
       const b = formatShapeBadge(s);
@@ -5079,22 +6407,12 @@
 
   function findSettingsItem(kind, id) {
     if (kind === "fn") return state.cards.find((c) => c.id === id);
-    if (kind === "shape") {
-      const list = isRealMode() ? (window.CFVReal.state.shapes || []) : window.CFVComplex.state.shapes;
-      return list.find((s) => s.id === id);
-    }
-    if (kind === "point") {
-      const list = isRealMode() ? window.CFVReal.state.points : window.CFVComplex.state.points;
-      return list.find((p) => p.id === id);
-    }
-    if (kind === "guide_line") {
-      const list = isRealMode() ? window.CFVReal.state.lines : window.CFVComplex.state.lines;
-      return list.find((l) => l.id === id);
-    }
-    if (kind === "text") {
-      const list = isRealMode() ? (window.CFVReal.state.texts || []) : (window.CFVComplex.state.texts || []);
-      return list.find((t) => t.id === id);
-    }
+    const ctrl = activeCanvasCtrl();
+    if (!ctrl || !ctrl.state) return null;
+    if (kind === "shape") return (ctrl.state.shapes || []).find((s) => s.id === id);
+    if (kind === "point") return (ctrl.state.points || []).find((p) => p.id === id);
+    if (kind === "guide_line") return (ctrl.state.lines || []).find((l) => l.id === id);
+    if (kind === "text") return (ctrl.state.texts || []).find((t) => t.id === id);
     return null;
   }
 
@@ -5162,19 +6480,26 @@
       if (kind === "fn") {
         renderFnCards();
         if (isRealMode()) window.CFVReal.scheduleSample(true);
+        else if (isVectorMode() && window.CFVVector) window.CFVVector.onWorkspaceCompiled();
         else if (recalc) window.CFVComplex.recomputeAll(1.0);
         else window.CFVComplex.requestRender();
       } else if (kind === "shape") {
-        renderDomainCards();
+        if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
         if (isRealMode()) {
           window.CFVReal.requestRender();
+        } else if (isVectorMode() && window.CFVVector) {
+          window.CFVVector.recomputeAllIntegrals();
+          window.CFVVector.requestRender();
         } else {
           window.CFVComplex.updateIntegralPanel();
           window.CFVComplex.requestRender();
         }
       } else {
-        renderDomainCards();
+        if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
         if (isRealMode()) window.CFVReal.requestRender();
+        else if (isVectorMode() && window.CFVVector) window.CFVVector.requestRender();
         else window.CFVComplex.requestRender();
       }
       notifyStateChanged(true, true);
@@ -5367,8 +6692,8 @@
           clBtn.className = "btn-subtle flex-1";
           clBtn.textContent = item.closed ? "Open Path" : "Close Loop";
           clBtn.addEventListener("click", async () => {
-            if (isRealMode()) window.CFVReal.toggleCloseShape(item.id);
-            else await window.CFVComplex.toggleCloseShape(item.id);
+            const ac = activeCanvasCtrl();
+            if (ac && ac.toggleCloseShape) await ac.toggleCloseShape(item.id);
             renderItemSettings();
           });
           actRow.appendChild(clBtn);
@@ -5378,7 +6703,8 @@
           revBtn.className = "btn-subtle flex-1";
           revBtn.textContent = "Reverse ⇄";
           revBtn.addEventListener("click", async () => {
-            await window.CFVComplex.reverseShape(item.id);
+            const ac = activeCanvasCtrl();
+            if (ac && ac.reverseShape) await ac.reverseShape(item.id);
             renderItemSettings();
           });
           actRow.appendChild(revBtn);
@@ -5395,8 +6721,8 @@
       const lRow = document.createElement("div");
       lRow.className = "layer-move-row";
       const moveFn = (act) => {
-        if (isRealMode() && window.CFVReal.moveElementLayer) window.CFVReal.moveElementLayer(kind, id, act);
-        else if (!isRealMode() && window.CFVComplex.moveElementLayer) window.CFVComplex.moveElementLayer(kind, id, act);
+        const ac = activeCanvasCtrl();
+        if (ac && ac.moveElementLayer) ac.moveElementLayer(kind, id, act);
       };
       for (const [act, lbl, title] of [
         ["back", "⇤ Back", "Send to Back (drawn first)"],
@@ -5726,6 +7052,7 @@
       await window.CFVComplex.recomputeAll(1.0);
     }
 
+    if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
     renderDomainCards();
     renderExamplesMenu();
     renderPresetBar();
@@ -5770,6 +7097,8 @@
 
       if (normTarget === "real") {
         window.CFVReal.clearToBlank();
+      } else if (normTarget === "vector") {
+        if (window.CFVVector) window.CFVVector.resetBlank();
       } else {
         window.CFVComplex.clearToBlank();
         if (mode === "integral") window.CFVComplex.setContourMode(true, { silent: true });
@@ -5778,7 +7107,8 @@
       setStatus("ok", "Blank · Click + Fn or pick a Project");
       updateProjectHeaderUI();
       renderFnCards();
-      renderDomainCards();
+      if (state.imagePicker && state.imagePicker.active) updateImagePickerBanner();
+    renderDomainCards();
       renderExamplesMenu();
       renderPresetBar();
       syncUrl(pushHistory, false);
@@ -5900,6 +7230,25 @@
         }
         renderFnCards();
         await window.CFVReal.loadExampleAndPreset(ex, preset);
+        resolveVariables(true, true);
+        if (preset.startSlider) ensureSliderLoop();
+      } else if (ex.mode === "vector") {
+        const fns = fnCards();
+        const wantActIdx = typeof preset.activeFnIndex === "number"
+          ? preset.activeFnIndex
+          : Math.max(0, (ex.fnCards || []).findIndex((c) => c.active === true));
+        if (fns[wantActIdx]) {
+          state.primaryCardId = fns[wantActIdx].id;
+          if (fns[wantActIdx].vecKind === "matrix") {
+            fns.forEach((c, idx) => {
+              if (c.vecKind === "matrix") c.visible = idx === wantActIdx;
+            });
+          } else {
+            fns[wantActIdx].visible = true;
+          }
+        }
+        renderFnCards();
+        if (window.CFVVector) window.CFVVector.loadExampleAndPreset(ex, preset);
         resolveVariables(true, true);
         if (preset.startSlider) ensureSliderLoop();
       } else {
@@ -6263,6 +7612,7 @@
       closeSavePresetForm();
 
       const ex = window.CFVExamples.byId(exampleId);
+      if (window.CFVMainMenu && ex && ex.id) window.CFVMainMenu.recordProjectUse(`ex:${ex.id}`);
       const preset = (presetId && ex.presets && ex.presets.find((p) => p.id === presetId)) || (ex.presets && ex.presets[0]) || null;
 
       state.activeProjectId = ex.id;
@@ -6294,6 +7644,7 @@
       const fns = (ex.fnCards || []).map((c) => ({
         ...c,
         kind: "fn",
+        vecKind: c.vecKind || (normExMode === "vector" && c.kind && c.kind !== "fn" ? c.kind : "field"),
         id: state.nextCardId++,
         lineWidth: c.lineWidth || 2.2,
         lineStyle: c.lineStyle || (c.dashed ? "dashed" : "solid"),
@@ -6355,6 +7706,10 @@
         await window.CFVReal.loadExampleAndPreset(ex, preset);
         resolveVariables(true, true);
         if (preset && preset.startSlider) ensureSliderLoop();
+      } else if (normExMode === "vector") {
+        if (window.CFVVector) window.CFVVector.loadExampleAndPreset(ex, preset);
+        resolveVariables(true, true);
+        if (preset && preset.startSlider) ensureSliderLoop();
       } else {
         await window.CFVComplex.loadExampleAndPreset(ex, preset);
         resolveVariables(true, true);
@@ -6370,6 +7725,7 @@
     const normM = normMode(mode);
     state.mode = normM;
     const isReal = normM === "real";
+    const isVec = normM === "vector";
 
     document.querySelectorAll(".ws-btn").forEach((b) => {
       const a = b.dataset.wsMode === normM;
@@ -6379,47 +7735,54 @@
 
     if (fnTabLabel) {
       fnTabLabel.textContent =
-        isReal ? "Real Curves & Relations" : isContourMode() ? "Integrand f(z) & Aux" : "Function w = f(z) & Aux";
+        isReal ? "Real Curves & Relations" : isVec ? "Functions, Matrices & Vars" : isContourMode() ? "Integrand f(z) & Aux" : "Function w = f(z) & Aux";
     }
+    document.querySelectorAll(".vec-only-add").forEach((el) => el.classList.toggle("hidden", !isVec));
+    document.querySelectorAll(".nonvec-only-add").forEach((el) => el.classList.toggle("hidden", isVec));
     if (domainSectionLabel) {
       domainSectionLabel.textContent = "Elements & Layers";
     }
     if (fnSyntaxGuide && !fnSyntaxGuide.classList.contains("hidden") && window.CFVFunctionLibrary) {
       const gb = document.getElementById("fn-guide-body");
-      if (gb) gb.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(mode);
-      else fnSyntaxGuide.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(mode);
+      if (gb) gb.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(normM);
+      else fnSyntaxGuide.innerHTML = window.CFVFunctionLibrary.renderSyntaxGuideHtml(normM);
     }
     if (fnLibraryDropdown && !fnLibraryDropdown.classList.contains("hidden")) {
       renderFnLibraryMenu();
     }
     if (domainQuickAdds && domainQuickAdds.querySelectorAll) {
       domainQuickAdds.querySelectorAll(".complex-only-add").forEach((el) => {
-        el.classList.toggle("hidden", isReal);
+        el.classList.toggle("hidden", isReal || isVec);
       });
     }
 
-    stageComplex.classList.toggle("hidden", isReal);
+    stageComplex.classList.toggle("hidden", isReal || isVec);
     stageReal.classList.toggle("hidden", !isReal);
-    toolsComplexBody.classList.toggle("hidden", isReal);
+    if (stageVector) stageVector.classList.toggle("hidden", !isVec);
+    toolsComplexBody.classList.toggle("hidden", isReal || isVec);
     toolsRealBody.classList.toggle("hidden", !isReal);
-    toolsTitle.textContent = isReal ? "Real Analysis Tools" : "Complex Analysis Tools";
+    if (toolsVectorBody) toolsVectorBody.classList.toggle("hidden", !isVec);
+    toolsTitle.textContent = isReal ? "Real Analysis Tools" : isVec ? "2D Vector Field Tools" : "Complex Analysis Tools";
 
-    readoutInLabel.textContent = isReal ? "x" : "z";
-    readoutOutLabel.textContent = isReal ? "y" : "f(z)";
+    readoutInLabel.textContent = isReal ? "x" : isVec ? "(x,y)" : "z";
+    readoutOutLabel.textContent = isReal ? "y" : isVec ? "F(x,y)" : "f(z)";
     readoutIn.textContent = "—";
     readoutOut.textContent = "—";
 
-    window.CFVComplex.state.active = !isReal;
+    window.CFVComplex.state.active = !isReal && !isVec;
     window.CFVReal.state.active = isReal;
+    if (window.CFVVector) window.CFVVector.setActive(isVec);
 
     applyLayoutVisibility();
     if (isReal) window.CFVReal.resize();
+    else if (isVec) { if (window.CFVVector) window.CFVVector.onResize(); }
     else {
       applySplitPct(state.splitPct, true);
       window.CFVComplex.resize();
     }
     requestAnimationFrame(() => {
       if (isReal) window.CFVReal.resize();
+      else if (isVec) { if (window.CFVVector) window.CFVVector.onResize(); }
       else window.CFVComplex.resize();
     });
   }
@@ -6428,23 +7791,38 @@
    * Adding Functions, Sliders, Shapes, Points & Landmark Lines
    * ------------------------------------------------------------------------- */
 
-  function addFunctionCard(code, title) {
+  function addFunctionCard(code, title, vecKind = "field") {
     const fnCount = fnCards().length;
+    const isVec = isVectorMode();
+    const vk = isVec ? (vecKind || "field") : "field";
+    const defaultTitle = isRealMode()
+      ? `Curve ${fnCount + 1}`
+      : isVec
+        ? (vk === "matrix" ? `Matrix M${fnCount + 1}` : vk === "vector" ? `Vector v${fnCount + 1}` : vk === "potential" ? `Scalar f${fnCount + 1}(x, y)` : `Vector Field F${fnCount + 1}(x, y)`)
+        : (fnCount === 0 ? "Function f(z)" : `Helper f${fnCount + 1}(z)`);
+    const defaultCode = isRealMode()
+      ? "sin(x)"
+      : isVec
+        ? defaultVectorCodeForKind(vk)
+        : (fnCount === 0 ? "c_zeta(s)" : `f${fnCount}(z)`);
     const card = {
       id: state.nextCardId++,
       kind: "fn",
-      title: title || (isRealMode() ? `Curve ${fnCount + 1}` : fnCount === 0 ? "Function f(z)" : `Helper f${fnCount + 1}(z)`),
-      code: code || (isRealMode() ? "sin(x)" : fnCount === 0 ? "c_zeta(s)" : `f${fnCount}(z)`),
-      color: COLORS[fnCount % COLORS.length],
+      vecKind: vk,
+      title: title || defaultTitle,
+      code: code || defaultCode,
+      color: vk === "matrix" ? "#a78bfa" : vk === "vector" ? "#38bdf8" : COLORS[fnCount % COLORS.length],
       lineWidth: 2.2,
       lineStyle: "solid",
       locked: false,
-      visible: true,
+      visible: isVec ? (vk === "matrix" ? false : (vk === "field" ? !fnCards().some((q) => q.vecKind === "matrix") : true)) : true,
       step: false,
       builtin: isRealMode() ? { fn: 0, kind: "exact" } : { fn: 0 },
     };
     state.cards.push(card);
-    if (!state.primaryCardId) state.primaryCardId = card.id;
+    if (!state.primaryCardId || vk === "matrix") {
+      if (!state.primaryCardId) state.primaryCardId = card.id;
+    }
     renderFnCards();
     compileWorkspace(false, false);
     notifyStateChanged(true, true);
@@ -6471,15 +7849,60 @@
     notifyStateChanged(true, true);
   }
 
+  function convertMatrixCardToVar(card, targetKind, cells) {
+    const idx = state.cards.indexOf(card);
+    if (idx < 0) return;
+    const used = new Set([...paramCards().map((s) => s.name), ...vecVarCards().map((v) => v.name)]);
+    if (targetKind === "vec") {
+      const name = ["u", "w", "p", "q", "b", "c", "d"].find((n) => !used.has(n)) || `u${vecVarCards().length + 1}`;
+      const expr = `[${cells[0] ?? "1"}, ${cells[1] ?? "0"}]`;
+      state.cards[idx] = { id: card.id, kind: "var", varKind: "vec", name, label: "", expr, vx: 1, vy: 0 };
+    } else {
+      const name = ["s", "k", "c", "a", "r", "R"].find((n) => !used.has(n)) || `s${scalarVarCards().length + 1}`;
+      const expr = String(cells[0] ?? "1");
+      state.cards[idx] = { id: card.id, kind: "var", varKind: "scalar", name, label: "", expr, value: 0 };
+    }
+    if (state.primaryCardId === card.id) {
+      const nextFn = fnCards()[0];
+      state.primaryCardId = nextFn ? nextFn.id : null;
+    }
+    resolveVariables(true);
+    renderFnCards();
+    if (window.CFVVector && window.CFVVector.syncToolbarUI) window.CFVVector.syncToolbarUI();
+    compileWorkspace(false, false);
+    notifyStateChanged(true, true);
+  }
+
+  function addVectorVariableCard() {
+    const used = new Set([...paramCards().map((s) => s.name), ...vecVarCards().map((v) => v.name)]);
+    const candidates = ["u", "w", "p", "q", "b", "d", "n"];
+    const name = candidates.find((n) => !used.has(n)) || `u${vecVarCards().length + 1}`;
+    state.cards.push({
+      id: state.nextCardId++,
+      kind: "var",
+      varKind: "vec",
+      name,
+      label: "",
+      expr: "[1, 0]",
+      vx: 1,
+      vy: 0,
+    });
+    resolveVariables(false);
+    renderFnCards();
+    compileWorkspace(true, false);
+    notifyStateChanged(true, true);
+  }
+
   function addVariableCard() {
-    const used = new Set(getParamNames());
-    const candidates = ["R", "r", "eps", "w", "h", "d", "u", "v"];
-    const name = candidates.find((n) => !used.has(n)) || `v${varCards().length + 1}`;
+    const used = new Set([...paramCards().map((s) => s.name), ...vecVarCards().map((v) => v.name)]);
+    const candidates = ["R", "r", "eps", "w", "h", "d", "s", "k"];
+    const name = candidates.find((n) => !used.has(n)) || `s${scalarVarCards().length + 1}`;
     const firstSlider = sliderCards()[0];
     const expr = firstSlider ? `2.0 * ${firstSlider.name}` : "1.0";
     state.cards.push({
       id: state.nextCardId++,
       kind: "var",
+      varKind: "scalar",
       name,
       label: "",
       expr,
@@ -6898,6 +8321,10 @@
     }
     if (window.CFVComplex) window.CFVComplex.requestRender();
     if (window.CFVReal) window.CFVReal.requestRender();
+    if (window.CFVVector) {
+      if (typeof window.CFVVector.onThemeChanged === "function") window.CFVVector.onThemeChanged();
+      else window.CFVVector.requestRender(true);
+    }
   }
   try {
     const savedTheme = window.localStorage && window.localStorage.getItem(THEME_KEY);
@@ -7116,7 +8543,7 @@
     });
   }
 
-  /* Clicking Map / Integral / 2D Real opens a BLANK Project in that mode */
+  /* Clicking Complex / Real / Vector switches cleanly to a blank workspace for that mode */
   document.querySelectorAll(".ws-btn").forEach((b) => {
     b.addEventListener("click", () => {
       const m = b.dataset.wsMode;
@@ -7152,7 +8579,18 @@
     else window.CFVComplex.addTextBox({});
   }
 
+    /* Clean dock & sidebar wiring for Interactive f(·) Image Tool */
+    document.querySelectorAll("[data-image-tool]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (state.imagePicker && state.imagePicker.active) cancelImageDomainPicker();
+        else startImageDomainPicker(null);
+      });
+    });
+
   document.getElementById("btn-add-fn").addEventListener("click", () => addFunctionCard());
+  const btnAddMatrix = document.getElementById("btn-add-matrix");
+  if (btnAddMatrix) btnAddMatrix.addEventListener("click", () => addFunctionCard(null, null, "matrix"));
   document.getElementById("btn-add-slider").addEventListener("click", addSliderCard);
   const btnAddVar = document.getElementById("btn-add-var");
   if (btnAddVar) btnAddVar.addEventListener("click", addVariableCard);
@@ -7309,6 +8747,11 @@
       out.height = src.height;
       const g = out.getContext("2d");
       g.drawImage(src, 0, 0);
+    } else if (isVectorMode() && window.CFVVector && window.CFVVector.getCanvas()) {
+      const src = window.CFVVector.getCanvas();
+      out.width = src.width;
+      out.height = src.height;
+      out.getContext("2d").drawImage(src, 0, 0);
     } else {
       const c1 = window.CFVComplex.canvasIn;
       const c2 = window.CFVComplex.canvasOut;
@@ -7342,11 +8785,48 @@
   window.addEventListener("resize", () => {
     window.CFVComplex.resize();
     window.CFVReal.resize();
+    if (window.CFVVector) window.CFVVector.onResize();
   });
+
+  function getActiveVectorPayload() {
+    if (!isVectorMode() || state.compiledKind !== "vector") return null;
+    const fns = fnCards();
+    const graphable = fns.filter((c) => !isScalarInputVecCard(c) && c.vecKind !== "vector");
+    if (graphable.length === 0) return null;
+    /* Single active function/matrix selection (scalar-input helpers ℝ→ℝ / ℝ→ℝ² are NEVER graphed!) */
+    const active = graphable.find((c) => c.id === state.primaryCardId) || graphable[0];
+    if (!active) return null;
+    const slot = typeof active.slot === "number" ? active.slot : Math.max(0, fns.indexOf(active));
+    return {
+      slot,
+      cardId: active.id,
+      name: defaultCardName(active, fns.indexOf(active)),
+      vecKind: active.vecKind || "field",
+      matDims: active.matDims || "2x2",
+      tMin: active.tMin !== undefined ? Number(active.tMin) : 0,
+      tMax: active.tMax !== undefined ? Number(active.tMax) : 6.2831853,
+      params: getParamValues(),
+    };
+  }
 
   window.CFVWorkspace = {
     state,
     VIEWPORT_GLOBALS,
+    getMode: () => state.mode,
+    setMode: (m) => guardNavigation(() => openBlankWorkspace(m, true)),
+    loadExampleById: (id) => guardNavigation(() => loadExample(id, null, true)),
+    getActiveVectorPayload,
+    evalLinearAlgebraState,
+    updateLinearAlgebraPreviews,
+    setVectorCardCoords,
+    isImagePickerActive,
+    updateImagePickerBanner,
+    startImageDomainPicker,
+    resolveFnCardByNameOrId,
+    defaultCardName,
+    syncUrl,
+    renderDomainSidebar: renderDomainCards,
+    onCanvasStateChange: (dirty) => notifyStateChanged(Boolean(dirty), Boolean(dirty)),
     getViewportGlobals,
     applyViewportGlobals,
     paramsRequireServerRecompute,

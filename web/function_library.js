@@ -237,12 +237,62 @@
     `;
   }
 
+  const VECTOR_FUNCTIONS = [
+    { cat: "Electromagnetism & Fluids", name: "Electric Dipole Field", desc: "Two opposite charges ±1 at (±1.5, 0) + potential φ", code: "double r1 = (x+1.5)*(x+1.5)+y*y+0.1, r2 = (x-1.5)*(x-1.5)+y*y+0.1;\nfx = (x+1.5)/r1 - (x-1.5)/r2; fy = y/r1 - y/r2;\nphi = -0.5*(log(r1) - log(r2));", insert: "fx = (x+1.5)/((x+1.5)*(x+1.5)+y*y+0.1) - (x-1.5)/((x-1.5)*(x-1.5)+y*y+0.1); fy = y/((x+1.5)*(x+1.5)+y*y+0.1) - y/((x-1.5)*(x-1.5)+y*y+0.1);" },
+    { cat: "Electromagnetism & Fluids", name: "Rankine Vortex", desc: "Solid-body core (r < 1.2) + irrotational outer swirl", code: "double r2 = x*x + y*y, s = r2 < 1.44 ? 2.5/1.44 : 2.5/(r2+1e-6);\nfx = -s*y; fy = s*x;", insert: "double r2 = x*x + y*y; fx = -y/(r2+0.25); fy = x/(r2+0.25);" },
+    { cat: "Electromagnetism & Fluids", name: "Source + Vortex Spiral", desc: "Outward radial source + counter-clockwise rotation", code: "double r2 = x*x + y*y + 0.25;\nfx = (x - 2.0*y)/r2; fy = (y + 2.0*x)/r2;", insert: "fx = (x - 2.0*y)/(x*x+y*y+0.25); fy = (y + 2.0*x)/(x*x+y*y+0.25);" },
+    { cat: "Phase Planes & ODEs", name: "Van der Pol Oscillator", desc: "Self-sustaining limit cycle x'=y, y'=(1-x²)y - x", code: "fx = y;\nfy = 1.2*(1.0 - x*x)*y - x;", insert: "fx = y; fy = 1.2*(1.0 - x*x)*y - x;" },
+    { cat: "Phase Planes & ODEs", name: "Damped Pendulum", desc: "Nonlinear pendulum phase portrait θ'=ω, ω'=-sin(θ)-0.25ω", code: "fx = y;\nfy = -sin(x) - 0.25*y;", insert: "fx = y; fy = -sin(x) - 0.25*y;" },
+    { cat: "Phase Planes & ODEs", name: "Hyperbolic Saddle", desc: "Incompressible saddle flow F = (x, -y)", code: "fx = x; fy = -y; phi = 0.5*(x*x - y*y);", insert: "fx = x; fy = -y;" },
+    { cat: "Curl & Gradient Fields", name: "Incompressible Cellular Eddies", desc: "Exact zero-divergence curl of sin(x)sin(y)", code: "fx = sin(x)*cos(y);\nfy = -cos(x)*sin(y);\nphi = sin(x)*sin(y);", insert: "fx = sin(x)*cos(y); fy = -cos(x)*sin(y);" },
+    { cat: "Curl & Gradient Fields", name: "Gaussian Peak Gradient", desc: "Conservative gradient field pointing toward peak", code: "double e = exp(-(x*x + y*y));\nfx = -2.0*x*e; fy = -2.0*y*e; phi = e;", insert: "double e = exp(-(x*x + y*y)); fx = -2.0*x*e; fy = -2.0*y*e; phi = e;" },
+  ];
+
+  const _origRenderSyntaxGuideHtml = renderSyntaxGuideHtml;
+  function renderSyntaxGuideHtmlEx(mode) {
+    if (mode === "vector") {
+      return `
+        <div class="guide-box">
+          <div class="guide-sec">
+            <div class="guide-sec-hdr">1. 2D Vector Field C11 Syntax (Click + Insert)</div>
+            <div class="guide-examples">
+              <div class="guide-ex">
+                <button class="guide-copy-btn" data-guide-insert="fx = -y;\nfy = x;">+ Insert</button>
+                <span class="guide-ex-badge">Vector Field</span>
+                <code>fx = -y; fy = x;</code>
+                <span class="guide-ex-note">Assign <code>fx</code> and <code>fy</code> (both <code>double</code>) using <code>x, y</code> and any Sliders/Vars. Optional: assign <code>phi = ...;</code> for equipotentials!</span>
+              </div>
+              <div class="guide-ex">
+                <button class="guide-copy-btn" data-guide-insert="double r2 = x*x + y*y + 0.15;\nfx = x / r2; fy = y / r2;\nphi = -0.5 * log(r2);">+ Insert</button>
+                <span class="guide-ex-badge param">Field + Potential</span>
+                <code>fx = x/r2; fy = y/r2; phi = -0.5*log(r2);</code>
+                <span class="guide-ex-note">Or write a <strong>Potential</strong> card (toggle card kind) returning scalar <code>φ(x, y)</code> — C11 computes <code>∇φ</code> automatically!</span>
+              </div>
+            </div>
+          </div>
+          <div class="guide-sec">
+            <div class="guide-sec-hdr">2. Live Divergence, Curl, Work &amp; Flux</div>
+            <ul class="guide-list">
+              <li><strong>Heatmaps:</strong> Switch the top-right dropdown between <strong>Potential φ</strong>, <strong>Magnitude |F|</strong>, <strong>Divergence ∇·F</strong> (sources/sinks), and <strong>Curl ∇×F</strong> (vorticity)!</li>
+              <li><strong>Green's &amp; Gauss's Theorems:</strong> Draw a Circle, Rect, or Freehand loop and drag it across sources or vortices — the floating panel computes live <strong>Work/Circulation ∮ F·dr</strong> and <strong>Outward Flux ∮ F·n ds</strong>!</li>
+              <li><strong>60 FPS Flow Particles &amp; Streamlines:</strong> Toggle RK4 Streamlines, Equipotentials, Quiver Arrows &amp; 60 FPS Advected Particles in <strong>Tools</strong>.</li>
+            </ul>
+          </div>
+        </div>
+      `;
+    }
+    return _origRenderSyntaxGuideHtml(mode);
+  }
+
   window.CFVFunctionLibrary = {
     complex: COMPLEX_FUNCTIONS,
     real: REAL_FUNCTIONS,
+    vector: VECTOR_FUNCTIONS,
     getForMode(mode) {
-      return mode === "real" ? REAL_FUNCTIONS : COMPLEX_FUNCTIONS;
+      if (mode === "real") return REAL_FUNCTIONS;
+      if (mode === "vector") return VECTOR_FUNCTIONS;
+      return COMPLEX_FUNCTIONS;
     },
-    renderSyntaxGuideHtml,
+    renderSyntaxGuideHtml: renderSyntaxGuideHtmlEx,
   };
 })();

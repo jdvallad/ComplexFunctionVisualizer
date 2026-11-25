@@ -113,6 +113,14 @@ size_t sampler_find_zeros(const FunctionDef *fn, const Point2D *poly, size_t pol
                           double xmin, double xmax, double ymin, double ymax, FoundZero *zeros_out,
                           size_t max_zeros);
 
+/*
+ * Bidirectional Output -> Input Newton Pullback: solves f(z) = target_w
+ * from optional seed points plus a viewport grid to locate preimages z in f^{-1}(w).
+ */
+size_t sampler_pullback(const FunctionDef *fn, double target_re, double target_im,
+                        const Point2D *seeds, size_t seed_count, double xmin, double xmax,
+                        double ymin, double ymax, FoundZero *out, size_t max_out);
+
 #define MAX_TAYLOR_DEGREE 24
 
 typedef struct {

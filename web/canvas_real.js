@@ -863,6 +863,7 @@
   }
 
   function isLightTheme() {
+    if (window.CFVGeom && window.CFVGeom.isLightTheme) return window.CFVGeom.isLightTheme();
     return typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
   }
   function normLineWidth(v, fallback = 2.1) {
@@ -911,9 +912,13 @@
     return out;
   }
   function rebuildFormulaElements() {
+    const pm = ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
+    if (window.CFVGeom && window.CFVGeom.rebuildFormulaElementsInState) {
+      window.CFVGeom.rebuildFormulaElementsInState(state, pm);
+      return;
+    }
     const ev = window.CFVComplex && window.CFVComplex.evalParamExpr;
     if (!ev) return;
-    const pm = ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
     for (const p of state.points) {
       if (p.xExpr && String(p.xExpr).trim()) {
         const vx = ev(p.xExpr, pm);
@@ -940,6 +945,16 @@
         if (Number.isFinite(vy)) tb.y = vy;
       }
     }
+  }
+  async function rebuildShapeFromFormula(shape) {
+    if (!shape || !shape.formula || !window.CFVGeom) return false;
+    const pm = ws() && typeof ws().getParamMap === "function" ? ws().getParamMap() : {};
+    const res = window.CFVGeom.evalShapeFormula(shape.formula, pm);
+    if (!res || res.rawPts.length < 2) return false;
+    shape.rawPts = res.rawPts;
+    if (shape.formula.kind !== "parametric") shape.closed = res.closed;
+    requestRender();
+    return true;
   }
   function reorderElement(fromIdx, toIdx) {
     syncLayerOrder();
@@ -982,18 +997,28 @@
     const op = normOpacity(opacity, 1.0);
     if (width <= 0 || op <= 0.001) return;
     const h = canvas.clientHeight;
+    const ySpan = Math.max(1e-6, state.view.ymax - state.view.ymin);
     const trace = () => {
       ctx.beginPath();
-      let down = false, psy = 0;
+      let down = false, psy = 0, prevY = 0;
       for (let i = 0; i < xs.length; i++) {
         const y = ys[i];
         if (y === null || !Number.isFinite(y)) { down = false; continue; }
         const sx = xToS(xs[i]);
         const sy = Math.max(-h * 2, Math.min(h * 3, yToS(y)));
+        /* Asymptotic jump / pole discontinuity detection (prevents vertical spikes on tan(x), 1/(x-a), etc.) */
+        if (down && !step) {
+          const dy = Math.abs(y - prevY);
+          const signFlip = (y > 0 && prevY < 0) || (y < 0 && prevY > 0);
+          if ((signFlip && dy > ySpan * 3.5) || dy > ySpan * 14.0) {
+            down = false;
+          }
+        }
         if (!down) { ctx.moveTo(sx, sy); down = true; }
         else if (step) { ctx.lineTo(sx, psy); ctx.lineTo(sx, sy); }
         else ctx.lineTo(sx, sy);
         psy = sy;
+        prevY = y;
       }
     };
     ctx.save();
@@ -1656,18 +1681,9 @@
         ctx.restore();
       }
     }
-    /* Magnetic Endpoint & Point Snap Ring (matches Complex mode!) */
-    if (state.snapHint) {
-      const spx = xToS(state.snapHint.x), spy = yToS(state.snapHint.y);
-      ctx.save();
-      ctx.strokeStyle = "#34d399";
-      ctx.fillStyle = "rgba(52, 211, 153, 0.22)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(spx, spy, 9, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
+    /* Standardized Smart Magnetic Snap Indicator (Shared across Complex, Real & Vector!) */
+    if (state.snapHint && window.CFVGeom && window.CFVGeom.drawSnapIndicator) {
+      window.CFVGeom.drawSnapIndicator(ctx, state.snapHint, xToS, yToS, light);
     }
     ctx.restore();
   }
@@ -1848,41 +1864,36 @@
   const HANDLE_HIT_PX = 10;
   const SNAP_PX = 14;
 
-  /* Magnetic Endpoint & Landmark Point Snapping (Exact Parity with Complex Mode!) */
-  function findRealSnapTarget(sx, sy, excludeShapeId = null, excludePointId = null) {
+  /* Standardized Smart Magnetic Snapping (Shared CFVGeom Engine + Real Curve y=f(x) fallback!) */
+  function findRealSnapTarget(sx, sy, excludeShapeId = null, excludePointId = null, shiftKey = false) {
     let best = null;
-    let bestDist = SNAP_PX;
-    for (const s of state.shapes) {
-      if (!s.visible || s.id === excludeShapeId || !s.rawPts || s.rawPts.length < 2) continue;
-      const ptsToCheck = s.closed
-        ? (s.rawPts.length <= 16 ? s.rawPts : [s.rawPts[0]])
-        : [s.rawPts[0], s.rawPts[s.rawPts.length - 1]];
-      for (const ep of ptsToCheck) {
-        const d = Math.hypot(sx - xToS(ep.x), sy - yToS(ep.y));
-        if (d <= bestDist) {
-          bestDist = d;
-          best = { x: ep.x, y: ep.y, kind: "endpoint", shapeId: s.id };
-        }
-      }
+    if (window.CFVGeom && window.CFVGeom.findSmartSnap) {
+      best = window.CFVGeom.findSmartSnap(sx, sy, {
+        shapes: state.shapes,
+        points: state.points,
+        lines: state.lines,
+        xToS,
+        yToS,
+        sToX,
+        sToY,
+        excludeShapeId,
+        excludePointId,
+        snapPx: SNAP_PX,
+        shiftKey: Boolean(shiftKey),
+        includeGrid: Boolean(shiftKey),
+      });
     }
-    for (const p of state.points) {
-      if (!p.visible || p.id === excludePointId) continue;
-      const d = Math.hypot(sx - xToS(p.x), sy - yToS(p.y));
-      if (d <= bestDist) {
-        bestDist = d;
-        best = { x: p.x, y: p.y, kind: "point", pointId: p.id };
-      }
-    }
-    /* Also snap to graphed curve y = f(x) when hovering close! */
-    if (!best && state.cache && state.cache.xs && state.cache.xs.length >= 2) {
+    /* Also snap to graphed curve y = f(x) when no higher-priority geometric landmark is within radius! */
+    if ((!best || best.kind === "grid") && state.cache && state.cache.xs && state.cache.xs.length >= 2) {
       const wx = sToX(sx);
+      let bestDist = 10;
       for (const c of state.cache.curves || []) {
         const yv = sampleAt(state.cache.xs, c.ys, wx);
         if (yv !== null && Number.isFinite(yv)) {
           const d = Math.abs(sy - yToS(yv));
-          if (d <= 10 && d < bestDist) {
+          if (d <= bestDist) {
             bestDist = d;
-            best = { x: wx, y: yv, kind: "curve" };
+            best = { x: wx, y: yv, kind: "curve", label: "Curve" };
           }
         }
       }
@@ -2119,8 +2130,8 @@
     return [{ x: xmin, y: ymin }, { x: xmax, y: ymin }, { x: xmax, y: ymax }, { x: xmin, y: ymax }];
   }
 
-  function pushShapeUndo() {
-    state.shapeUndoStack.push({
+  function cloneShapeUndoSnap() {
+    return {
       shapes: state.shapes.map((s) => ({
         ...s,
         rawPts: (s.rawPts || []).map((p) => ({ x: p.x, y: p.y })),
@@ -2129,14 +2140,17 @@
       lines: state.lines.map((l) => ({ ...l })),
       texts: state.texts.map((t) => ({ ...t })),
       layerOrder: (state.layerOrder || []).map((e) => ({ ...e })),
-    });
+    };
+  }
+
+  function pushShapeUndo() {
+    state.shapeUndoStack.push(cloneShapeUndoSnap());
     if (state.shapeUndoStack.length > 40) state.shapeUndoStack.shift();
+    state.shapeRedoStack = [];
     state.lastUndoKind = "elements";
   }
 
-  function undoShapeAction() {
-    if (state.shapeUndoStack.length === 0) return false;
-    const snap = state.shapeUndoStack.pop();
+  function applyShapeSnap(snap) {
     if (Array.isArray(snap)) {
       state.shapes = snap;
     } else {
@@ -2150,6 +2164,22 @@
     notifyDomain();
     notifyState(true);
     requestRender();
+  }
+
+  function undoShapeAction() {
+    if (state.shapeUndoStack.length === 0) return false;
+    if (!Array.isArray(state.shapeRedoStack)) state.shapeRedoStack = [];
+    state.shapeRedoStack.push(cloneShapeUndoSnap());
+    if (state.shapeRedoStack.length > 40) state.shapeRedoStack.shift();
+    applyShapeSnap(state.shapeUndoStack.pop());
+    return true;
+  }
+
+  function redoShapeAction() {
+    if (!Array.isArray(state.shapeRedoStack) || state.shapeRedoStack.length === 0) return false;
+    state.shapeUndoStack.push(cloneShapeUndoSnap());
+    if (state.shapeUndoStack.length > 40) state.shapeUndoStack.shift();
+    applyShapeSnap(state.shapeRedoStack.pop());
     return true;
   }
 
@@ -2162,6 +2192,13 @@
     }
     if (state.polyUndoStack.length > 0) {
       return undoPolygonAction();
+    }
+    return false;
+  }
+
+  async function redoRealAction() {
+    if (Array.isArray(state.shapeRedoStack) && state.shapeRedoStack.length > 0) {
+      return redoShapeAction();
     }
     return false;
   }
@@ -2809,7 +2846,9 @@
       const sh = dr.shape;
       const h = dr.handle;
       const ob = dr.origBox;
-      const wx = sToX(pos.x), wy = sToY(pos.y);
+      const sn = findRealSnapTarget(pos.x, pos.y, sh.id, null, e.shiftKey);
+      state.snapHint = sn && sn.kind !== "grid" ? sn : null;
+      const wx = sn ? sn.x : sToX(pos.x), wy = sn ? sn.y : sToY(pos.y);
       if (h.shapeKind === "circle") {
         const origR = Math.max(1e-6, 0.25 * ((ob.xmax - ob.xmin) + (ob.ymax - ob.ymin)));
         const r = Math.max(0.03, Math.hypot(wx - ob.cx, wy - ob.cy));
@@ -2930,10 +2969,8 @@
     }
     if (state.drawing) {
       const d = state.drawing;
-      const sn = (d.kind === "line" || d.kind === "seg" || d.kind === "ray" || d.kind === "infline" || d.kind === "freehand")
-        ? findRealSnapTarget(pos.x, pos.y)
-        : null;
-      state.snapHint = sn;
+      const sn = d.kind === "freehand" ? null : findRealSnapTarget(pos.x, pos.y, null, null, e.shiftKey);
+      state.snapHint = sn && sn.kind !== "grid" ? sn : null;
       const cur = sn ? { x: sn.x, y: sn.y } : { x: sToX(pos.x), y: sToY(pos.y) };
       if (d.kind === "freehand") {
         const last = d.rawPts[d.rawPts.length - 1];
@@ -3384,6 +3421,28 @@
     }
     requestRender(); scheduleSample(false); notifyState(false, false);
   }, { passive: false });
+
+  if (window.CFVGeom && typeof window.CFVGeom.attachPinchController === "function") {
+    window.CFVGeom.attachPinchController(canvas, {
+      onPinch(factor, sx, sy) {
+        const f = 1 / Math.max(0.5, Math.min(2.0, factor));
+        const wx = sToX(sx), wy = sToY(sy);
+        state.view.xmin = wx + (state.view.xmin - wx) * f;
+        state.view.xmax = wx + (state.view.xmax - wx) * f;
+        state.view.ymin = wy + (state.view.ymin - wy) * f;
+        state.view.ymax = wy + (state.view.ymax - wy) * f;
+        requestRender(); scheduleSample(false);
+      },
+      onTwoFingerPan(dx, dy) {
+        const w = canvas.clientWidth || 600, h = canvas.clientHeight || 400;
+        const dWorldX = -(dx / w) * (state.view.xmax - state.view.xmin);
+        const dWorldY = (dy / h) * (state.view.ymax - state.view.ymin);
+        state.view.xmin += dWorldX; state.view.xmax += dWorldX;
+        state.view.ymin += dWorldY; state.view.ymax += dWorldY;
+        requestRender(); scheduleSample(false);
+      },
+    });
+  }
 
   const btnRealSquare = document.getElementById("real-square");
   if (btnRealSquare) btnRealSquare.addEventListener("click", () => setSquareAspect(!state.squareAspect));
@@ -3857,6 +3916,7 @@
     toggleCloseShape,
     undoShapeAction,
     undoRealAction,
+    redoRealAction,
     deleteSelectedItems,
     clearShapes,
     addPoint,
@@ -3869,6 +3929,7 @@
     deleteTextBox,
     selectTextBox,
     rebuildFormulaElements,
+    rebuildShapeFromFormula,
     getOrderedElements,
     reorderElement,
     moveElementLayer,
@@ -3901,6 +3962,7 @@
       state.selectedPolyIds.clear();
       state.polyUndoStack = [];
       state.shapeUndoStack = [];
+      state.shapeRedoStack = [];
       state.drawing = null;
       state.polyDraft = null;
       state.polyTool = "move";
@@ -3925,6 +3987,84 @@
       state.view = { ...v };
       if (state.squareAspect) enforceSquareView(true);
       scheduleSample(true);
+    },
+    setTool(t) { setPolyTool(t); },
+    async recomputeImageElements() {
+      const w = ws();
+      if (!w || !w.state) return;
+      const evalRealPts = async (fnCardId, expr, pts) => {
+        const fc = w.resolveFnCardByNameOrId ? w.resolveFnCardByNameOrId(expr || "", fnCardId) : null;
+        const slot = fc && typeof fc.slot === "number" ? fc.slot : 0;
+        const params = w.getParamValues ? w.getParamValues() : [];
+        const out = [];
+        for (const p of pts) {
+          try {
+            const res = await fetch("/api/workspace/real_sample", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slot, xmin: p.x - 1e-4, xmax: p.x + 1e-4, samples: 8, params }),
+            });
+            if (res.ok) {
+              const d = await res.json();
+              const ys = d && d.ys ? d.ys : [];
+              const mid = ys[Math.floor(ys.length / 2)];
+              out.push(mid !== null && Number.isFinite(Number(mid)) ? { x: p.x, y: Number(mid) } : { x: p.x, y: p.y });
+            } else out.push({ x: p.x, y: p.y });
+          } catch (_) { out.push({ x: p.x, y: p.y }); }
+        }
+        return out;
+      };
+      for (const p of state.points) {
+        if (!p.visible || !p.imageOf) continue;
+        const src = state.points.find((q) => q.id === p.imageOf.sourceId);
+        if (!src) continue;
+        const mp = await evalRealPts(p.imageOf.fnCardId, p.imageOf.expr, [{ x: src.x, y: src.y }]);
+        if (mp && mp[0]) { p.x = mp[0].x; p.y = mp[0].y; }
+      }
+      for (const s of state.shapes) {
+        if (!s.visible || !s.imageOf) continue;
+        const src = state.shapes.find((q) => q.id === s.imageOf.sourceId);
+        if (!src || !src.rawPts || src.rawPts.length < 2) continue;
+        const step = Math.max(1, Math.floor(src.rawPts.length / 24));
+        const samplePts = src.rawPts.filter((_, idx) => idx % step === 0 || idx === src.rawPts.length - 1);
+        const mp = await evalRealPts(s.imageOf.fnCardId, s.imageOf.expr, samplePts);
+        if (mp && mp.length >= 2) { s.rawPts = mp; s.closed = Boolean(src.closed); }
+      }
+      requestRender();
+    },
+    async createImageFromSources(sources, def = {}) {
+      if (!Array.isArray(sources) || sources.length === 0) return null;
+      if (sources.length === 1 && sources[0].kind === "point") {
+        const src = state.points.find((p) => p.id === sources[0].id);
+        if (!src) return null;
+        const img = {
+          id: state.nextPointId++, x: src.x, y: src.y,
+          label: `${def.labelPrefix || "f"}(${src.label || "P"})`, icon: "diamond", color: "#fbbf24",
+          size: 6, opacity: 1.0, locked: false, visible: true, showLabel: true,
+          imageOf: { sourceKind: "point", sourceId: src.id, sources: sources.map((s) => ({ ...s })), fnCardId: def.fnCardId ?? null, expr: def.expr || "f1(x)" },
+        };
+        state.points.push(img);
+        syncLayerOrder();
+        await this.recomputeImageElements();
+        notifyDomain(); notifyState(true); requestRender();
+        return img;
+      }
+      const firstShape = sources.find((sr) => sr.kind === "shape");
+      const src = firstShape ? state.shapes.find((s) => s.id === firstShape.id) : null;
+      if (!src) return null;
+      const img = {
+        id: state.nextShapeId++, kind: "path",
+        label: `${def.labelPrefix || "f"}(${src.label || "Shape"})`, color: "#fbbf24",
+        lineWidth: 2.3, opacity: src.closed ? 0.18 : 1.0, lineStyle: "solid",
+        closed: Boolean(src.closed), locked: false, visible: true,
+        imageOf: { sourceKind: "shape", sourceId: src.id, sources: sources.map((s) => ({ ...s })), fnCardId: def.fnCardId ?? null, expr: def.expr || "f1(x)" },
+        rawPts: src.rawPts.map((p) => ({ x: p.x, y: p.y })),
+      };
+      state.shapes.push(img);
+      syncLayerOrder();
+      await this.recomputeImageElements();
+      notifyDomain(); notifyState(true); requestRender();
+      return img;
     },
     async loadExampleAndPreset(ex, preset) {
       const pr = preset || (ex.presets && ex.presets[0]) || {};
@@ -4017,6 +4157,7 @@
       state.selectedLineId = null;
       state.polyUndoStack = [];
       state.shapeUndoStack = [];
+      state.shapeRedoStack = [];
       if (pr.fillGrid) {
         const dims = getActiveGridDims();
         const r = pr.fillGrid.r ? Math.min(60, Math.max(4, Math.round(pr.fillGrid.r))) : dims.r;

@@ -1,0 +1,67 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795596300786_63",
+  "name": "py",
+  "folder": "my",
+  "subtitle": "2 cards · 0 presets",
+  "description": "",
+  "mode": "map",
+  "cards": [
+    {
+      "title": "Vector Field F1(x, y)",
+      "code": "fx = -y;\nfy = x;",
+      "vecKind": "field",
+      "color": "#38bdf8",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Vector Field F2(x, y)",
+      "code": "fx = -y;\nfy = x;",
+      "vecKind": "field",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": false,
+      "active": false
+    }
+  ],
+  "sliders": [],
+  "vars": [],
+  "shapes": [
+    {
+      "id": 1,
+      "kind": "vector",
+      "label": "u1",
+      "color": "#38bdf8",
+      "lineWidth": 2.8,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "closed": false,
+      "locked": false,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 2,
+          "y": 1
+        }
+      ]
+    }
+  ],
+  "points": [],
+  "lines": [],
+  "viewport": {},
+  "presets": []
+}

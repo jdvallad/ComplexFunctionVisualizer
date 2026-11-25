@@ -909,6 +909,102 @@ size_t sampler_find_zeros(const FunctionDef *fn, const Point2D *poly, size_t pol
     return found;
 }
 
+size_t sampler_pullback(const FunctionDef *fn, double target_re, double target_im,
+                        const Point2D *seeds, size_t seed_count, double xmin, double xmax,
+                        double ymin, double ymax, FoundZero *out, size_t max_out) {
+    if (!fn || !out || max_out == 0 || xmax <= xmin || ymax <= ymin) {
+        return 0;
+    }
+    double complex target = c_make(target_re, target_im);
+    double tmag = cabs(target);
+    double tol = 1e-3 * fmax(1.0, tmag);
+    double span = hypot(xmax - xmin, ymax - ymin);
+    double max_step = 0.4 * span;
+    double pad_x = 0.35 * (xmax - xmin);
+    double pad_y = 0.35 * (ymax - ymin);
+
+    /* Combine caller seeds with a fast 5x5 viewport grid */
+    Point2D cand[64];
+    size_t ncand = 0;
+    if (seeds) {
+        for (size_t i = 0; i < seed_count && ncand < 32; i++) {
+            if (isfinite(seeds[i].x) && isfinite(seeds[i].y)) {
+                cand[ncand++] = seeds[i];
+            }
+        }
+    }
+    const int gx = 5, gy = 5;
+    for (int iy = 0; iy < gy && ncand < 64; iy++) {
+        double sy = ymin + (ymax - ymin) * ((double)iy + 0.5) / (double)gy;
+        for (int ix = 0; ix < gx && ncand < 64; ix++) {
+            double sx = xmin + (xmax - xmin) * ((double)ix + 0.5) / (double)gx;
+            cand[ncand++] = (Point2D){.x = sx, .y = sy};
+        }
+    }
+
+    size_t found = 0;
+    for (size_t c = 0; c < ncand && found < max_out; c++) {
+        double complex z = c_make(cand[c].x, cand[c].y);
+        double res = INFINITY;
+        bool ok = false;
+        for (int iter = 0; iter < 16; iter++) {
+            double complex fz = fn->eval(z);
+            if (!c_isfinite(fz)) {
+                break;
+            }
+            double complex g = fz - target;
+            res = cabs(g);
+            if (res < tol * 1e-4) {
+                ok = true;
+                break;
+            }
+            double h = 1e-6 * fmax(1.0, cabs(z));
+            double complex df = (fn->eval(z + h) - fn->eval(z - h)) / (2.0 * h);
+            if (!c_isfinite(df) || cabs(df) < 1e-12) {
+                break;
+            }
+            double complex step = g / df;
+            double smag = cabs(step);
+            if (smag > max_step) {
+                step *= (max_step / smag);
+            }
+            z -= step;
+            if (creal(z) < xmin - pad_x || creal(z) > xmax + pad_x ||
+                cimag(z) < ymin - pad_y || cimag(z) > ymax + pad_y) {
+                break;
+            }
+        }
+        if (!ok) {
+            double complex fz = fn->eval(z);
+            if (c_isfinite(fz)) {
+                res = cabs(fz - target);
+                if (res < tol) {
+                    ok = true;
+                }
+            }
+        }
+        if (!ok) {
+            continue;
+        }
+        double zx = creal(z), zy = cimag(z);
+        if (zx < xmin - 0.1 * (xmax - xmin) || zx > xmax + 0.1 * (xmax - xmin) ||
+            zy < ymin - 0.1 * (ymax - ymin) || zy > ymax + 0.1 * (ymax - ymin)) {
+            continue;
+        }
+        bool dup = false;
+        for (size_t k = 0; k < found; k++) {
+            if (hypot(out[k].x - zx, out[k].y - zy) < fmax(1e-3, span * 2e-3)) {
+                dup = true;
+                break;
+            }
+        }
+        if (!dup) {
+            out[found++] = (FoundZero){.x = zx, .y = zy, .residual = res};
+        }
+    }
+    return found;
+}
+
 /* ----------------------------------------------------------------------------
  * Taylor Series Expansion via Cauchy's Integral Formula
  * ---------------------------------------------------------------------------- */

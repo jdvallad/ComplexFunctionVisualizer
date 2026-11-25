@@ -3,15 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Conformal — C11 Complex &amp; Real Math Studio</title>
-  <link rel="stylesheet" href="/style.css?v=43" />
+  <title>Conformal — Native C11 Complex, Real &amp; Vector Math Studio</title>
+  <meta name="description" content="Interactive native C11 mathematics studio for Complex Analysis, 3D Riemann Sphere, Domain Coloring, Contour Integration, 2D Real Calculus, ODE Physics, and 2D Vector Calculus Fields." />
+  <meta name="theme-color" content="#080c14" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=53" />
+  <link rel="stylesheet" href="/style.css?v=53" />
 </head>
 <body>
-  <div class="app-shell">
-    <!-- Clean Single-Tier Top Header: Brand, Modes, Project Bar + Lock, Coords + Utilities -->
+  <div id="app-shell" class="app-shell">
+    <!-- Clean Single-Tier Top Header: Brand (New Project), Modes, Project Bar + Lock, Coords + Utilities -->
     <header class="topbar">
       <div class="header-left">
-        <div class="brand" title="Conformal — Native C11 Complex &amp; Real Function Studio">
+        <button id="btn-main-menu" type="button" class="brand brand-btn" title="New Blank Project in Current Mode">
           <div class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
               <defs>
@@ -29,15 +32,18 @@
             </svg>
           </div>
           <span class="brand-name">Conformal</span>
-        </div>
+        </button>
 
-        <!-- Unified 2-Way Workspace Switcher (Complex + Real; Contour Integration toggles inside Complex) -->
+        <!-- Unified 3-Way Workspace Switcher (Complex + Real + 2D Vector) -->
         <div class="workspace-switch" role="tablist" aria-label="Workspace Mode">
           <button class="ws-btn active" data-ws-mode="map" role="tab" aria-selected="true" title="Complex Analysis: Mapping w = f(z), Domain Coloring, Riemann Sphere &amp; Contour Integrals">
             <span class="ws-sym">&Copf;</span><span>Complex</span>
           </button>
           <button class="ws-btn" data-ws-mode="real" role="tab" aria-selected="false" title="Real Functions, Parametric Curves, Implicit Relations &amp; Landmarks">
             <span class="ws-sym">&Ropf;</span><span>Real</span>
+          </button>
+          <button class="ws-btn" data-ws-mode="vector" role="tab" aria-selected="false" title="2D Vector Calculus: Vector Fields F(x,y), Potentials, Streamlines, Div/Curl Heatmaps, Work &amp; Flux">
+            <span class="ws-sym">&nabla;</span><span>Vector</span>
           </button>
         </div>
 
@@ -154,6 +160,15 @@
             <span>PNG</span>
           </button>
 
+          <button id="btn-record-webm" class="btn-header-pill rec-btn" title="Record live 60 FPS WebM video clip of the active stage">
+            <span class="rec-dot" aria-hidden="true"></span>
+            <span class="rec-label">Rec</span>
+          </button>
+
+          <button id="btn-open-palette" class="btn-header-pill" title="Open Quick Command &amp; Project Palette (Ctrl+K)" onclick="window.CFVCommands && window.CFVCommands.openPalette()">
+            <span>⌘K</span>
+          </button>
+
           <button id="btn-toggle-theme" class="btn-header-pill theme-toggle-btn" title="Toggle Light / Dark Mode">
             <svg id="theme-icon-sun" class="hidden" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="4" />
@@ -221,9 +236,10 @@
               <div class="domain-quick-adds fn-quick-adds" id="fn-quick-adds">
                 <button class="mini-hdr-btn fn-lib-btn" id="btn-fn-library" type="button" title="Browse prewritten C11 functions for this graph mode">&#402; Library &#9662;</button>
                 <button class="mini-hdr-btn fn-guide-btn" id="btn-fn-guide" type="button" title="Show strict C11 syntax rules, parameter names &amp; global variables">? Guide</button>
-                <button class="mini-hdr-btn fn-hdr-btn" id="btn-add-fn" title="Add a C11 function / auxiliary card">+ Fn</button>
-                <button class="mini-hdr-btn" id="btn-add-slider" title="Add interactive parameter slider">+ Slider</button>
-                <button class="mini-hdr-btn" id="btn-add-var" title="Add computed variable (e.g. R = 2.2 + 18*t*t)">+ Var</button>
+                <button class="mini-hdr-btn fn-hdr-btn" id="btn-add-fn" title="Add a named C11 function card (switchable signature in Vector mode)">+ Fn</button>
+                <button class="mini-hdr-btn mat-hdr-btn vec-only-add hidden" id="btn-add-matrix" type="button" title="Add a named resizable Matrix (2×2 or 1×2; resizing to 2×1 or 1×1 auto-converts to a Variable)">+ Matrix</button>
+                <button class="mini-hdr-btn slider-hdr-btn" id="btn-add-slider" title="Add interactive scalar parameter slider">+ Slider</button>
+                <button class="mini-hdr-btn var-hdr-btn" id="btn-add-var" title="Add named Variable (Scalar or 2D Vector in Vector mode; supports 1×1 matrix formulas)">+ Var</button>
               </div>
             </div>
             <div id="fn-cards" class="expr-cards vtab-body"></div>
@@ -265,6 +281,7 @@
               <button class="dock-tool" data-tool="polygon" title="Polygon (5) — Click vertices, double-click to finish">Poly</button>
               <button class="dock-tool" data-tool="point" title="Point — Click anywhere on the plane to drop a point">Point</button>
               <button class="dock-tool" data-tool="text" title="Text Box — Click anywhere on the plane to drop a draggable note">Text</button>
+              <button class="dock-tool img-dock-btn" id="btn-complex-image-tool" data-image-tool="1" title="Image Element f(·) — Select 1 or more elements on the plane, then press Enter to map them in-plane!">f(·)</button>
             </div>
             <div class="dock-btn-group dock-acts-row">
               <button class="dock-act dock-join-btn" id="btn-join-shapes" title="Join selected or touching open paths into one continuous contour / closed loop">Join</button>
@@ -292,6 +309,7 @@
               <button class="dock-tool real-dock-tool" data-real-tool="polygon" title="Polygon (5) — Click vertices, double-click to finish">Poly</button>
               <button class="dock-tool real-dock-tool" data-real-tool="point" title="Point — Click anywhere on the plane to drop a point">Point</button>
               <button class="dock-tool real-dock-tool" data-real-tool="text" title="Text Box — Click anywhere on the plane to drop a draggable note">Text</button>
+              <button class="dock-tool img-dock-btn" id="btn-real-image-tool" data-image-tool="1" title="Image Element f(·) — Select 1 or more elements on the plane, then press Enter to map them!">f(·)</button>
             </div>
             <div class="dock-btn-group dock-acts-row">
               <button class="dock-act" id="btn-real-close-shape" title="Toggle selected shape open/closed">Close</button>
@@ -307,6 +325,33 @@
               <button class="dock-act" id="btn-real-undo-polys" title="Undo polygon edit (Ctrl+Z)">Undo</button>
               <button class="dock-act" id="btn-real-fill-grid" title="Fill entire [-R, R]×[-R, R] play area with square polygons">Fill [-R,R]&sup2;</button>
               <button class="dock-act danger" id="btn-real-clear-polys" title="Clear all polygons">Clear</button>
+            </div>
+          </div>
+
+          <div class="sidebar-draw-dock hidden" id="vector-draw-dock">
+            <div class="dock-btn-group">
+              <button class="dock-tool vec-dock-tool active" data-vec-tool="move" title="Select, Move, Drag Vectors, Resize &amp; Rotate elements (V)">Move</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="pan" title="Pan view (Space or Right-drag)">Pan</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="vector" title="2D Vector — drag from tail to tip (transforms live under active Matrix A!)">Vec</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="freehand" title="Freehand path / closed loop (snap end to start to close)">Draw</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="infline" title="Infinite Line — click or drag 2 points">Line</button>
+            </div>
+            <div class="dock-btn-group dock-acts-row">
+              <button class="dock-tool vec-dock-tool" data-vec-tool="seg" title="Line Segment — click or drag endpoints">Seg</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="arc" title="Circular Arc — click or drag radius">Arc</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="circle" title="Closed Circle (measures Gauss Flux &amp; Green Circulation)">Circle</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="rect" title="Closed Rectangle">Rect</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="polygon" title="Polygon — click vertices, double-click to finish">Poly</button>
+              <button class="dock-tool vec-dock-tool" data-vec-tool="point" title="Point — drop an editable point (also seeds streamlines)">Point</button>
+            </div>
+            <div class="dock-btn-group dock-acts-row">
+              <button class="dock-tool vec-dock-tool" data-vec-tool="text" title="Text Box — drop a draggable LaTeX note">Text</button>
+              <button class="dock-tool img-dock-btn" id="btn-vec-image-tool" data-image-tool="1" title="Image Element f(·) — Select 1 or more elements (vectors, points, shapes), then press Enter to map them!">f(·)</button>
+              <button class="dock-act dock-join-btn" id="btn-vec-join-shapes" title="Join selected or touching open paths into one continuous contour / closed loop">Join</button>
+              <button class="dock-act" id="btn-vec-close-shape" title="Toggle selected shape open/closed">Close</button>
+              <button class="dock-act" id="btn-vec-reverse-shape" title="Reverse curve orientation">&rlarr;</button>
+              <button class="dock-act" id="btn-vec-undo" title="Undo (Ctrl+Z)">Undo</button>
+              <button class="dock-act danger" id="btn-vec-clear" title="Clear unlocked shapes &amp; points">Clear</button>
             </div>
           </div>
         </div>
@@ -495,6 +540,54 @@
               <canvas id="canvas-real"></canvas>
             </div>
           </div>
+
+          <!-- 2D Vector Calculus Stage -->
+          <div id="stage-vector" class="real-stage hidden">
+            <div class="plane-card vector-card" id="vector-plane-card">
+              <div class="plane-hud-bar">
+                <div class="plane-hud top-left">
+                  <span class="plane-tag vector-tag">2D VECTOR FIELD</span>
+                  <span class="plane-sub" id="vector-plane-sub">F(x, y) = (P, Q) · ∇·F · ∇×F</span>
+                </div>
+                <div class="plane-hud top-right">
+                  <button class="hud-btn vec-pill" id="btn-vec-mgrid" title="Toggle 2×2 Matrix Warped Grid, Basis &amp; Eigenvectors">M Grid</button>
+                  <button class="hud-btn vec-pill" id="btn-vec-arrows" title="Toggle Quiver Vector Arrows">Arrows</button>
+                  <button class="hud-btn vec-pill" id="btn-vec-streams" title="Toggle 4-Thread RK4 Streamlines (full paths tangent to F)">Streams</button>
+                  <button class="hud-btn vec-pill" id="btn-vec-particles" title="Toggle 60 FPS Animated Flow Particles">Flow</button>
+                  <button class="hud-btn vec-pill" id="btn-vec-equipot" title="Toggle Level Curves / Contours (constant height or speed lines)">Contours</button>
+                  <select id="vec-heatmap-select" class="hud-select proj-select" title="Background color map">
+                    <option value="none" selected>Map: Off</option>
+                    <option value="phi">Map: f(x,y) Scalar</option>
+                    <option value="mag">Map: Speed |F|</option>
+                    <option value="div">Map: Div ∇·F</option>
+                    <option value="curl">Map: Curl ∇×F</option>
+                  </select>
+                  <button class="hud-btn square-btn active" id="vec-square" title="1:1 equal axes">1:1</button>
+                  <button class="hud-btn" id="vec-zoom-in" title="Zoom in">+</button>
+                  <button class="hud-btn" id="vec-zoom-out" title="Zoom out">&minus;</button>
+                  <button class="hud-btn" id="vec-reset" title="Reset view">Reset</button>
+                </div>
+              </div>
+
+              <!-- Live Work / Circulation & Outward Flux Panel (Unified Draggable/Resizable/Minimizable Floating Panel!) -->
+              <div class="integral-panel vec-integral-panel hidden" id="vector-integral-panel">
+                <div class="integral-panel-hdr" id="vector-integral-hdr" title="Drag to move panel">
+                  <span class="integral-hdr-left">
+                    <span class="integral-drag-grip" aria-hidden="true">&#8942;&#8942;</span>
+                    <span class="integral-hdr-title">&oint; Line Integrals — Work &amp; Flux</span>
+                    <span class="integral-min-sum hidden" id="vector-integral-min-sum"></span>
+                  </span>
+                  <span class="integral-hdr-right">
+                    <button class="integral-min-btn" id="btn-min-vec-integral" title="Minimize / expand panel">&minus;</button>
+                  </span>
+                </div>
+                <div id="vector-integral-rows" class="integral-rows vec-int-rows"></div>
+                <div class="integral-resize-handle" id="vector-integral-resize-handle" title="Drag to resize Line Integrals window"></div>
+              </div>
+
+              <canvas id="canvas-vector"></canvas>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -650,7 +743,23 @@
           </div>
         </div>
       </div>
+
+      <div id="tools-vector-body" class="tools-body hidden">
+        <div class="tools-section">
+          <div class="tools-sec-label">2D Vector Field Overlays</div>
+          <label class="toggle-row"><span>Quiver Vector Arrows</span><input type="checkbox" id="opt-vec-arrows" /></label>
+          <label class="toggle-row"><span>RK4 Streamlines (4-Thread C11)</span><input type="checkbox" id="opt-vec-streamlines" /></label>
+          <label class="toggle-row"><span>Level Curves / Contours</span><input type="checkbox" id="opt-vec-equipot" /></label>
+          <label class="toggle-row"><span>60 FPS Animated Flow Particles</span><input type="checkbox" id="opt-vec-particles" /></label>
+          <div class="slider-row">
+            <span>Arrow Density</span>
+            <input type="range" id="opt-vec-density" min="10" max="32" step="2" value="20" />
+            <code id="opt-vec-density-val">20</code>
+          </div>
+        </div>
+      </div>
     </div>
+  </div> <!-- end #app-shell -->
 
     <!-- =================================================================
          EDIT PROJECT NAME & DESCRIPTION MODAL
@@ -810,15 +919,19 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <script src="/sphere3d.js?v=43"></script>
-  <script src="/projections.js?v=43"></script>
-  <script src="/function_library.js?v=43"></script>
-  <script src="/examples.js?v=43"></script>
-  <script src="/docs_prompt.js?v=43"></script>
-  <script src="/canvas_complex.js?v=43"></script>
-  <script src="/canvas_real.js?v=43"></script>
-  <script src="/workspace.js?v=43"></script>
+  <script src="/canvas_geom.js?v=53"></script>
+  <script src="/sphere3d.js?v=53"></script>
+  <script src="/projections.js?v=53"></script>
+  <script src="/function_library.js?v=53"></script>
+  <script src="/world_countries.js?v=53"></script>
+  <script src="/examples_vector.js?v=53"></script>
+  <script src="/examples.js?v=53"></script>
+  <script src="/docs_prompt.js?v=53"></script>
+  <script src="/canvas_complex.js?v=53"></script>
+  <script src="/canvas_real.js?v=53"></script>
+  <script src="/canvas_vector.js?v=53"></script>
+  <script src="/workspace.js?v=53"></script>
+  <script src="/command_palette.js?v=53"></script>
 </body>
 </html>

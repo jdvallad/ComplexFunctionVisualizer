@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define MAX_HOT_SLOTS 24
-#define MAX_EVAL_PARAMS 16
+#define MAX_EVAL_PARAMS 32
 
 typedef struct {
     double v[MAX_EVAL_PARAMS];
@@ -38,6 +38,11 @@ bool hot_compile_workspace(bool is_real, const char *const *card_codes, size_t c
                            const char *const *param_names, size_t param_count, char *diag_out,
                            size_t diag_cap, double *elapsed_ms_out);
 
+bool hot_compile_workspace_named(bool is_real, const char *const *card_codes,
+                                 const char *const *card_names, size_t card_count,
+                                 const char *const *param_names, size_t param_count, char *diag_out,
+                                 size_t diag_cap, double *elapsed_ms_out);
+
 /* Thread-safe status & evaluators. */
 bool hot_has_complex(void);
 bool hot_has_real(void);
@@ -64,7 +69,66 @@ void hot_sample_parametric_slot(int slot, const EvalParams *params, double tmin,
                                 size_t count, float *xy_out);
 
 /* Multi-threaded RGBA domain / fractal field rendering for a compiled complex slot. */
+typedef enum {
+    DOMAIN_PROJ_PLANAR = 0,
+    DOMAIN_PROJ_POLAR = 1,
+    DOMAIN_PROJ_MERCATOR = 2,
+    DOMAIN_PROJ_STEREOGRAPHIC = 3,
+    DOMAIN_PROJ_POINCARE = 4,
+    DOMAIN_PROJ_SPHERE = 5
+} DomainProjKind;
+
+typedef struct {
+    int proj;
+    int merc_uv;
+    double sphere_yaw;
+    double sphere_pitch;
+    double sphere_zoom;
+    double canvas_w;
+    double canvas_h;
+} DomainProjSpec;
+
 void hot_render_domain_slot(int slot, const EvalParams *params, double cx, double cy, double half_w,
                             double half_h, int width, int height, int scheme, uint8_t *rgba_out);
+
+void hot_render_domain_slot_proj(int slot, const EvalParams *params, double cx, double cy,
+                                 double half_w, double half_h, int width, int height, int scheme,
+                                 const DomainProjSpec *pspec, uint8_t *rgba_out);
+
+/*
+ * 2D Vector Calculus Workspace Compiler & Multi-Threaded Evaluators
+ *   card_kinds[i] == 0 -> Vector field F(x, y) = (fx, fy)
+ *   card_kinds[i] == 1 -> Scalar potential phi(x, y) with automatic gradient (dphi/dx, dphi/dy)
+ */
+bool hot_compile_vector_workspace(const char *const *card_codes, const int *card_kinds,
+                                  size_t card_count, const char *const *param_names,
+                                  size_t param_count, char *diag_out, size_t diag_cap,
+                                  double *elapsed_ms_out);
+
+bool hot_compile_vector_workspace_named(const char *const *card_codes, const int *card_kinds,
+                                        const char *const *card_names, size_t card_count,
+                                        const char *const *param_names, size_t param_count,
+                                        char *diag_out, size_t diag_cap, double *elapsed_ms_out);
+
+bool hot_has_vector(void);
+int hot_vector_slot_count(void);
+
+void hot_eval_vector_slot(int slot, double x, double y, const EvalParams *params, double *fx_out,
+                          double *fy_out, double *phi_out);
+
+/* 6 floats per grid point: [fx, fy, mag, div, curl, phi] */
+void hot_sample_vector_grid(int slot, const EvalParams *params, double xmin, double xmax,
+                            double ymin, double ymax, int nx, int ny, float *grid_out);
+
+/* Bidirectional RK4 streamlines: out_xy has capacity seed_count * max_pts_per_line * 2 floats */
+void hot_sample_vector_streamlines(int slot, const EvalParams *params, const double *seed_xy,
+                                   size_t seed_count, double xmin, double xmax, double ymin,
+                                   double ymax, int max_steps_each_dir, float *out_xy,
+                                   int *out_counts);
+
+/* Adaptive 8-point Gauss-Legendre Work (F.dr) & Outward Flux (F.n ds) line integral */
+void hot_integrate_vector_curve(int slot, const EvalParams *params, const double *pts_xy,
+                                size_t npts, bool closed, double *work_out, double *flux_out,
+                                double *arc_len_out);
 
 #endif /* HOT_COMPILE_H */

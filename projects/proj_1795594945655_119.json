@@ -1,0 +1,96 @@
+{
+  "format": "cfv_project_v1",
+  "id": "proj_1795594945655_119",
+  "name": "euo",
+  "folder": "my",
+  "subtitle": "2 cards · 0 presets",
+  "description": "",
+  "mode": "map",
+  "cards": [
+    {
+      "title": "Matrix M1",
+      "code": "[[1, 0.5], [0, 1]]",
+      "vecKind": "matrix",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": true,
+      "active": true
+    },
+    {
+      "title": "Vector Field F2(x, y)",
+      "code": "fx = -y;\nfy = x;",
+      "vecKind": "field",
+      "color": "#a78bfa",
+      "lineWidth": 2.2,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "step": false,
+      "locked": false,
+      "visible": false,
+      "active": false
+    }
+  ],
+  "sliders": [],
+  "vars": [],
+  "shapes": [
+    {
+      "id": 1,
+      "kind": "vector",
+      "label": "Path 1",
+      "color": "#34d399",
+      "lineWidth": 2.4,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "closed": false,
+      "locked": false,
+      "visible": true,
+      "rawPts": [
+        {
+          "x": 0.7337,
+          "y": 0.5047
+        },
+        {
+          "x": 0.748,
+          "y": 0.5047
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "kind": "vector",
+      "label": "Path 2",
+      "color": "#34d399",
+      "lineWidth": 2.4,
+      "opacity": 1,
+      "lineStyle": "solid",
+      "closed": false,
+      "locked": false,
+      "visible": true,
+      "formula": {
+        "kind": "vector",
+        "x0": "0.848",
+        "y0": "0.304",
+        "vx": "1.482",
+        "vy": "0.63"
+      },
+      "rawPts": [
+        {
+          "x": 0.9476,
+          "y": 0.4868
+        },
+        {
+          "x": 2.4296,
+          "y": 1.1168
+        }
+      ]
+    }
+  ],
+  "points": [],
+  "lines": [],
+  "viewport": {},
+  "presets": []
+}

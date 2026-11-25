@@ -474,7 +474,7 @@
 
   function projectPoint(mode, pt) {
     if (!pt) return null;
-    if (mode === "planar" || mode === "polar" || mode === "sphere" || mode === "cylinder") return pt;
+    if (mode === "planar" || mode === "polar" || mode === "sphere") return pt;
     if (mode === "stereographic") return projectStereographicDisk(pt.x, pt.y);
     if (mode === "poincare") return projectPoincareDisk(pt.x, pt.y);
     if (mode === "mercator") return projectMercator(pt.x, pt.y);
@@ -490,7 +490,7 @@
   }
 
   function projectPoints(mode, pts) {
-    if (!pts || mode === "planar" || mode === "polar" || mode === "sphere" || mode === "cylinder") return pts;
+    if (!pts || mode === "planar" || mode === "polar" || mode === "sphere") return pts;
     if (mode === "mercator") {
       const mapped = [];
       let validCount = 0;
@@ -563,7 +563,7 @@
 
   /* Draws specialized coordinate backdrops: Polar Grid, Mercator Lat/Lon Graticule,
    * Stereographic Disk, and Poincaré Disk (making each coordinate system unmistakable!). */
-  function drawProjectionOverlay(ctx, canvas, view, worldToScreen, mode, isLight) {
+  function drawProjectionOverlay(ctx, canvas, view, worldToScreen, mode, isLight, drawDomainCb) {
     if (mode === "polar") {
       const w = canvas.clientWidth, h = canvas.clientHeight;
       const scX = view.scaleX || view.scale, scY = view.scaleY || view.scale;
@@ -577,7 +577,8 @@
       ctx.save();
       ctx.fillStyle = isLight ? "#f4f7fb" : "#080c14";
       ctx.fillRect(0, 0, w, h);
-      const ringCol = isLight ? "rgba(15, 23, 42, 0.12)" : "rgba(148, 163, 184, 0.15)";
+      if (typeof drawDomainCb === "function") drawDomainCb();
+      const ringCol = isLight ? "rgba(15, 23, 42, 0.14)" : "rgba(148, 163, 184, 0.18)";
       const axisCol = isLight ? "rgba(15, 23, 42, 0.28)" : "rgba(203, 213, 225, 0.30)";
       const lblCol = isLight ? "rgba(51, 65, 85, 0.78)" : "rgba(148, 163, 184, 0.78)";
       ctx.font = '10px "JetBrains Mono", monospace';
@@ -617,6 +618,14 @@
       const br = worldToScreen(view, canvas, Math.PI, -2.65);
       ctx.fillStyle = isLight ? "#f7f9fc" : "#0b111e";
       ctx.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+      if (typeof drawDomainCb === "function") {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        ctx.clip();
+        drawDomainCb();
+        ctx.restore();
+      }
       ctx.strokeStyle = isLight ? "rgba(2, 132, 199, 0.55)" : "rgba(56, 189, 248, 0.55)";
       ctx.lineWidth = 1.6;
       ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
@@ -684,6 +693,7 @@
     ctx.beginPath();
     ctx.ellipse(o.x, o.y, rx, ry, 0, 0, Math.PI * 2);
     ctx.clip();
+    if (typeof drawDomainCb === "function") drawDomainCb();
 
     const gridCol = isLight ? "rgba(15, 23, 42, 0.13)" : "rgba(148, 163, 184, 0.16)";
     const axisCol = isLight ? "rgba(15, 23, 42, 0.30)" : "rgba(203, 213, 225, 0.32)";
@@ -1448,7 +1458,7 @@
     inverseProjectPoint,
     drawProjectionOverlay,
     getSubtitle,
-    is3D: (m) => m === "sphere" || m === "cylinder",
+    is3D: (m) => m === "sphere",
     isDisk: (m) => m === "stereographic" || m === "poincare",
   };
 })();

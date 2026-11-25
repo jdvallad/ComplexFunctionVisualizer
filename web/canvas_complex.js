@@ -42,7 +42,7 @@
     showCriticalLine: true,
     showDirichletWall: false,
 
-    /* Input & Output space projections: "planar" | "polar" | "mercator" | "stereographic" | "poincare" | "sphere" | "cylinder" */
+    /* Input & Output space projections: "planar" | "polar" | "mercator" | "stereographic" | "poincare" | "sphere" */
     inProjection: "planar",
     projection: "planar",
 
@@ -74,6 +74,7 @@
     dragRotate: null,
     marquee: null,
     undoStack: [],
+    redoStack: [],
     dragPoint: null,
     dragLine: null,
     snapHint: null,
@@ -85,11 +86,13 @@
     playPhase: 0,
     lastFrameTs: 0,
 
-    /* Live hover probe */
-    probe: { active: false, z: null, w: null, pending: false, queuedZ: null },
+    /* Live hover probe (+ Output -> Input Newton Pullback preimages!) */
+    probe: { active: false, z: null, w: null, pending: false, queuedZ: null, preimages: [], pullbackTimer: null, pullbackReqId: 0 },
 
-    /* Domain coloring */
+    /* Domain coloring (supports native C11 per-pixel rendering on ALL 6 projections for Input & Output!) */
     domainImg: null,
+    outDomainImg: null,
+    domainBaseImg: null,
     domainTimer: null,
     domainReqId: 0,
 
@@ -114,6 +117,7 @@
   const btnTracePlay = document.getElementById("btn-trace-play");
 
   function isLightTheme() {
+    if (window.CFVGeom && window.CFVGeom.isLightTheme) return window.CFVGeom.isLightTheme();
     return typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
   }
 
@@ -292,6 +296,7 @@
       }
     }
     ensureCanvasSize(canvasIn);
+    if (state.showDomain) scheduleDomain();
     requestRender("in");
     if (!opts.silent) notifyState(true, true);
   }
@@ -336,6 +341,7 @@
       }
     }
     ensureCanvasSize(canvasOut);
+    if (state.showOutDomain) scheduleDomain();
     requestRender("out");
     if (!opts.silent) notifyState(true, true);
   }
@@ -763,31 +769,25 @@
     return { kind: "parametric", xExpr: `${f2(bb.cx)} + cos(u)`, yExpr: `${f2(bb.cy)} + sin(u)`, u0: "0", u1: "2*pi", closed: Boolean(s.closed) };
   }
 
-  /* Magnetic Endpoint & Landmark Point Snapping */
-  function findSnapTarget(sx, sy, excludeShapeId = null) {
-    let best = null;
-    let bestDist = SNAP_PX;
-    for (const s of state.shapes) {
-      if (!s.visible || s.closed || s.id === excludeShapeId || !s.rawPts || s.rawPts.length < 2) continue;
-      for (const ep of [s.rawPts[0], s.rawPts[s.rawPts.length - 1]]) {
-        const sp = worldToScreen(state.inView, canvasIn, ep.x, ep.y);
-        const d = Math.hypot(sx - sp.x, sy - sp.y);
-        if (d <= bestDist) {
-          bestDist = d;
-          best = { x: ep.x, y: ep.y, kind: "endpoint", shapeId: s.id };
-        }
-      }
+  /* Standardized Smart Magnetic Snapping (Origin, Points, Corners, Endpoints, Midpoints, Centers, Circle Cardinals/Diagonals, Guides) */
+  function findSnapTarget(sx, sy, excludeShapeId = null, excludePointId = null, shiftKey = false) {
+    if (window.CFVGeom && window.CFVGeom.findSmartSnap) {
+      return window.CFVGeom.findSmartSnap(sx, sy, {
+        shapes: state.shapes,
+        points: state.points,
+        lines: state.lines,
+        xToS: (x) => worldToScreen(state.inView, canvasIn, x, 0).x,
+        yToS: (y) => worldToScreen(state.inView, canvasIn, 0, y).y,
+        sToX: (px) => screenToWorld(state.inView, canvasIn, px, 0).x,
+        sToY: (py) => screenToWorld(state.inView, canvasIn, 0, py).y,
+        excludeShapeId,
+        excludePointId,
+        snapPx: SNAP_PX,
+        shiftKey: Boolean(shiftKey),
+        includeGrid: Boolean(shiftKey),
+      });
     }
-    for (const p of state.points) {
-      if (!p.visible) continue;
-      const sp = worldToScreen(state.inView, canvasIn, p.x, p.y);
-      const d = Math.hypot(sx - sp.x, sy - sp.y);
-      if (d <= bestDist) {
-        bestDist = d;
-        best = { x: p.x, y: p.y, kind: "point", pointId: p.id };
-      }
-    }
-    return best;
+    return null;
   }
 
   /* -------------------------------------------------------------------------
@@ -935,12 +935,17 @@
 
   async function computeShape(shape, qScale = 1.0) {
     const evalPts = expandLinearShapePts(shape);
+    const outHidden = Boolean(ws() && ws().state && ws().state.outputHidden);
     const targets = visibleComplexTargets();
-    if (targets.length === 0) {
+    if (targets.length === 0 || (outHidden && state.mode !== "integral")) {
       shape.integral = null;
       shape.boundary = { inPts: evalPts, outPts: [] };
       shape.mesh = [];
       shape.extraCurves = [];
+      if (!shape.imageOf && state.shapes.some((q) => q.visible && q.imageOf)) {
+        await recomputeImageElements(qScale);
+        requestRender("in");
+      }
       return;
     }
 
@@ -950,6 +955,10 @@
         shape.integral = unpackIntegral(data);
         shape.boundary = { inPts: shape.integral.inPts, outPts: shape.integral.cumPts };
         shape.extraCurves = [];
+      }
+      if (!shape.imageOf && state.shapes.some((q) => q.visible && q.imageOf)) {
+        await recomputeImageElements(qScale);
+        requestRender("in");
       }
       return;
     }
@@ -982,12 +991,22 @@
     if (state.shapes.includes(shape)) {
       shape.extraCurves = extras;
     }
+    if (!shape.imageOf && state.shapes.some((q) => q.visible && q.imageOf)) {
+      await recomputeImageElements(qScale);
+      requestRender("in");
+    }
   }
 
   async function recomputePoints() {
     if (!state.active) return;
-    if (state.mode !== "map" || visibleComplexTargets().length === 0) {
-      for (const p of state.points) p.outPt = null;
+    if (state.points.some((q) => q.visible && q.imageOf)) {
+      await recomputeImageElements(1.0);
+    }
+    const outHidden = Boolean(ws() && ws().state && ws().state.outputHidden);
+    if (outHidden || state.mode !== "map" || visibleComplexTargets().length === 0) {
+      if (state.mode !== "map" || visibleComplexTargets().length === 0) {
+        for (const p of state.points) p.outPt = null;
+      }
       requestRender();
       return;
     }
@@ -1009,15 +1028,198 @@
     return state.inProjection === "planar" || state.inProjection === "polar";
   }
 
+  function fnTargetForCardId(fnCardId) {
+    const w = ws();
+    if (!w || !w.state) return primaryFnPayload();
+    const fns = (w.state.cards || []).filter((c) => c.kind === "fn");
+    const card = (fnCardId !== null && fnCardId !== undefined)
+      ? fns.find((c) => c.id === fnCardId)
+      : fns.find((c) => c.id === w.state.primaryCardId) || fns[0];
+    if (!card) return primaryFnPayload();
+    if (w.isWorkspaceCompiled && w.isWorkspaceCompiled("complex")) {
+      return { slot: card.slot ?? 0, params: w.getParamValues ? w.getParamValues() : [] };
+    }
+    return card.builtin ? { ...card.builtin } : primaryFnPayload();
+  }
+
+  async function recomputeImageElements(qScale = 1.0) {
+    /* Compute live Image Elements (shapes & points whose imageOf references another element on the Input Plane!)
+       Supports chaining (e.g. f2(f1(Circle))) via 2 passes! */
+    const imgShapes = state.shapes.filter((s) => s && s.visible && s.imageOf);
+    const imgPts = state.points.filter((p) => p && p.visible && p.imageOf);
+    if (imgShapes.length === 0 && imgPts.length === 0) return;
+
+    for (let pass = 0; pass < 2; pass++) {
+      for (const s of imgShapes) {
+        const srcs = Array.isArray(s.imageOf.sources) && s.imageOf.sources.length > 0
+          ? s.imageOf.sources
+          : [{ kind: s.imageOf.sourceKind || "shape", id: s.imageOf.sourceId }];
+        const fc = (ws() && ws().resolveFnCardByNameOrId)
+          ? ws().resolveFnCardByNameOrId(s.imageOf.expr || "", s.imageOf.fnCardId)
+          : null;
+        const tgt = fnTargetForCardId(fc ? fc.id : s.imageOf.fnCardId);
+        if (!tgt) continue;
+        if (srcs.length > 1 || s.kind === "image") {
+          const mappedItems = [];
+          const allPts = [];
+          for (const sr of srcs) {
+            if (sr.kind === "point") {
+              const pSrc = state.points.find((q) => q.id === sr.id);
+              if (!pSrc) continue;
+              const res = await fetch("/api/eval", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...tgt, points: [pSrc.x, pSrc.y] }) });
+              if (res.ok) {
+                const dt = await res.json();
+                if (dt && Array.isArray(dt.out) && dt.out.length >= 2 && dt.out[0] !== null && dt.out[1] !== null) {
+                  const pt = { x: Number(dt.out[0]), y: Number(dt.out[1]) };
+                  mappedItems.push({ kind: "point", pt }); allPts.push(pt);
+                }
+              }
+            } else {
+              const sSrc = state.shapes.find((q) => q.id === sr.id);
+              if (!sSrc || !sSrc.rawPts || sSrc.rawPts.length < 2) continue;
+              const d = await apiTrace(expandLinearShapePts(sSrc), sSrc.closed, false, tgt, qScale);
+              if (d && d.boundary) {
+                const curve = unpackCurve(d.boundary);
+                const clean = (curve.outPts || []).filter((q) => q && Number.isFinite(q.x) && Number.isFinite(q.y));
+                if (clean.length >= 2) {
+                  mappedItems.push({ kind: "path", pts: clean, closed: Boolean(sSrc.closed) });
+                  allPts.push(...clean);
+                }
+              }
+            }
+          }
+          s.kind = "image";
+          s._mappedItems = mappedItems;
+          if (allPts.length >= 2) s.rawPts = allPts.slice(0, 64);
+          continue;
+        }
+        const src = state.shapes.find((q) => q.id === srcs[0].id);
+        if (!src || !src.rawPts || src.rawPts.length < 2) continue;
+        const evalPts = expandLinearShapePts(src);
+        const d = await apiTrace(evalPts, src.closed, false, tgt, qScale);
+        if (d && d.boundary && state.shapes.includes(s)) {
+          const curve = unpackCurve(d.boundary);
+          const clean = (curve.outPts || []).filter((q) => q && Number.isFinite(q.x) && Number.isFinite(q.y));
+          if (clean.length >= 2) {
+            s.rawPts = clean;
+            s.closed = Boolean(src.closed);
+            s.boundary = { inPts: clean, outPts: (s.boundary && s.boundary.outPts) ? s.boundary.outPts : [] };
+            s.mesh = [];
+          }
+        }
+      }
+      for (const p of imgPts) {
+        const src = state.points.find((q) => q.id === p.imageOf.sourceId);
+        if (!src) continue;
+        const tgt = fnTargetForCardId(p.imageOf.fnCardId);
+        if (!tgt) continue;
+        const res = await fetch("/api/eval", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...tgt, points: [src.x, src.y] }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.out) && data.out.length >= 2 && data.out[0] !== null && data.out[1] !== null) {
+            p.x = Number(data.out[0]);
+            p.y = Number(data.out[1]);
+            if (ws() && typeof ws().syncPointCoords === "function") ws().syncPointCoords(p);
+          }
+        }
+      }
+      if (imgShapes.every((s) => !imgShapes.some((o) => o.id === s.imageOf.sourceId)) &&
+          imgPts.every((p) => !imgPts.some((o) => o.id === p.imageOf.sourceId))) {
+        break;
+      }
+    }
+  }
+
+  async function createImageOfShape(sourceId, fnCardId = null) {
+    const src = state.shapes.find((s) => s.id === sourceId);
+    if (!src) return null;
+    const w = ws();
+    const fns = w && w.state ? (w.state.cards || []).filter((c) => c.kind === "fn") : [];
+    const fc = fnCardId !== null ? fns.find((c) => c.id === fnCardId) : (fns.find((c) => c.id === w?.state?.primaryCardId) || fns[0]);
+    const fnIdx = fc ? fns.indexOf(fc) + 1 : 1;
+    pushUndoSnapshot();
+    const img = {
+      id: state.nextShapeId++,
+      kind: "path",
+      label: `f${fnIdx}(${src.label || "Shape"})`,
+      color: "#fbbf24",
+      lineWidth: normLineWidth(src.lineWidth, 2.2),
+      opacity: normOpacity(src.opacity, src.closed ? 0.22 : 1.0),
+      lineStyle: src.lineStyle || "solid",
+      locked: false,
+      closed: Boolean(src.closed),
+      visible: true,
+      imageOf: { sourceKind: "shape", sourceId: src.id, fnCardId: fc ? fc.id : null },
+      rawPts: src.rawPts.map((p) => ({ x: p.x, y: p.y })),
+      boundary: null,
+      mesh: [],
+      extraCurves: [],
+    };
+    state.shapes.push(img);
+    syncLayerOrder();
+    selectShape(img.id);
+    await recomputeImageElements(1.0);
+    if (!(w && w.state && w.state.outputHidden)) await computeShape(img, 1.0);
+    notifyDomain();
+    requestRender();
+    if (w && w.onCanvasStateChange) w.onCanvasStateChange(true);
+    return img;
+  }
+
+  async function createImageOfPoint(sourceId, fnCardId = null) {
+    const src = state.points.find((p) => p.id === sourceId);
+    if (!src) return null;
+    const w = ws();
+    const fns = w && w.state ? (w.state.cards || []).filter((c) => c.kind === "fn") : [];
+    const fc = fnCardId !== null ? fns.find((c) => c.id === fnCardId) : (fns.find((c) => c.id === w?.state?.primaryCardId) || fns[0]);
+    const fnIdx = fc ? fns.indexOf(fc) + 1 : 1;
+    pushUndoSnapshot();
+    const img = {
+      id: state.nextPointId++,
+      x: src.x,
+      y: src.y,
+      label: `f${fnIdx}(${src.label || "z"})`,
+      icon: src.icon || "diamond",
+      color: "#fbbf24",
+      size: src.size || 5,
+      opacity: 1.0,
+      locked: false,
+      visible: true,
+      showLabel: true,
+      imageOf: { sourceKind: "point", sourceId: src.id, fnCardId: fc ? fc.id : null },
+      outPt: null,
+    };
+    state.points.push(img);
+    syncLayerOrder();
+    selectPoint(img.id);
+    await recomputeImageElements(1.0);
+    if (!(w && w.state && w.state.outputHidden)) await recomputePoints();
+    notifyDomain();
+    requestRender();
+    if (w && w.onCanvasStateChange) w.onCanvasStateChange(true);
+    return img;
+  }
+
   async function recomputeAllOnce(qScale = 1.0, lightweight = false) {
     if (!state.active) return;
     rebuildFormulaShapes();
-    const hasDom = Boolean(state.showDomain || state.showOutDomain);
-    /* Fire domain coloring IMMEDIATELY in parallel instead of waiting behind shape/point roundtrips! */
-    if (hasDom) scheduleDomain(Boolean(lightweight));
+    const inHidden = Boolean(ws() && ws().state && ws().state.inputHidden);
     const outHidden = Boolean(ws() && ws().state && ws().state.outputHidden);
-    const skipShapesForInSphere = Boolean(outHidden && state.inProjection === "sphere");
-    const fastDomainOnly = Boolean((lightweight && hasDom && state.shapes.length === 0) || skipShapesForInSphere);
+    const wantInDom = Boolean(state.showDomain && !inHidden);
+    const wantOutDom = Boolean(state.showOutDomain && !outHidden);
+    /* Fire domain coloring ONLY for visible panes! */
+    if (wantInDom || wantOutDom) scheduleDomain(Boolean(lightweight));
+
+    /* Always refresh in-plane Image Elements (works even when Output Plane is closed!) */
+    await recomputeImageElements(qScale);
+
+    /* When Output Plane is hidden in Map mode, skip wasted Output Plane tracing & point mapping! */
+    const skipOutputTrace = Boolean(outHidden && state.mode !== "integral");
+    const fastDomainOnly = Boolean((lightweight && (wantInDom || wantOutDom) && state.shapes.length === 0) || skipOutputTrace);
     if (!fastDomainOnly) {
       await Promise.all([
         ...state.shapes.map((s) => computeShape(s, qScale)),
@@ -1030,7 +1232,7 @@
     } else if (!fastDomainOnly) {
       notifyDomain();
     }
-    if (state.taylor.enabled && !lightweight) fetchTaylor();
+    if (state.taylor.enabled && !lightweight && !inHidden) fetchTaylor();
     requestRender();
   }
 
@@ -1084,6 +1286,7 @@
     view.cx += b.x - a.x;
     view.cy += b.y - a.y;
     if (view === state.inView && (state.showDomain || state.showOutDomain)) scheduleDomain(true);
+    else if (view === state.outView && state.showOutDomain) scheduleDomain(true);
     requestRender(view === state.inView ? "in" : "out");
   }
 
@@ -1234,94 +1437,164 @@
     }, 35);
   }
 
-  async function fetchDomain(fastPreview = false) {
-    if ((!state.showDomain && !state.showOutDomain) || !state.active) return;
-    const tgt = primaryFnPayload();
-    if (!tgt) {
-      state.domainImg = null;
-      requestRender();
-      return;
-    }
-    const reqId = ++state.domainReqId;
-    const inW = canvasIn.clientWidth, inH = canvasIn.clientHeight;
-    const useMercGlobal = (
-      state.showOutDomain ||
-      (state.showDomain && state.inProjection === "sphere")
-    ) && state.outDomainMapping === "mercator" && (
-      !state.showDomain || state.inProjection === "sphere" || inW < 20 || inH < 20
-    );
-    const w = inW >= 20 ? inW : (canvasOut.clientWidth >= 20 ? canvasOut.clientWidth : 640);
-    const h = inH >= 20 ? inH : (canvasOut.clientHeight >= 20 ? canvasOut.clientHeight : 480);
+  async function fetchDomainTile(tgt, pane, proj, view, canvasEl, sphereInst, fastPreview, reqId) {
+    const w = canvasEl && canvasEl.clientWidth >= 20 ? canvasEl.clientWidth : 640;
+    const h = canvasEl && canvasEl.clientHeight >= 20 ? canvasEl.clientHeight : 480;
+    const isSphere = proj === "sphere" && sphereInst;
+    const isMercUv = state.outDomainMapping === "mercator" && (proj === "sphere" || proj === "mercator");
     const dpr = Math.min(2.0, window.devicePixelRatio || 1);
-    const physW = useMercGlobal ? 720 : Math.max(64, Math.round(w * dpr));
-    const physH = useMercGlobal ? 540 : Math.max(64, Math.round(h * dpr));
+    const physW = Math.max(64, Math.round(w * dpr));
+    const physH = Math.max(64, Math.round(h * dpr));
     const isFractal = state.domainScheme === "smooth_escape" || state.domainScheme === "inferno" || state.domainScheme === "ocean";
-    /* High-clarity adaptive FPS preview + 100% native device-pixel settle! */
     if (!Number.isFinite(state.domainFastBudget)) {
       state.domainFastBudget = isFractal ? 380000 : 260000;
     }
     const maxPixels = fastPreview
-      ? Math.max(120000, Math.min(720000, Math.round(state.domainFastBudget)))
-      : (isFractal ? 2800000 : 1500000);
-    const maxEdge = fastPreview ? (isFractal ? 1400 : 1080) : (isFractal ? 2200 : 1600);
+      ? Math.max(120000, Math.min(640000, Math.round(state.domainFastBudget)))
+      : (isFractal ? 2600000 : 1500000);
+    const maxEdge = fastPreview ? (isFractal ? 1280 : 960) : (isFractal ? 2100 : 1600);
     const pixelScale = Math.sqrt(maxPixels / Math.max(1, physW * physH));
     const edgeScale = maxEdge / Math.max(physW, physH);
     const scale = Math.min(1.0, pixelScale, edgeScale);
     const tw = Math.min(2400, Math.max(64, Math.round(physW * scale)));
     const th = Math.min(2400, Math.max(64, Math.round(physH * scale)));
-    const scX = state.inView.scaleX || state.inView.scale;
-    const scY = state.inView.scaleY || state.inView.scale;
-    const halfW = useMercGlobal ? Math.PI : (w * 0.5) / scX;
-    const halfH = useMercGlobal ? 2.65 : (h * 0.5) / scY;
-    const cx = useMercGlobal ? 0.0 : state.inView.cx;
-    const cy = useMercGlobal ? 0.0 : state.inView.cy;
-    const paramKey = JSON.stringify(tgt) + "|" + (state.domainScheme || "classic") + (useMercGlobal ? "|merc" : "");
+    const scX = view.scaleX || view.scale;
+    const scY = view.scaleY || view.scale;
+    const halfW = (w * 0.5) / scX;
+    const halfH = (h * 0.5) / scY;
+    const cx = view.cx;
+    const cy = view.cy;
+    const sYaw = isSphere ? sphereInst.state.yaw : 0;
+    const sPitch = isSphere ? sphereInst.state.pitch : 0;
+    const sZoom = isSphere ? sphereInst.state.zoom : 1;
+    const paramKey = JSON.stringify(tgt) + "|" + (state.domainScheme || "classic") + "|" + proj + (isMercUv ? "|muv" : "");
+
+    const payload = {
+      ...tgt,
+      cx,
+      cy,
+      half_w: halfW,
+      half_h: halfH,
+      width: tw,
+      height: th,
+      scheme: state.domainScheme || "classic",
+      proj: proj || "planar",
+      merc_uv: isMercUv,
+      ...(isSphere ? { sphere_yaw: sYaw, sphere_pitch: sPitch, sphere_zoom: sZoom, canvas_w: w, canvas_h: h } : {}),
+    };
+
+    const tFetchStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const res = await fetch("/api/domain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    if (reqId < (state.domainLastAppliedId || 0)) return null;
+    if (!fastPreview && reqId !== state.domainReqId) return null;
+    const buf = await res.arrayBuffer();
+    if (fastPreview) {
+      const dtMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - tFetchStart;
+      if (dtMs > 34) state.domainFastBudget = Math.max(120000, state.domainFastBudget * 0.78);
+      else if (dtMs < 18) state.domainFastBudget = Math.min(640000, state.domainFastBudget * 1.22);
+    }
+    if (reqId < (state.domainLastAppliedId || 0)) return null;
+    if (!fastPreview && reqId !== state.domainReqId) return null;
+
+    const pixels = new Uint8ClampedArray(buf);
+    const offKey = pane === "out" ? "_outDomainOffCanvas" : "_domainOffCanvas";
+    const off = state[offKey] || (state[offKey] = document.createElement("canvas"));
+    if (off.width !== tw || off.height !== th) { off.width = tw; off.height = th; }
+    off.getContext("2d").putImageData(new ImageData(pixels, tw, th), 0, 0);
+    return {
+      canvas: off,
+      pixels,
+      cx,
+      cy,
+      halfW,
+      halfH,
+      proj: proj || "planar",
+      nativeSphere: Boolean(isSphere),
+      yaw: sYaw,
+      pitch: sPitch,
+      zoom: sZoom,
+      paramKey,
+      fast: Boolean(fastPreview),
+      tw,
+      th,
+      reqId,
+    };
+  }
+
+  async function fetchDomainBaseForSphereSpin(tgt, reqId) {
+    /* Maintain a cached 640x480 global planar/Mercator base texture so live 60 FPS WebGL2 sphere
+     * spinning never stalls waiting on per-frame ray-traced sphere tiles! */
+    const isMerc = state.outDomainMapping === "mercator";
+    const baseKey = JSON.stringify(tgt) + "|" + (state.domainScheme || "classic") + (isMerc ? "|merc_base" : "|stereo_base");
+    if (state.domainBaseImg && state.domainBaseImg.paramKey === baseKey) return state.domainBaseImg;
+    const tw = isMerc ? 720 : 600, th = isMerc ? 480 : 600;
+    const cx = 0.0, cy = 0.0, halfW = isMerc ? Math.PI : 3.2, halfH = isMerc ? 2.65 : 3.2;
+    const res = await fetch("/api/domain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...tgt, cx, cy, half_w: halfW, half_h: halfH, width: tw, height: th,
+        scheme: state.domainScheme || "classic", proj: "planar",
+      }),
+    });
+    if (!res.ok || reqId < (state.domainLastAppliedId || 0)) return null;
+    const buf = await res.arrayBuffer();
+    const pixels = new Uint8ClampedArray(buf);
+    state.domainBaseImg = { pixels, tw, th, cx, cy, halfW, halfH, paramKey: baseKey, reqId };
+    return state.domainBaseImg;
+  }
+
+  async function fetchDomain(fastPreview = false) {
+    if ((!state.showDomain && !state.showOutDomain) || !state.active) return;
+    const tgt = primaryFnPayload();
+    if (!tgt) {
+      state.domainImg = null;
+      state.outDomainImg = null;
+      requestRender();
+      return;
+    }
+    const reqId = ++state.domainReqId;
+    const inHidden = Boolean(ws() && ws().state && ws().state.inputHidden);
+    const outHidden = Boolean(ws() && ws().state && ws().state.outputHidden);
+    const inVis = !inHidden && canvasIn && canvasIn.clientWidth >= 20 && canvasIn.clientHeight >= 20;
+    const outVis = !outHidden && canvasOut && canvasOut.clientWidth >= 20 && canvasOut.clientHeight >= 20;
+    const needIn = state.showDomain && inVis;
+    const needOut = state.showOutDomain && outVis;
+    const anySphere = (needIn && state.inProjection === "sphere") || (needOut && state.projection === "sphere");
+    const playing = Boolean(ws() && typeof ws().isAnySliderPlaying === "function" && ws().isAnySliderPlaying());
+
     state.domainInFlight = true;
     state.domainPendingMode = null;
-    const tFetchStart = typeof performance !== "undefined" ? performance.now() : Date.now();
     try {
-      const res = await fetch("/api/domain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...tgt,
-          cx,
-          cy,
-          half_w: halfW,
-          half_h: halfH,
-          width: tw,
-          height: th,
-          scheme: state.domainScheme || "classic",
-        }),
-      });
-      if (!res.ok) return;
-      if (reqId < (state.domainLastAppliedId || 0)) return;
-      if (!fastPreview && reqId !== state.domainReqId) return;
-      const buf = await res.arrayBuffer();
-      if (fastPreview) {
-        const dtMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - tFetchStart;
-        if (dtMs > 34) state.domainFastBudget = Math.max(120000, state.domainFastBudget * 0.78);
-        else if (dtMs < 18) state.domainFastBudget = Math.min(720000, state.domainFastBudget * 1.24);
+      const jobs = [];
+      if (anySphere) {
+        jobs.push(fetchDomainBaseForSphereSpin(tgt, reqId));
       }
-      if (reqId < (state.domainLastAppliedId || 0)) return;
-      if (!fastPreview && reqId !== state.domainReqId) return;
-      /* Never let a lower-res fastPreview overwrite an already-settled full-res tile for the EXACT same viewport AND parameters! */
-      const cur = state.domainImg;
-      if (fastPreview && cur && !cur.fast &&
-          cur.paramKey === paramKey &&
-          Math.abs(cur.cx - cx) < halfW * 1e-6 &&
-          Math.abs(cur.cy - cy) < halfH * 1e-6 &&
-          Math.abs(cur.halfW - halfW) < halfW * 1e-6 &&
-          Math.abs(cur.halfH - halfH) < halfH * 1e-6) {
-        return;
+      /* During live 60 FPS sphere-only spin (when the C11 card doesn't change), the cached base texture
+       * + WebGL2 shader already renders 60 FPS! Otherwise render native HiDPI per-projection C11 tiles! */
+      const inSphereSpin = needIn && state.inProjection === "sphere" && (fastPreview && (playing || (window.RiemannSphereIn && window.RiemannSphereIn.state.orbiting)));
+      const outSphereSpin = needOut && state.projection === "sphere" && (fastPreview && (playing || (window.RiemannSphere && window.RiemannSphere.state.orbiting)));
+
+      if (needIn && !inSphereSpin) {
+        jobs.push(fetchDomainTile(tgt, "in", state.inProjection, state.inView, canvasIn, window.RiemannSphereIn, fastPreview, reqId).then((tile) => {
+          if (tile) state.domainImg = tile;
+        }));
       }
-      state.domainLastAppliedId = reqId;
-      const pixels = new Uint8ClampedArray(buf);
-      const off = state._domainOffCanvas || (state._domainOffCanvas = document.createElement("canvas"));
-      if (off.width !== tw || off.height !== th) { off.width = tw; off.height = th; }
-      off.getContext("2d").putImageData(new ImageData(pixels, tw, th), 0, 0);
-      state.domainImg = { canvas: off, pixels, cx, cy, halfW, halfH, paramKey, fast: Boolean(fastPreview), tw, th };
-      requestRender(state.showOutDomain ? "both" : "in");
+      if (needOut && !outSphereSpin) {
+        jobs.push(fetchDomainTile(tgt, "out", state.projection, state.outView, canvasOut, window.RiemannSphere, fastPreview, reqId).then((tile) => {
+          if (tile) state.outDomainImg = tile;
+        }));
+      }
+      await Promise.all(jobs);
+      if (reqId >= (state.domainLastAppliedId || 0)) {
+        state.domainLastAppliedId = reqId;
+        requestRender(needIn && needOut ? "both" : (needOut ? "out" : "in"));
+      }
     } finally {
       state.domainInFlight = false;
       const nextMode = state.domainPendingMode;
@@ -1533,8 +1806,8 @@
   }
 
   function getSelectedMovableItems() {
-    const shapes = state.shapes.filter((s) => !s.locked && s.visible !== false && isShapeSelected(s.id) && s.rawPts && s.rawPts.length >= 2);
-    const points = state.points.filter((p) => !p.locked && p.visible !== false && isPointSelected(p.id));
+    const shapes = state.shapes.filter((s) => !s.locked && !s.imageOf && s.visible !== false && isShapeSelected(s.id) && s.rawPts && s.rawPts.length >= 2);
+    const points = state.points.filter((p) => !p.locked && !p.imageOf && p.visible !== false && isPointSelected(p.id));
     return { shapes, points, total: shapes.length + points.length };
   }
 
@@ -1619,6 +1892,7 @@
   function pushUndoSnapshot() {
     state.undoStack.push(cloneUndoState());
     if (state.undoStack.length > 40) state.undoStack.shift();
+    state.redoStack = [];
   }
 
   async function undoLastAction() {
@@ -1626,7 +1900,26 @@
       showSelectionToast("Nothing to undo");
       return false;
     }
+    state.redoStack.push(cloneUndoState());
+    if (state.redoStack.length > 40) state.redoStack.shift();
     const snap = state.undoStack.pop();
+    state.shapes = snap.shapes;
+    state.points = snap.points;
+    state.lines = snap.lines;
+    clearSelection();
+    await recomputeAll(1.0);
+    notifyState(true);
+    return true;
+  }
+
+  async function redoLastAction() {
+    if (!state.redoStack || state.redoStack.length === 0) {
+      showSelectionToast("Nothing to redo");
+      return false;
+    }
+    state.undoStack.push(cloneUndoState());
+    if (state.undoStack.length > 40) state.undoStack.shift();
+    const snap = state.redoStack.pop();
     state.shapes = snap.shapes;
     state.points = snap.points;
     state.lines = snap.lines;
@@ -1772,7 +2065,7 @@
   function hitResizeHandle(sx, sy) {
     if (getSelectedMovableItems().total >= 2) return null;
     const s = state.shapes.find((x) => x.id === state.selectedShapeId);
-    if (!s || !s.visible || s.locked) return null;
+    if (!s || !s.visible || s.locked || s.imageOf) return null;
     for (const h of getResizeHandles(s)) {
       const sp = worldToScreen(state.inView, canvasIn, h.x, h.y);
       if (Math.hypot(sx - sp.x, sy - sp.y) <= HANDLE_HIT_PX) return { shape: s, handle: h };
@@ -2005,10 +2298,23 @@
     const xmin = view.cx - hw, xmax = view.cx + hw, ymin = view.cy - hh, ymax = view.cy + hh;
     const light = isLightTheme();
 
-    /* Specialized coordinate backdrops (Polar, Mercator, Stereographic & Poincaré Disks) on Input OR Output! */
+    /* Specialized coordinate backdrops (Polar, Mercator, Stereographic & Poincaré Disks) on Input OR Output
+     * — now with crisp native C11 per-pixel Domain Coloring rendered seamlessly underneath the grid! */
     const activeProj = isInput ? state.inProjection : state.projection;
+    const activeDomImg = isInput ? (state.showDomain ? state.domainImg : null) : (state.showOutDomain ? (state.outDomainImg || state.domainImg) : null);
+    const stampDomain = () => {
+      if (!activeDomImg || !activeDomImg.canvas || activeDomImg.nativeSphere) return;
+      const tl = worldToScreen(view, canvas, activeDomImg.cx - activeDomImg.halfW, activeDomImg.cy + activeDomImg.halfH);
+      const br = worldToScreen(view, canvas, activeDomImg.cx + activeDomImg.halfW, activeDomImg.cy - activeDomImg.halfH);
+      ctx.save();
+      ctx.globalAlpha = normOpacity(state.domainOpacity, 0.72);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(activeDomImg.canvas, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+      ctx.restore();
+    };
     if (window.CFVProjections && (activeProj === "polar" || activeProj === "mercator" || activeProj === "stereographic" || activeProj === "poincare")) {
-      window.CFVProjections.drawProjectionOverlay(ctx, canvas, view, worldToScreen, activeProj, light);
+      window.CFVProjections.drawProjectionOverlay(ctx, canvas, view, worldToScreen, activeProj, light, stampDomain);
       if (activeProj === "stereographic" || activeProj === "poincare") {
         const origin = worldToScreen(view, canvas, 0, 0);
         if (origin.x >= -20 && origin.x <= w + 20 && origin.y >= -20 && origin.y <= h + 20) {
@@ -2026,16 +2332,8 @@
     ctx.fillStyle = light ? "#f5f7fb" : "#0a0e17";
     ctx.fillRect(0, 0, w, h);
 
-    if (isInput && state.showDomain && state.domainImg) {
-      const d = state.domainImg;
-      const tl = worldToScreen(view, canvas, d.cx - d.halfW, d.cy + d.halfH);
-      const br = worldToScreen(view, canvas, d.cx + d.halfW, d.cy - d.halfH);
-      ctx.save();
-      ctx.globalAlpha = normOpacity(state.domainOpacity, 0.72);
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(d.canvas, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-      ctx.restore();
+    if (activeDomImg) {
+      stampDomain();
     }
 
     const stepX = niceStep(78 / scX);
@@ -2131,6 +2429,27 @@
     ctx.restore();
   }
 
+  function drawCountryLabel2D(ctx, sp, p, viewSpan, op) {
+    const tier = Math.max(1, Number(p.size) || 2);
+    if (tier < 2 && viewSpan > 2.4) return;
+    if (tier < 3 && viewSpan > 5.0) return;
+    const fontPx = tier >= 4 ? 11.2 : tier >= 3 ? 10.0 : tier >= 2 ? 9.1 : 8.4;
+    const up = p._upLabel || (p._upLabel = String(p.label || "").toUpperCase());
+    if (!up) return;
+    ctx.save();
+    ctx.globalAlpha = op * (tier >= 4 ? 0.92 : tier >= 3 ? 0.85 : 0.78);
+    ctx.font = `700 ${fontPx}px "Inter", "JetBrains Mono", system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2.8;
+    ctx.strokeStyle = isLightTheme() ? "rgba(255,255,255,0.85)" : "rgba(4, 11, 24, 0.80)";
+    ctx.strokeText(up, sp.x, sp.y);
+    ctx.fillStyle = isLightTheme() ? "#0f172a" : (p.color || "#f1f5f9");
+    ctx.fillText(up, sp.x, sp.y);
+    ctx.restore();
+  }
+
   function drawSinglePointIn(ctx, p) {
     if (!p.visible) return;
     const op = normOpacity(p.opacity, 1.0);
@@ -2140,6 +2459,10 @@
     if (!pp) return;
     const sp = worldToScreen(state.inView, canvasIn, pp.x, pp.y);
     if (sp.x < -36 || sp.x > w + 36 || sp.y < -36 || sp.y > h + 36) return;
+    if (p.icon === "country_label") {
+      if (p.showLabel !== false) drawCountryLabel2D(ctx, sp, p, state.inView.r * 2, op);
+      return;
+    }
     ctx.save();
     ctx.globalAlpha = op;
     ctx.font = '10.5px "JetBrains Mono", monospace';
@@ -2162,6 +2485,10 @@
     const w = canvasOut.clientWidth, h = canvasOut.clientHeight;
     const sp = worldToScreen(state.outView, canvasOut, projPt.x, projPt.y);
     if (sp.x < -36 || sp.x > w + 36 || sp.y < -36 || sp.y > h + 36) return;
+    if (p.icon === "country_label") {
+      if (p.showLabel !== false) drawCountryLabel2D(ctx, sp, p, state.outView.r * 2, op);
+      return;
+    }
     ctx.save();
     ctx.globalAlpha = op;
     ctx.font = '10.5px "JetBrains Mono", monospace';
@@ -2215,13 +2542,37 @@
 
   function drawShapeIn(ctx, s) {
     if (!s.visible) return;
+    if (s.kind === "image" && Array.isArray(s._mappedItems) && s._mappedItems.length > 0) {
+      const col = themeCol(s.color || "#fbbf24", { solidFill: false });
+      const lw = normLineWidth(s.lineWidth, 2.2);
+      const hi = isShapeSelected(s.id) || s.id === state.hoveredShapeId;
+      ctx.save();
+      for (const mi of s._mappedItems) {
+        if (mi.kind === "point" && mi.pt) {
+          const sp = worldToScreen(state.inView, canvasIn, mi.pt.x, mi.pt.y);
+          ctx.fillStyle = col; ctx.strokeStyle = isLightTheme() ? "#ffffff" : "#0a0e17"; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        } else if (mi.pts && mi.pts.length >= 2) {
+          const pts = projectInPts(mi.pts);
+          if (mi.closed) {
+            ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, true);
+            ctx.fillStyle = themeRgba(s.color || "#fbbf24", 0.18); ctx.fill("nonzero");
+          }
+          ctx.beginPath(); tracePts(ctx, canvasIn, state.inView, pts, Boolean(mi.closed));
+          ctx.strokeStyle = hi ? (isLightTheme() ? "#0f172a" : "#ffffff") : col;
+          ctx.lineWidth = lw; ctx.stroke();
+        }
+      }
+      ctx.restore();
+      return;
+    }
     const defaultOp = s.closed ? 0.22 : 1.0;
     const op = normOpacity(s.opacity, defaultOp);
     if (op <= 0.001) return;
     const strokeAlpha = s.closed ? (op < 0.22 ? op / 0.22 : 1.0) : op;
     const rawInPts = (s.kind === "ray" || s.kind === "infline")
       ? expandLinearShapePts(s)
-      : (s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts);
+      : (s.imageOf ? s.rawPts : (s.boundary && s.boundary.inPts.length >= 2 ? s.boundary.inPts : s.rawPts));
     const pts = projectInPts(rawInPts);
     const hi = isShapeSelected(s.id) || s.id === state.hoveredShapeId;
     const lw = normLineWidth(s.lineWidth, 2.2);
@@ -2287,8 +2638,8 @@
     }
     ctx.restore();
 
-    /* Draw individual resize handles ONLY in editable modes (Planar ℂ / Polar ℂ) for a single selected unlocked shape */
-    if (isInputEditable() && s.id === state.selectedShapeId && !s.locked && getSelectedMovableItems().total < 2) {
+    /* Draw individual resize handles ONLY in editable modes (Planar ℂ / Polar ℂ) for a single selected unlocked, non-tethered shape */
+    if (isInputEditable() && s.id === state.selectedShapeId && !s.locked && !s.imageOf && getSelectedMovableItems().total < 2) {
       ctx.save();
       for (const h of getResizeHandles(s)) {
         const sp = worldToScreen(state.inView, canvasIn, h.x, h.y);
@@ -2520,8 +2871,10 @@
     const drawOutNow = dirtyOut || state.playing;
     dirtyIn = false;
     dirtyOut = false;
-    const okIn = drawInNow && ensureCanvasSize(canvasIn);
-    const okOut = drawOutNow && ensureCanvasSize(canvasOut);
+    const inHidden = Boolean(ws() && ws().state && ws().state.inputHidden);
+    const outHidden = Boolean(ws() && ws().state && ws().state.outputHidden);
+    const okIn = !inHidden && drawInNow && ensureCanvasSize(canvasIn);
+    const okOut = !outHidden && drawOutNow && ensureCanvasSize(canvasOut);
     if (!okIn && !okOut) return;
     const dpr = window.devicePixelRatio || 1;
     if (state.playing) {
@@ -2537,16 +2890,30 @@
       const orderedEls = getOrderedElements();
       const orderedShapes = orderedEls.filter((e) => e.kind === "shape").map((e) => e.item);
       const orderedPoints = orderedEls.filter((e) => e.kind === "point").map((e) => ({ ...e.item, outPt: { x: e.item.x, y: e.item.y } }));
-      const cfIn = state.showDomain && state.domainImg && state.domainImg.pixels
+      const baseDom = state.domainBaseImg || state.domainImg;
+      const natDom = state.domainImg && state.domainImg.nativeSphere ? state.domainImg : null;
+      const cfIn = state.showDomain && (natDom || (baseDom && baseDom.pixels))
         ? {
-            pixels: state.domainImg.pixels, tw: state.domainImg.tw, th: state.domainImg.th,
-            cx: state.domainImg.cx, cy: state.domainImg.cy, halfW: state.domainImg.halfW, halfH: state.domainImg.halfH,
-            opacity: normOpacity(state.domainOpacity, 0.9), mapping: state.outDomainMapping || "stereo",
+            canvas: natDom ? natDom.canvas : null,
+            nativeSphere: Boolean(natDom),
+            yaw: natDom ? natDom.yaw : 0,
+            pitch: natDom ? natDom.pitch : 0,
+            zoom: natDom ? natDom.zoom : 1,
+            pixels: baseDom ? baseDom.pixels : null,
+            tw: baseDom ? baseDom.tw : 0,
+            th: baseDom ? baseDom.th : 0,
+            cx: baseDom ? baseDom.cx : 0,
+            cy: baseDom ? baseDom.cy : 0,
+            halfW: baseDom ? baseDom.halfW : 1,
+            halfH: baseDom ? baseDom.halfH : 1,
+            paramKey: baseDom ? baseDom.paramKey : "",
+            reqId: baseDom ? baseDom.reqId : 0,
+            opacity: normOpacity(state.domainOpacity, 0.9),
+            mapping: state.outDomainMapping || "stereo",
           }
         : null;
       const isAnimNow = Boolean(ws() && typeof ws().isAnySliderPlaying === "function" && ws().isAnySliderPlaying());
       window.RiemannSphereIn.render(ctxIn, canvasIn, orderedShapes, {
-        surface: "sphere",
         mode: state.mode,
         showMesh: state.showMesh,
         getPts: (s) => s.rawPts,
@@ -2603,8 +2970,8 @@
       ctxIn.setLineDash([]);
       for (const h of getGroupHandles(gBox)) {
         const sp = worldToScreen(state.inView, canvasIn, h.x, h.y);
-        ctxIn.fillStyle = "#0a0e17";
-        ctxIn.strokeStyle = "#38bdf8";
+        ctxIn.fillStyle = isLightTheme() ? "#ffffff" : "#0a0e17";
+        ctxIn.strokeStyle = isLightTheme() ? "#0284c7" : "#38bdf8";
         ctxIn.lineWidth = 2;
         ctxIn.beginPath();
         ctxIn.rect(sp.x - 4.5, sp.y - 4.5, 9, 9);
@@ -2618,14 +2985,14 @@
     const rotInfo = getSelectionRotateInfo();
     if (rotInfo) {
       ctxIn.save();
-      ctxIn.strokeStyle = "rgba(56, 189, 248, 0.85)";
+      ctxIn.strokeStyle = isLightTheme() ? "rgba(2, 132, 199, 0.85)" : "rgba(56, 189, 248, 0.85)";
       ctxIn.lineWidth = 1.6;
       ctxIn.beginPath();
       ctxIn.moveTo(rotInfo.stemX, rotInfo.stemY);
       ctxIn.lineTo(rotInfo.handleX, rotInfo.handleY);
       ctxIn.stroke();
-      ctxIn.fillStyle = state.dragRotate ? "#38bdf8" : "#0a0e17";
-      ctxIn.strokeStyle = "#38bdf8";
+      ctxIn.fillStyle = state.dragRotate ? "#38bdf8" : (isLightTheme() ? "#ffffff" : "#0a0e17");
+      ctxIn.strokeStyle = isLightTheme() ? "#0284c7" : "#38bdf8";
       ctxIn.lineWidth = 2;
       ctxIn.beginPath();
       ctxIn.arc(rotInfo.handleX, rotInfo.handleY, 6, 0, Math.PI * 2);
@@ -2687,17 +3054,14 @@
       ctxIn.beginPath(); tracePts(ctxIn, canvasIn, state.inView, pts, false); ctxIn.stroke();
       ctxIn.restore();
     }
-    if (state.snapHint) {
-      const sp = worldToScreen(state.inView, canvasIn, state.snapHint.x, state.snapHint.y);
-      ctxIn.save();
-      ctxIn.strokeStyle = "#34d399";
-      ctxIn.fillStyle = "rgba(52, 211, 153, 0.22)";
-      ctxIn.lineWidth = 2;
-      ctxIn.beginPath();
-      ctxIn.arc(sp.x, sp.y, 9, 0, Math.PI * 2);
-      ctxIn.fill();
-      ctxIn.stroke();
-      ctxIn.restore();
+    if (state.snapHint && window.CFVGeom && window.CFVGeom.drawSnapIndicator) {
+      window.CFVGeom.drawSnapIndicator(
+        ctxIn,
+        state.snapHint,
+        (x) => worldToScreen(state.inView, canvasIn, x, 0).x,
+        (y) => worldToScreen(state.inView, canvasIn, 0, y).y,
+        isLightTheme()
+      );
     }
     } /* end canEditIn */
     if (!canEditIn) {
@@ -2726,6 +3090,22 @@
         ctxIn.beginPath(); ctxIn.arc(sp.x, sp.y, 4, 0, Math.PI * 2); ctxIn.fill(); ctxIn.stroke();
       }
     }
+    /* Bidirectional Output -> Input Newton Pullback Preimages z in f^{-1}(w) */
+    if (!inIs3D && state.probe.active && !state.probe.z && Array.isArray(state.probe.preimages) && state.probe.preimages.length > 0) {
+      ctxIn.save();
+      for (const pre of state.probe.preimages) {
+        const pz = projectInPt(pre);
+        if (!pz || !Number.isFinite(pz.x) || !Number.isFinite(pz.y)) continue;
+        const sp = worldToScreen(state.inView, canvasIn, pz.x, pz.y);
+        ctxIn.fillStyle = "rgba(167, 139, 250, 0.25)";
+        ctxIn.beginPath(); ctxIn.arc(sp.x, sp.y, 8, 0, Math.PI * 2); ctxIn.fill();
+        ctxIn.fillStyle = "#ffffff";
+        ctxIn.strokeStyle = "#a78bfa";
+        ctxIn.lineWidth = 2;
+        ctxIn.beginPath(); ctxIn.arc(sp.x, sp.y, 3.8, 0, Math.PI * 2); ctxIn.fill(); ctxIn.stroke();
+      }
+      ctxIn.restore();
+    }
     if (window.CFVAnnotations && state.texts.length > 0) {
       window.CFVAnnotations.drawTextBoxes(ctxIn, canvasIn, state.texts, {
         plane: "in",
@@ -2743,26 +3123,34 @@
     if (okOut) {
     ctxOut.save();
     ctxOut.scale(dpr, dpr);
-    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) {
+    if (window.RiemannSphere && state.projection === "sphere") {
       const orderedEls = getOrderedElements();
       const orderedShapes = orderedEls.filter((e) => e.kind === "shape").map((e) => e.item);
       const orderedPoints = orderedEls.filter((e) => e.kind === "point").map((e) => e.item);
-      const cf = state.showOutDomain && state.domainImg && state.domainImg.pixels
+      const baseDom = state.domainBaseImg || state.domainImg;
+      const natOut = state.outDomainImg && state.outDomainImg.nativeSphere ? state.outDomainImg : null;
+      const cf = state.showOutDomain && (natOut || (baseDom && baseDom.pixels))
         ? {
-            pixels: state.domainImg.pixels,
-            tw: state.domainImg.tw,
-            th: state.domainImg.th,
-            cx: state.domainImg.cx,
-            cy: state.domainImg.cy,
-            halfW: state.domainImg.halfW,
-            halfH: state.domainImg.halfH,
+            canvas: natOut ? natOut.canvas : null,
+            nativeSphere: Boolean(natOut),
+            yaw: natOut ? natOut.yaw : 0,
+            pitch: natOut ? natOut.pitch : 0,
+            zoom: natOut ? natOut.zoom : 1,
+            pixels: baseDom ? baseDom.pixels : null,
+            tw: baseDom ? baseDom.tw : 0,
+            th: baseDom ? baseDom.th : 0,
+            cx: baseDom ? baseDom.cx : 0,
+            cy: baseDom ? baseDom.cy : 0,
+            halfW: baseDom ? baseDom.halfW : 1,
+            halfH: baseDom ? baseDom.halfH : 1,
+            paramKey: baseDom ? baseDom.paramKey : "",
+            reqId: baseDom ? baseDom.reqId : 0,
             opacity: normOpacity(state.domainOpacity, 0.9),
             mapping: state.outDomainMapping || "stereo",
           }
         : null;
       const isAnimOut = Boolean(ws() && typeof ws().isAnySliderPlaying === "function" && ws().isAnySliderPlaying());
       window.RiemannSphere.render(ctxOut, canvasOut, orderedShapes, {
-        surface: state.projection,
         mode: state.mode,
         showMesh: state.showMesh,
         getPts: (s) => (state.mode === "integral" ? (s.integral ? s.integral.cumPts : null) : s.boundary ? s.boundary.outPts : null),
@@ -2787,16 +3175,18 @@
         ctxOut.beginPath();
         ctxOut.rect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
         ctxOut.clip();
-        for (const s of state.shapes) {
-          if (s && s.visible && s.closed && (s.isOcean || (s.label && /^global ocean\b/i.test(s.label)))) {
-            diskOcean = s;
-            const g = ctxOut.createLinearGradient(tl.x, tl.y, tl.x, br.y);
-            g.addColorStop(0.0, "#073462");
-            g.addColorStop(0.5, "#1169ad");
-            g.addColorStop(1.0, "#073462");
-            ctxOut.fillStyle = g;
-            ctxOut.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-            break;
+        if (!state.showOutDomain) {
+          for (const s of state.shapes) {
+            if (s && s.visible && s.closed && (s.isOcean || (s.label && /^global ocean\b/i.test(s.label)))) {
+              diskOcean = s;
+              const g = ctxOut.createLinearGradient(tl.x, tl.y, tl.x, br.y);
+              g.addColorStop(0.0, "#073462");
+              g.addColorStop(0.5, "#1169ad");
+              g.addColorStop(1.0, "#073462");
+              ctxOut.fillStyle = g;
+              ctxOut.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+              break;
+            }
           }
         }
       }
@@ -2808,72 +3198,22 @@
         ctxOut.beginPath();
         ctxOut.ellipse(o.x, o.y, rx, ry, 0, 0, Math.PI * 2);
         ctxOut.clip();
-        /* Seamless full-disk Ocean fill (eliminates any rim gap on Stereographic & Poincaré Earth!) */
-        for (const s of state.shapes) {
-          if (s && s.visible && s.closed && (s.isOcean || (s.label && /^global ocean\b/i.test(s.label)))) {
-            diskOcean = s;
-            const op = normOpacity(s.opacity, 1.0);
-            if (op > 0.001) {
-              ctxOut.fillStyle = op >= 0.995 ? s.color : themeRgba(s.color, op);
-              ctxOut.beginPath();
-              ctxOut.ellipse(o.x, o.y, rx, ry, 0, 0, Math.PI * 2);
-              ctxOut.fill();
-            }
-            break;
-          }
-        }
-        /* Optional C11 Output Color Field mapped seamlessly onto the bounded Stereographic / Poincaré Disk! */
-        if (state.showOutDomain && state.domainImg && state.domainImg.pixels) {
-          const dom = state.domainImg;
-          const sz = Math.max(120, Math.min(260, Math.round(Math.max(rx, ry) * 1.15)));
-          const off = state._diskOutCanvas || (state._diskOutCanvas = document.createElement("canvas"));
-          if (off.width !== sz || off.height !== sz) {
-            off.width = sz; off.height = sz;
-            state._diskOutImgData = off.getContext("2d").createImageData(sz, sz);
-          }
-          const outD = state._diskOutImgData.data;
-          const src = dom.pixels, tw = dom.tw, th = dom.th;
-          const invHW = 0.5 / Math.max(1e-12, dom.halfW), invHH = 0.5 / Math.max(1e-12, dom.halfH);
-          const isMerc = state.outDomainMapping === "mercator";
-          const isPoin = state.projection === "poincare";
-          const aByte = Math.round(normOpacity(state.domainOpacity, 0.85) * 255);
-          const invR = 2.0 / sz;
-          let p = 0;
-          for (let py = 0; py < sz; py++) {
-            const dy = 1.0 - (py + 0.5) * invR;
-            for (let px = 0; px < sz; px++) {
-              const dx = (px + 0.5) * invR - 1.0;
-              const r = Math.hypot(dx, dy);
-              if (r >= 0.998) { outD[p + 3] = 0; p += 4; continue; }
-              const wMag = isPoin ? (2.0 * r / Math.max(1e-4, 1.0 - r * r)) : Math.tan(r * Math.PI * 0.5);
-              const invD = r > 1e-6 ? wMag / r : 0.0;
-              const wx = dx * invD, wy = dy * invD;
-              let u, v;
-              if (isMerc) {
-                u = Math.atan2(wx, wy);
-                v = Math.log(Math.max(1e-4, Math.min(1e4, wMag)));
-              } else {
-                u = wx; v = wy;
+        /* Seamless full-disk Ocean fill (only when domain coloring is not already painting the disk!) */
+        if (!state.showOutDomain) {
+          for (const s of state.shapes) {
+            if (s && s.visible && s.closed && (s.isOcean || (s.label && /^global ocean\b/i.test(s.label)))) {
+              diskOcean = s;
+              const op = normOpacity(s.opacity, 1.0);
+              if (op > 0.001) {
+                ctxOut.fillStyle = op >= 0.995 ? s.color : themeRgba(s.color, op);
+                ctxOut.beginPath();
+                ctxOut.ellipse(o.x, o.y, rx, ry, 0, 0, Math.PI * 2);
+                ctxOut.fill();
               }
-              const ix = Math.max(0, Math.min(tw - 1, Math.floor(((u - dom.cx) * invHW + 0.5) * tw)));
-              const iy = Math.max(0, Math.min(th - 1, Math.floor((0.5 - (v - dom.cy) * invHH) * th)));
-              const si = (iy * tw + ix) * 4;
-              outD[p] = src[si]; outD[p + 1] = src[si + 1]; outD[p + 2] = src[si + 2];
-              outD[p + 3] = Math.round((src[si + 3] * aByte) / 255);
-              p += 4;
+              break;
             }
           }
-          off.getContext("2d").putImageData(state._diskOutImgData, 0, 0);
-          ctxOut.drawImage(off, o.x - rx, o.y - ry, rx * 2, ry * 2);
         }
-      } else if (state.showOutDomain && state.domainImg && state.domainImg.canvas) {
-        const d = state.domainImg;
-        const tl = worldToScreen(state.outView, canvasOut, d.cx - d.halfW, d.cy + d.halfH);
-        const br = worldToScreen(state.outView, canvasOut, d.cx + d.halfW, d.cy - d.halfH);
-        ctxOut.save();
-        ctxOut.globalAlpha = normOpacity(state.domainOpacity, 0.72);
-        ctxOut.drawImage(d.canvas, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-        ctxOut.restore();
       }
       const orderedEls = getOrderedElements();
       if (state.mode === "integral") {
@@ -2979,95 +3319,41 @@
     let closedSumRe = 0, closedSumIm = 0, closedCount = 0;
     for (const s of vis) {
       const ig = s.integral;
-      const row = document.createElement("div");
-      row.className = "integral-row-card" + (s.id === state.selectedShapeId ? " selected" : "");
-
-      const top = document.createElement("div");
-      top.className = "integral-row-top";
-
-      const dot = document.createElement("span");
-      dot.className = "integral-dot";
-      dot.style.background = s.color;
-      top.appendChild(dot);
-
-      const title = document.createElement("span");
-      title.textContent = s.label || "Contour";
-      top.appendChild(title);
-
-      const orient = document.createElement("span");
-      orient.className = "integral-row-badge" + (s.closed ? (ig.orientation > 0 ? " ccw" : " cw") : "");
-      orient.textContent = s.closed ? (ig.orientation > 0 ? "Closed ↺ CCW" : "Closed ↻ CW") : "Open γ";
-      top.appendChild(orient);
-
-      const revBtn = document.createElement("button");
-      revBtn.className = "integral-row-rev";
-      revBtn.textContent = "⇄";
-      revBtn.title = "Reverse contour orientation (flips sign of integral)";
-      revBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        reverseShape(s.id);
-      });
-      top.appendChild(revBtn);
-      row.appendChild(top);
-
-      const metrics = document.createElement("div");
-      metrics.className = "integral-row-metrics";
-
-      const mLeft = document.createElement("div");
-      mLeft.className = "integral-row-metric";
       const sym = s.closed ? "∮" : "∫";
-      const lblL = document.createElement("span");
-      lblL.className = "integral-metric-lbl";
-      lblL.textContent = `${sym} f(z) dz`;
-      const main = document.createElement("span");
-      main.className = "integral-row-main";
-      main.textContent = ig.singular ? "Pole on contour" : fmtComplex(ig.total.x, ig.total.y, 4);
-      mLeft.appendChild(lblL);
-      mLeft.appendChild(main);
-      if (!ig.singular) {
-        const hint = fmtExactHint(ig.total.x, ig.total.y);
-        if (hint) {
-          const hEl = document.createElement("span");
-          hEl.className = "integral-row-exact";
-          hEl.textContent = hint;
-          mLeft.appendChild(hEl);
-        }
-      }
-      metrics.appendChild(mLeft);
-
-      const mRight = document.createElement("div");
-      mRight.className = "integral-row-metric";
-      const lblR = document.createElement("span");
-      lblR.className = "integral-metric-lbl";
-      const right = document.createElement("span");
-      right.className = "integral-row-res";
-      if (ig.singular) {
-        lblR.textContent = "Status";
-        right.style.color = "#fb7185";
-        right.textContent = "Singular";
-      } else if (s.closed) {
-        lblR.textContent = "Residue (÷ 2πi)";
-        right.textContent = fmtCompact(ig.div2pii.x, ig.div2pii.y);
-      } else {
-        lblR.textContent = "Magnitude · Length";
-        right.style.color = "var(--text-secondary)";
-        right.textContent = `|I|=${Math.hypot(ig.total.x, ig.total.y).toFixed(3)} · L=${ig.arcLength.toFixed(2)}`;
-      }
-      mRight.appendChild(lblR);
-      mRight.appendChild(right);
-      metrics.appendChild(mRight);
-
-      row.appendChild(metrics);
-
-      row.addEventListener("click", () => {
-        state.selectedShapeId = state.selectedShapeId === s.id ? null : s.id;
-        state.selectedPointId = null;
-        updateIntegralPanel();
-        notifyDomain();
-        requestRender();
-      });
-
-      integralRows.appendChild(row);
+      const hint = !ig.singular ? fmtExactHint(ig.total.x, ig.total.y) : "";
+      const rightMetric = ig.singular
+        ? { label: "Status", value: "Singular", valClass: "integral-row-res", valColor: "#fb7185" }
+        : s.closed
+          ? { label: "Residue (÷ 2πi)", value: fmtCompact(ig.div2pii.x, ig.div2pii.y), valClass: "integral-row-res" }
+          : { label: "Magnitude · Length", value: `|I|=${Math.hypot(ig.total.x, ig.total.y).toFixed(3)} · L=${ig.arcLength.toFixed(2)}`, valClass: "integral-row-res", valColor: "var(--text-secondary)" };
+      const row = window.CFVGeom && window.CFVGeom.createIntegralRowCard
+        ? window.CFVGeom.createIntegralRowCard({
+            id: s.id,
+            color: s.color,
+            title: s.label || "Contour",
+            badgeText: s.closed ? (ig.orientation > 0 ? "Closed ↺ CCW" : "Closed ↻ CW") : "Open γ",
+            badgeClass: s.closed ? (ig.orientation > 0 ? "ccw" : "cw") : "",
+            selected: s.id === state.selectedShapeId,
+            tooltip: "Click to highlight & select this contour on the graph",
+            onReverse: () => reverseShape(s.id),
+            onSelect: () => {
+              state.selectedShapeId = state.selectedShapeId === s.id ? null : s.id;
+              state.selectedPointId = null;
+              updateIntegralPanel();
+              notifyDomain();
+              requestRender();
+            },
+            onHover: (on) => {
+              state.hoveredShapeId = on ? s.id : null;
+              requestRender();
+            },
+            metrics: [
+              { label: `${sym} f(z) dz`, value: ig.singular ? "Pole on contour" : fmtComplex(ig.total.x, ig.total.y, 4), hint, valClass: "integral-row-main" },
+              rightMetric,
+            ],
+          })
+        : null;
+      if (row) integralRows.appendChild(row);
       if (!ig.singular) {
         sumRe += ig.total.x;
         sumIm += ig.total.y;
@@ -3111,98 +3397,16 @@
     }
   }
 
-  /* Draggable, Resizable & Minimizable Contour Integrals Panel */
-  let savedIntegralSize = null;
-  if (btnMinIntegral && integralPanel) {
-    btnMinIntegral.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      state.integralMinimized = !state.integralMinimized;
-      if (state.integralMinimized) {
-        savedIntegralSize = { w: integralPanel.style.width, h: integralPanel.style.height, mh: integralPanel.style.maxHeight };
-        integralPanel.style.width = "";
-        integralPanel.style.height = "";
-      } else if (savedIntegralSize) {
-        integralPanel.style.width = savedIntegralSize.w || "";
-        integralPanel.style.height = savedIntegralSize.h || "";
-        integralPanel.style.maxHeight = savedIntegralSize.mh || "";
-      }
-      integralPanel.classList.toggle("minimized", state.integralMinimized);
-      btnMinIntegral.textContent = state.integralMinimized ? "+" : "−";
-      if (integralMinSum) {
-        const hasVal = integralMinSum.textContent && integralMinSum.textContent.trim().length > 0;
-        integralMinSum.classList.toggle("hidden", !state.integralMinimized || !hasVal);
-      }
+  /* Unified Draggable, Resizable & Minimizable Contour Integrals Panel (shared with Vector Mode!) */
+  if (integralPanel && window.CFVGeom && window.CFVGeom.attachFloatingPanel) {
+    window.CFVGeom.attachFloatingPanel(integralPanel, {
+      containerEl: outCard,
+      headerEl: integralPanelHdr,
+      minBtnEl: btnMinIntegral,
+      resizeHandleEl: integralResizeHandle,
+      minSumEl: integralMinSum,
+      onMinimizeChange(m) { state.integralMinimized = m; },
     });
-  }
-  if (integralResizeHandle && integralPanel) {
-    let ipRes = null;
-    integralResizeHandle.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const cardRect = outCard.getBoundingClientRect();
-      const panelRect = integralPanel.getBoundingClientRect();
-      const startLeft = panelRect.left - cardRect.left;
-      const startTop = panelRect.top - cardRect.top;
-      integralPanel.style.left = `${startLeft}px`;
-      integralPanel.style.top = `${startTop}px`;
-      integralPanel.style.bottom = "auto";
-      integralPanel.style.right = "auto";
-      ipRes = { startX: e.clientX, startY: e.clientY, startW: panelRect.width, startH: panelRect.height, startLeft, startTop };
-      integralPanel.classList.add("dragging");
-      if (integralResizeHandle.setPointerCapture) integralResizeHandle.setPointerCapture(e.pointerId);
-    });
-    integralResizeHandle.addEventListener("pointermove", (e) => {
-      if (!ipRes) return;
-      const maxW = Math.max(240, outCard.clientWidth - ipRes.startLeft - 8);
-      const maxH = Math.max(110, outCard.clientHeight - ipRes.startTop - 8);
-      const nw = Math.max(240, Math.min(maxW, ipRes.startW + (e.clientX - ipRes.startX)));
-      const nh = Math.max(100, Math.min(maxH, ipRes.startH + (e.clientY - ipRes.startY)));
-      integralPanel.style.width = `${Math.round(nw)}px`;
-      integralPanel.style.height = `${Math.round(nh)}px`;
-      integralPanel.style.maxHeight = "none";
-    });
-    const endIpRes = () => {
-      if (!ipRes) return;
-      ipRes = null;
-      integralPanel.classList.remove("dragging");
-    };
-    integralResizeHandle.addEventListener("pointerup", endIpRes);
-    integralResizeHandle.addEventListener("pointercancel", endIpRes);
-  }
-  if (integralPanelHdr && integralPanel) {
-    let ipDrag = null;
-    integralPanelHdr.addEventListener("pointerdown", (e) => {
-      if (e.target && e.target.closest && e.target.closest("button")) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const cardRect = outCard.getBoundingClientRect();
-      const panelRect = integralPanel.getBoundingClientRect();
-      const startLeft = panelRect.left - cardRect.left;
-      const startTop = panelRect.top - cardRect.top;
-      integralPanel.style.left = `${startLeft}px`;
-      integralPanel.style.top = `${startTop}px`;
-      integralPanel.style.bottom = "auto";
-      integralPanel.style.right = "auto";
-      ipDrag = { startX: e.clientX, startY: e.clientY, startLeft, startTop };
-      integralPanel.classList.add("dragging");
-      if (integralPanelHdr.setPointerCapture) integralPanelHdr.setPointerCapture(e.pointerId);
-    });
-    integralPanelHdr.addEventListener("pointermove", (e) => {
-      if (!ipDrag) return;
-      const maxL = Math.max(8, outCard.clientWidth - integralPanel.offsetWidth - 8);
-      const maxT = Math.max(46, outCard.clientHeight - integralPanel.offsetHeight - 8);
-      const nl = Math.max(8, Math.min(maxL, ipDrag.startLeft + (e.clientX - ipDrag.startX)));
-      const nt = Math.max(46, Math.min(maxT, ipDrag.startTop + (e.clientY - ipDrag.startY)));
-      integralPanel.style.left = `${nl}px`;
-      integralPanel.style.top = `${nt}px`;
-    });
-    const endIpDrag = () => {
-      if (!ipDrag) return;
-      ipDrag = null;
-      integralPanel.classList.remove("dragging");
-    };
-    integralPanelHdr.addEventListener("pointerup", endIpDrag);
-    integralPanelHdr.addEventListener("pointercancel", endIpDrag);
   }
 
   async function updateProbe(z) {
@@ -3509,14 +3713,14 @@
         return;
       }
 
-      /* 3. Landmark Point Hit (don't let a locked landmark inside a multi-select box steal a group drag!) */
+      /* 3. Landmark Point Hit (don't let a locked/tethered landmark inside a multi-select box steal a group drag!) */
       const pHit = hitPoint(pos.x, pos.y);
-      if (pHit && !(pHit.locked && !multiMod && hitGroupBox(pos.x, pos.y))) {
+      if (pHit && !((pHit.locked || pHit.imageOf) && !multiMod && hitGroupBox(pos.x, pos.y))) {
         if (multiMod) {
           selectPoint(pHit.id, { toggle: true });
           return;
         }
-        if (isPointSelected(pHit.id) && getSelectedMovableItems().total >= 2 && !pHit.locked) {
+        if (isPointSelected(pHit.id) && getSelectedMovableItems().total >= 2 && !pHit.locked && !pHit.imageOf) {
           pushUndoSnapshot();
           const items = getSelectedMovableItems();
           state.dragGroup = {
@@ -3531,7 +3735,7 @@
         clearSelection();
         state.selectedPointIds.add(pHit.id);
         syncPrimarySelection();
-        if (!pHit.locked) {
+        if (!pHit.locked && !pHit.imageOf) {
           pushUndoSnapshot();
           state.dragPoint = { point: pHit };
           inCard.classList.add("dragging-shape");
@@ -3549,7 +3753,7 @@
           selectShape(hit.id, { toggle: true });
           return;
         }
-        if (isShapeSelected(hit.id) && getSelectedMovableItems().total >= 2 && !hit.locked) {
+        if (isShapeSelected(hit.id) && getSelectedMovableItems().total >= 2 && !hit.locked && !hit.imageOf) {
           pushUndoSnapshot();
           const items = getSelectedMovableItems();
           state.dragGroup = {
@@ -3566,7 +3770,7 @@
         syncPrimarySelection();
         updateIntegralPanel();
         notifyDomain();
-        if (!hit.locked) {
+        if (!hit.locked && !hit.imageOf) {
           pushUndoSnapshot();
           state.dragShape = {
             mode: "move", shape: hit, startWorld: z, origRawPts: hit.rawPts.map((p) => ({ ...p })),
@@ -3649,11 +3853,9 @@
       return;
     }
 
-    const snapStart = (state.tool === "line" || state.tool === "seg" || state.tool === "ray" || state.tool === "infline" || state.tool === "freehand" || state.tool === "polygon")
-      ? findSnapTarget(pos.x, pos.y)
-      : null;
+    const snapStart = findSnapTarget(pos.x, pos.y, null, null, e.shiftKey);
     const zStart = snapStart ? { x: snapStart.x, y: snapStart.y } : z;
-    state.snapHint = snapStart;
+    state.snapHint = snapStart && snapStart.kind !== "grid" ? snapStart : null;
 
     if (state.tool === "polygon") {
       if (!state.polyDraft) {
@@ -3872,8 +4074,11 @@
 
     if (state.dragPoint) {
       const pt = state.dragPoint.point;
-      pt.x = Number(z.x.toFixed(4));
-      pt.y = Number(z.y.toFixed(4));
+      const sn = findSnapTarget(pos.x, pos.y, null, pt.id, e.shiftKey);
+      state.snapHint = sn && sn.kind !== "grid" ? sn : null;
+      const pz = sn ? { x: sn.x, y: sn.y } : z;
+      pt.x = Number(pz.x.toFixed(4));
+      pt.y = Number(pz.y.toFixed(4));
       if (ws() && typeof ws().syncPointCoords === "function") ws().syncPointCoords(pt);
       if (state.mode === "map") flushPointDrag();
       requestRender();
@@ -3932,14 +4137,17 @@
             s.rawPts = makeRect(xmin, ymin, xmax, ymax, drag.origCcw);
           }
         } else if (h.shapeKind === "line") {
-          const sn = findSnapTarget(pos.x, pos.y, s.id);
-          state.snapHint = sn;
+          const sn = findSnapTarget(pos.x, pos.y, s.id, null, e.shiftKey);
+          state.snapHint = sn && sn.kind !== "grid" ? sn : null;
           const tz = sn ? { x: sn.x, y: sn.y } : z;
           const p0 = h.id === "start" ? tz : drag.origRawPts[0];
           const p1 = h.id === "end" ? tz : drag.origRawPts[drag.origRawPts.length - 1];
           s.rawPts = makeLine(p0.x, p0.y, p1.x, p1.y, Math.max(40, drag.origRawPts.length - 1));
         } else if (h.shapeKind === "polygon") {
-          s.rawPts = drag.origRawPts.map((p, i) => (i === h.vertexIndex ? { x: z.x, y: z.y } : { ...p }));
+          const sn = findSnapTarget(pos.x, pos.y, s.id, null, e.shiftKey);
+          state.snapHint = sn && sn.kind !== "grid" ? sn : null;
+          const tz = sn ? { x: sn.x, y: sn.y } : z;
+          s.rawPts = drag.origRawPts.map((p, i) => (i === h.vertexIndex ? { x: tz.x, y: tz.y } : { ...p }));
         } else if (h.shapeKind === "scale") {
           const b = drag.origBox;
           const ax = h.id.includes("w") ? b.xmax : b.xmin, ay = h.id.includes("s") ? b.ymax : b.ymin;
@@ -3980,7 +4188,7 @@
       if (state.hoveredPointId !== npid || state.hoveredShapeId !== nsid) {
         state.hoveredPointId = npid;
         state.hoveredShapeId = nsid;
-        const canDrag = canEdit && ((pHit && !pHit.locked) || (sHit && !sHit.locked) || hitGroupBox(pos.x, pos.y));
+        const canDrag = canEdit && ((pHit && !pHit.locked && !pHit.imageOf) || (sHit && !sHit.locked && !sHit.imageOf) || hitGroupBox(pos.x, pos.y));
         inCard.classList.toggle("move-hover", Boolean(canDrag));
         requestRender();
       }
@@ -4051,16 +4259,13 @@
       requestRender("in");
       return;
     }
-    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn && window.RiemannSphereIn.state.orbiting) {
+    if (state.inProjection === "sphere" && window.RiemannSphereIn && window.RiemannSphereIn.state.orbiting) {
       window.RiemannSphereIn.onPointerUp();
       inCard.classList.remove("panning");
+      if (state.showDomain) scheduleDomain();
       return;
     }
     if (state.taylor.draggingZ0) { state.taylor.draggingZ0 = false; fetchTaylor(); return; }
-    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn && window.RiemannSphereIn.state.orbiting) {
-      if (window.RiemannSphereIn.onPointerMove(pos.x, pos.y)) requestRender("in");
-      return;
-    }
     if (state.pan && state.pan.which === "in") {
       const p = state.pan;
       state.pan = null;
@@ -4275,8 +4480,9 @@
   });
   canvasIn.addEventListener("wheel", (e) => {
     e.preventDefault();
-    if ((state.inProjection === "sphere" || state.inProjection === "cylinder") && window.RiemannSphereIn) {
+    if (state.inProjection === "sphere" && window.RiemannSphereIn) {
       window.RiemannSphereIn.onWheel(e.deltaY);
+      if (state.showDomain) scheduleDomain(true);
       requestRender("in");
       return;
     }
@@ -4381,17 +4587,21 @@
         canvasOut.style.cursor = "";
       }
     }
-    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder") && window.RiemannSphere.state.orbiting) {
-      if (window.RiemannSphere.onPointerMove(pos.x, pos.y)) requestRender("out");
+    if (window.RiemannSphere && state.projection === "sphere" && window.RiemannSphere.state.orbiting) {
+      if (window.RiemannSphere.onPointerMove(pos.x, pos.y)) {
+        if (state.showOutDomain) scheduleDomain(true);
+        requestRender("out");
+      }
       return;
     }
     if (state.pan && state.pan.which === "out") {
       state.outView.cx = state.pan.origCx - (pos.x - state.pan.startX) / (state.outView.scaleX || state.outView.scale);
       state.outView.cy = state.pan.origCy + (pos.y - state.pan.startY) / (state.outView.scaleY || state.outView.scale);
+      if (state.showOutDomain) scheduleDomain(true);
       requestRender("out");
       return;
     }
-    /* Output pane live probe dot & exact element hover highlighting across ALL projections (Planar, Disks, Mercator, Riemann Sphere)! */
+    /* Output pane live probe dot, Newton Pullback preimages & exact element hover highlighting across ALL projections! */
     const wProbe = screenToOutComplexExact(pos.x, pos.y);
     if (wProbe) {
       state.probe.active = true;
@@ -4399,10 +4609,46 @@
       state.probe.w = wProbe;
       if (readoutIn) readoutIn.textContent = "—";
       if (readoutOut) readoutOut.textContent = fmtComplex(wProbe.x, wProbe.y, 4);
+      if (!state.contourMode) {
+        if (state.probe.pullbackTimer) clearTimeout(state.probe.pullbackTimer);
+        state.probe.pullbackTimer = setTimeout(async () => {
+          const tgt = primaryFnPayload();
+          if (!tgt || !state.probe.active || !state.probe.w) return;
+          const rid = ++state.probe.pullbackReqId;
+          const hw = (canvasIn.clientWidth || 500) * 0.5 / (state.inView.scaleX || state.inView.scale);
+          const hh = (canvasIn.clientHeight || 400) * 0.5 / (state.inView.scaleY || state.inView.scale);
+          try {
+            const res = await fetch("/api/workspace/pullback", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...tgt,
+                wx: wProbe.x,
+                wy: wProbe.y,
+                xmin: state.inView.cx - hw,
+                xmax: state.inView.cx + hw,
+                ymin: state.inView.cy - hh,
+                ymax: state.inView.cy + hh,
+              }),
+            });
+            if (!res.ok || rid !== state.probe.pullbackReqId || !state.probe.active || state.probe.z) return;
+            const d = await res.json();
+            const pre = Array.isArray(d.preimages) ? d.preimages.map((p) => ({ x: p[0], y: p[1] })) : [];
+            state.probe.preimages = pre;
+            if (pre.length > 0 && readoutIn) {
+              readoutIn.textContent = pre.length === 1
+                ? `f⁻¹ ≈ ${fmtComplex(pre[0].x, pre[0].y, 3)}`
+                : `${pre.length} preimages (${fmtComplex(pre[0].x, pre[0].y, 2)}…)`;
+            }
+            requestRender("in");
+          } catch (_) {}
+        }, 48);
+      }
     } else if (state.probe.active) {
       state.probe.active = false;
       state.probe.z = null;
       state.probe.w = null;
+      state.probe.preimages = [];
       if (readoutIn) readoutIn.textContent = "—";
       if (readoutOut) readoutOut.textContent = "—";
     }
@@ -4419,6 +4665,8 @@
     state.probe.active = false;
     state.probe.z = null;
     state.probe.w = null;
+    state.probe.preimages = [];
+    if (state.probe.pullbackTimer) { clearTimeout(state.probe.pullbackTimer); state.probe.pullbackTimer = null; }
     state.hoveredShapeId = null;
     state.hoveredPointId = null;
     if (hadAny) requestRender("both");
@@ -4435,7 +4683,12 @@
       requestRender("out");
       return;
     }
-    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) { window.RiemannSphere.onPointerUp(); outCard.classList.remove("panning"); return; }
+    if (window.RiemannSphere && state.projection === "sphere") {
+      window.RiemannSphere.onPointerUp();
+      outCard.classList.remove("panning");
+      if (state.showOutDomain) scheduleDomain();
+      return;
+    }
     const p = state.pan;
     state.pan = null; outCard.classList.remove("panning");
     if (p && p.which === "out" && p.rightClick) {
@@ -4462,7 +4715,12 @@
   });
   canvasOut.addEventListener("wheel", (e) => {
     e.preventDefault();
-    if (window.RiemannSphere && (state.projection === "sphere" || state.projection === "cylinder")) { window.RiemannSphere.onWheel(e.deltaY); requestRender("out"); return; }
+    if (window.RiemannSphere && state.projection === "sphere") {
+      window.RiemannSphere.onWheel(e.deltaY);
+      if (state.showOutDomain) scheduleDomain(true);
+      requestRender("out");
+      return;
+    }
     const pos = localPos(canvasOut, e);
     const f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     const scaleXOnly = e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
@@ -4526,103 +4784,26 @@
     }
 
     const tol = Math.max(0.06, 16 / Math.max(state.inView.scale || 40, 1e-3));
-    const connectLimit = useSelectedMode ? Infinity : tol;
-    const used = new Set();
-    const removedIds = new Set();
-    const created = [];
-    let mergedCount = 0;
+    const { groups, removedIds, mergedCount } = (window.CFVGeom && window.CFVGeom.joinOpenPaths)
+      ? window.CFVGeom.joinOpenPaths(candidates, { selectedId: state.selectedShapeId, tolerance: tol, useSelectedMode })
+      : { groups: [], removedIds: new Set(), mergedCount: 0 };
 
-    const ordered = [...candidates].sort((a, b) =>
-      a.id === state.selectedShapeId ? -1 : b.id === state.selectedShapeId ? 1 : 0
-    );
-
-    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-
-    for (const seed of ordered) {
-      if (used.has(seed.id)) continue;
-      used.add(seed.id);
-      const group = [seed];
-      let pts = seed.rawPts.map((p) => ({ x: p.x, y: p.y }));
-
-      let extended = true;
-      while (extended) {
-        extended = false;
-        const head = pts[0];
-        const tail = pts[pts.length - 1];
-        let best = null;
-        let bestDist = connectLimit;
-
-        for (const cand of candidates) {
-          if (used.has(cand.id)) continue;
-          const cFirst = cand.rawPts[0];
-          const cLast = cand.rawPts[cand.rawPts.length - 1];
-
-          const dTailFirst = dist(tail, cFirst);
-          if (dTailFirst <= bestDist) {
-            bestDist = dTailFirst;
-            best = { cand, where: "tail", rev: false };
-          }
-          const dTailLast = dist(tail, cLast);
-          if (dTailLast <= bestDist) {
-            bestDist = dTailLast;
-            best = { cand, where: "tail", rev: true };
-          }
-          const dHeadLast = dist(head, cLast);
-          if (dHeadLast <= bestDist) {
-            bestDist = dHeadLast;
-            best = { cand, where: "head", rev: false };
-          }
-          const dHeadFirst = dist(head, cFirst);
-          if (dHeadFirst <= bestDist) {
-            bestDist = dHeadFirst;
-            best = { cand, where: "head", rev: true };
-          }
-        }
-
-        if (best) {
-          used.add(best.cand.id);
-          group.push(best.cand);
-          const addPts = best.cand.rawPts.map((p) => ({ x: p.x, y: p.y }));
-          if (best.rev) addPts.reverse();
-          if (best.where === "tail") {
-            if (dist(pts[pts.length - 1], addPts[0]) < 1e-4) addPts.shift();
-            pts = pts.concat(addPts);
-          } else {
-            if (dist(addPts[addPts.length - 1], pts[0]) < 1e-4) addPts.pop();
-            pts = addPts.concat(pts);
-          }
-          extended = true;
-        }
-      }
-
-      if (group.length >= 2) {
-        for (const g of group) removedIds.add(g.id);
-        mergedCount += group.length;
-        const closeTol = useSelectedMode ? Math.max(tol * 1.5, 0.18) : tol;
-        let closed = false;
-        if (pts.length >= 3 && dist(pts[0], pts[pts.length - 1]) <= closeTol) {
-          closed = true;
-          if (dist(pts[0], pts[pts.length - 1]) < 1e-4 && pts.length > 3) pts.pop();
-        }
-        const merged = {
-          id: state.nextShapeId++,
-          kind: "path",
-          label: closed ? `Joined Loop (${group.length})` : `Joined Path (${group.length})`,
-          color: seed.color,
-          lineWidth: seed.lineWidth || 2.2,
-          lineStyle: seed.lineStyle || "solid",
-          locked: false,
-          closed,
-          visible: true,
-          formula: null,
-          rawPts: pts,
-          boundary: null,
-          mesh: [],
-          extraCurves: [],
-        };
-        created.push(merged);
-      }
-    }
+    const created = groups.map((g) => ({
+      id: state.nextShapeId++,
+      kind: "path",
+      label: g.closed ? `Joined Loop (${g.group.length})` : `Joined Path (${g.group.length})`,
+      color: g.seed.color,
+      lineWidth: g.seed.lineWidth || 2.2,
+      lineStyle: g.seed.lineStyle || "solid",
+      locked: false,
+      closed: g.closed,
+      visible: true,
+      formula: null,
+      rawPts: g.pts,
+      boundary: null,
+      mesh: [],
+      extraCurves: [],
+    }));
 
     if (created.length === 0) {
       showSelectionToast("Endpoints not touching — Ctrl/Shift+select 2+ open paths and click Join");
@@ -4817,6 +4998,11 @@
 
   window.addEventListener("keydown", (e) => {
     if (!state.active || e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "Y" || (e.shiftKey && (e.key === "z" || e.key === "Z")))) {
+      e.preventDefault();
+      redoLastAction();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) {
       e.preventDefault();
       undoLastAction();
@@ -5212,6 +5398,7 @@
           w: normLineWidth(s.lineWidth, 2.2),
           op: r4(normOpacity(s.opacity, s.closed ? 0.22 : 1.0)),
           ...(s.isOcean ? { oc: 1 } : {}),
+          ...(s.isBorder ? { bd: 1 } : {}),
           st: s.lineStyle || "solid",
           lk: s.locked ? 1 : 0,
           cl: s.closed ? 1 : 0,
@@ -5221,6 +5408,7 @@
           p: flat,
         };
         if (s.formula) rec.f = { ...s.formula };
+        if (s.imageOf) rec.imOf = { ...s.imageOf, sourceIdx: shapeIdxById.get(s.imageOf.sourceId) };
         return rec;
       }),
       pt: state.points.map((p) => ({
@@ -5236,6 +5424,7 @@
         lk: p.locked ? 1 : 0,
         v: p.visible !== false ? 1 : 0,
         sl: p.showLabel !== false ? 1 : 0,
+        ...(p.imageOf ? { imOf: { ...p.imageOf, sourceIdx: pointIdxById.get(p.imageOf.sourceId) } } : {}),
         ...(p.collapsed ? { col: 1 } : {}),
         ...(Number(p.cardHeight) > 0 ? { ch: Math.round(Number(p.cardHeight)) } : {}),
       })),
@@ -5414,10 +5603,16 @@
       locked: Boolean(p.lk),
       visible: p.v !== 0,
       showLabel: p.sl !== 0,
+      imageOf: p.imOf ? { ...p.imOf } : null,
       collapsed: Boolean(p.col),
       cardHeight: Number(p.ch) > 0 ? Number(p.ch) : 0,
       outPt: null,
     }));
+    for (const p of state.points) {
+      if (p.imageOf && typeof p.imageOf.sourceIdx === "number" && state.points[p.imageOf.sourceIdx]) {
+        p.imageOf.sourceId = state.points[p.imageOf.sourceIdx].id;
+      }
+    }
     state.lines = (snap.ln || []).map((ln) => ({
       id: state.nextLineId++,
       kind: "guide_line",
@@ -5472,6 +5667,7 @@
         lineWidth: normLineWidth(sh.w, 2.2),
         opacity: normOpacity(sh.op, sh.cl ? 0.22 : 1.0),
         isOcean: Boolean(sh.oc),
+        isBorder: Boolean(sh.bd),
         lineStyle: sh.st || "solid",
         locked: Boolean(sh.lk),
         closed: Boolean(sh.cl),
@@ -5479,12 +5675,18 @@
         collapsed: Boolean(sh.col),
         cardHeight: Number(sh.ch) > 0 ? Number(sh.ch) : 0,
         formula: sh.f ? { ...sh.f } : null,
+        imageOf: sh.imOf ? { ...sh.imOf } : null,
         rawPts,
         boundary: null,
         mesh: [],
         extraCurves: [],
       };
     });
+    for (const s of state.shapes) {
+      if (s.imageOf && typeof s.imageOf.sourceIdx === "number" && state.shapes[s.imageOf.sourceIdx]) {
+        s.imageOf.sourceId = state.shapes[s.imageOf.sourceIdx].id;
+      }
+    }
     applyLayerRefs(snap.lo);
     state.selectedShapeId = null;
     state.selectedPointId = null;
@@ -5532,6 +5734,7 @@
     getSelectionRotateInfo,
     pushUndoSnapshot,
     undoLastAction,
+    redoLastAction,
     updateSelectionBanner,
     rebuildFormulaShapes,
     rebuildShapeFromFormula,
@@ -5603,6 +5806,9 @@
       state.showDirichletWall = Boolean(pr.showDirichletWall !== undefined ? pr.showDirichletWall : ex.showDirichletWall);
       state.foundZeros = [];
       state.undoStack = [];
+      state.redoStack = [];
+      state.outDomainImg = null;
+      state.domainBaseImg = null;
 
       const projMode = pr.projection || ex.defaultProjection || (pr.enableSphere ? "sphere" : "planar");
       if (window.RiemannSphere) {
@@ -5716,6 +5922,7 @@
         lineWidth: normLineWidth(sh.lineWidth, 2.2),
         opacity: normOpacity(sh.opacity, sh.closed !== false ? 0.22 : 1.0),
         isOcean: Boolean(sh.isOcean),
+        isBorder: Boolean(sh.isBorder),
         lineStyle: sh.lineStyle || "solid",
         locked: Boolean(sh.locked),
         closed: Boolean(sh.closed),
@@ -5742,6 +5949,9 @@
       state.layerOrder = [];
       state.foundZeros = [];
       state.undoStack = [];
+      state.redoStack = [];
+      state.outDomainImg = null;
+      state.domainBaseImg = null;
       clearSelection();
       setContourMode(false, { silent: true });
       state.showMesh = true;
@@ -5779,5 +5989,99 @@
     centerInputOn(x, y, r = 2.5) {
       setView(state.inView, canvasIn, x, y, r);
     },
+    createImageOfShape,
+    createImageOfPoint,
+    async createImageFromSources(sources, def = {}) {
+      if (!Array.isArray(sources) || sources.length === 0) return null;
+      if (sources.length === 1 && sources[0].kind === "point") {
+        const pt = await createImageOfPoint(sources[0].id, def.fnCardId ?? null);
+        if (pt && pt.imageOf) { pt.imageOf.sources = sources; pt.imageOf.expr = def.expr || ""; await recomputeImageElements(1.0); }
+        return pt;
+      }
+      if (sources.length === 1 && sources[0].kind === "shape") {
+        const sh = await createImageOfShape(sources[0].id, def.fnCardId ?? null);
+        if (sh && sh.imageOf) { sh.imageOf.sources = sources; sh.imageOf.expr = def.expr || ""; await recomputeImageElements(1.0); }
+        return sh;
+      }
+      pushUndoSnapshot();
+      const img = {
+        id: state.nextShapeId++,
+        kind: "image",
+        label: `${def.labelPrefix || "f"}(${sources.length} elements)`,
+        color: "#fbbf24",
+        lineWidth: 2.3,
+        opacity: 0.20,
+        lineStyle: "solid",
+        locked: false,
+        closed: false,
+        visible: true,
+        imageOf: { sourceKind: "multi", sourceId: sources[0].id, sources: sources.map((s) => ({ ...s })), fnCardId: def.fnCardId ?? null, expr: def.expr || "f1(z)" },
+        rawPts: [{ x: 0, y: 0 }, { x: 1, y: 0 }],
+        boundary: null,
+        mesh: [],
+        extraCurves: [],
+        _mappedItems: [],
+      };
+      state.shapes.push(img);
+      syncLayerOrder();
+      selectShape(img.id);
+      await recomputeImageElements(1.0);
+      notifyDomain();
+      requestRender("in");
+      if (ws() && ws().onCanvasStateChange) ws().onCanvasStateChange(true);
+      return img;
+    },
+    recomputeImageElements,
   };
+
+  if (window.CFVGeom && typeof window.CFVGeom.attachPinchController === "function") {
+    window.CFVGeom.attachPinchController(canvasIn, {
+      onPinch(factor, sx, sy) {
+        if (state.inProjection === "sphere" && window.RiemannSphereIn) {
+          window.RiemannSphereIn.zoomBy(factor);
+          if (state.showDomain) scheduleDomain(true);
+          requestRender("in");
+        } else {
+          zoomAt(state.inView, canvasIn, sx, sy, factor, factor);
+        }
+      },
+      onTwoFingerPan(dx, dy) {
+        if (state.inProjection === "sphere" && window.RiemannSphereIn) {
+          window.RiemannSphereIn.state.yaw -= dx * 0.008;
+          window.RiemannSphereIn.state.pitch = Math.max(-1.48, Math.min(1.48, window.RiemannSphereIn.state.pitch + dy * 0.008));
+          if (state.showDomain) scheduleDomain(true);
+          requestRender("in");
+        } else {
+          state.inView.cx -= dx / (state.inView.scaleX || state.inView.scale);
+          state.inView.cy += dy / (state.inView.scaleY || state.inView.scale);
+          if (state.showDomain) scheduleDomain(true);
+          requestRender("in");
+        }
+      },
+    });
+    window.CFVGeom.attachPinchController(canvasOut, {
+      onPinch(factor, sx, sy) {
+        if (state.projection === "sphere" && window.RiemannSphere) {
+          window.RiemannSphere.zoomBy(factor);
+          if (state.showOutDomain) scheduleDomain(true);
+          requestRender("out");
+        } else {
+          zoomAt(state.outView, canvasOut, sx, sy, factor, factor);
+        }
+      },
+      onTwoFingerPan(dx, dy) {
+        if (state.projection === "sphere" && window.RiemannSphere) {
+          window.RiemannSphere.state.yaw -= dx * 0.008;
+          window.RiemannSphere.state.pitch = Math.max(-1.48, Math.min(1.48, window.RiemannSphere.state.pitch + dy * 0.008));
+          if (state.showOutDomain) scheduleDomain(true);
+          requestRender("out");
+        } else {
+          state.outView.cx -= dx / (state.outView.scaleX || state.outView.scale);
+          state.outView.cy += dy / (state.outView.scaleY || state.outView.scale);
+          if (state.showOutDomain) scheduleDomain(true);
+          requestRender("out");
+        }
+      },
+    });
+  }
 })();

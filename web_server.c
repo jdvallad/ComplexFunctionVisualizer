@@ -474,12 +474,20 @@ static bool json_get_points(const char *json, const char *key, Point2D **pts_out
         return false;
     }
 
-    while (*v) {
+    int depth = 1;
+    while (*v && depth > 0) {
         while (*v && (isspace((unsigned char)*v) || *v == ',')) {
             v++;
         }
+        if (*v == '[') {
+            depth++;
+            v++;
+            continue;
+        }
         if (*v == ']') {
-            break;
+            depth--;
+            v++;
+            continue;
         }
         char *end = NULL;
         double num = strtod(v, &end);
@@ -763,6 +771,114 @@ static int parse_domain_scheme(const char *body) {
     return DOMAIN_SCHEME_CLASSIC;
 }
 
+static int parse_domain_proj(const char *body) {
+    char proj[32] = "planar";
+    json_get_string(body, "proj", proj, sizeof(proj));
+    if (strcmp(proj, "polar") == 0) {
+        return DOMAIN_PROJ_POLAR;
+    }
+    if (strcmp(proj, "mercator") == 0) {
+        return DOMAIN_PROJ_MERCATOR;
+    }
+    if (strcmp(proj, "stereographic") == 0) {
+        return DOMAIN_PROJ_STEREOGRAPHIC;
+    }
+    if (strcmp(proj, "poincare") == 0) {
+        return DOMAIN_PROJ_POINCARE;
+    }
+    if (strcmp(proj, "sphere") == 0) {
+        return DOMAIN_PROJ_SPHERE;
+    }
+    return DOMAIN_PROJ_PLANAR;
+}
+
+static bool eval_builtin_proj_pixel(double px_f, double py_f, int width, int height, double cx,
+                                    double cy, double half_w, double half_h,
+                                    const DomainProjSpec *ps, double *re_out, double *im_out,
+                                    uint8_t *alpha_out) {
+    *alpha_out = 255;
+    if (ps->proj == DOMAIN_PROJ_SPHERE) {
+        double cw = ps->canvas_w > 1.0 ? ps->canvas_w : (double)width;
+        double ch = ps->canvas_h > 1.0 ? ps->canvas_h : (double)height;
+        double min_dim = cw < ch ? cw : ch;
+        double zoom = ps->sphere_zoom > 0.05 ? ps->sphere_zoom : 1.0;
+        double R = fmax(1.0, min_dim * 0.38 * zoom);
+        double u = (px_f / (double)width - 0.5) * cw / R;
+        double v = (0.5 - py_f / (double)height) * ch / R;
+        const double k = 0.72 / 3.8;
+        const double omk2 = 1.0 - k * k;
+        double a = u * u + v * v;
+        double disc = 1.0 - a * omk2;
+        if (disc <= 0.0) {
+            *alpha_out = 0;
+            return false;
+        }
+        double depth = (a * k + sqrt(disc)) / (1.0 + a * k * k);
+        double invP = 1.0 - k * depth;
+        double x1 = u * invP, scrY = v * invP;
+        double cp = cos(ps->sphere_pitch), sp = sin(ps->sphere_pitch);
+        double cyA = cos(ps->sphere_yaw), syA = sin(ps->sphere_yaw);
+        double y1 = depth * cp - scrY * sp;
+        double wz = depth * sp + scrY * cp;
+        double wx = x1 * cyA + y1 * syA;
+        double wy = -x1 * syA + y1 * cyA;
+        if (ps->merc_uv) {
+            double zc = wz < -0.996 ? -0.996 : (wz > 0.996 ? 0.996 : wz);
+            *re_out = atan2(wx, wy);
+            *im_out = 0.5 * log((1.0 + zc) / (1.0 - zc));
+        } else {
+            double den = fmax(1e-7, 1.0 - wz);
+            *re_out = wx / den;
+            *im_out = wy / den;
+        }
+        return true;
+    }
+    double sx = (cx - half_w) + (px_f / (double)width) * (2.0 * half_w);
+    double sy = (cy + half_h) - (py_f / (double)height) * (2.0 * half_h);
+    if (ps->proj == DOMAIN_PROJ_MERCATOR) {
+        if (ps->merc_uv) {
+            *re_out = sx;
+            *im_out = sy;
+            return true;
+        }
+        double yc = sy < -12.0 ? -12.0 : (sy > 12.0 ? 12.0 : sy);
+        double r = exp(yc);
+        *re_out = r * sin(sx);
+        *im_out = r * cos(sx);
+        return true;
+    }
+    if (ps->proj == DOMAIN_PROJ_STEREOGRAPHIC) {
+        double rho = hypot(sx, sy);
+        if (rho >= 0.9995) {
+            *alpha_out = 0;
+            return false;
+        }
+        if (rho < 1e-15) {
+            *re_out = 0.0;
+            *im_out = 0.0;
+            return true;
+        }
+        double r = tan(rho * (3.14159265358979323846 * 0.5));
+        *re_out = (sx / rho) * r;
+        *im_out = (sy / rho) * r;
+        return true;
+    }
+    if (ps->proj == DOMAIN_PROJ_POINCARE) {
+        double r2 = sx * sx + sy * sy;
+        if (r2 >= 0.9992) {
+            *alpha_out = 0;
+            return false;
+        }
+        double denom = 1.0 - r2;
+        *re_out = (2.0 * sx) / denom;
+        *im_out = (2.0 * sy) / denom;
+        return true;
+    }
+    *re_out = sx;
+    *im_out = sy;
+    return true;
+}
+
 static void handle_api_domain(int fd, const char *body, bool keep_alive) {
     double cx = 0.0, cy = 0.0, half_w = 4.0, half_h = 4.0;
     int width = 200, height = 200;
@@ -774,6 +890,22 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
     json_get_int(body, "width", &width);
     json_get_int(body, "height", &height);
     int scheme = parse_domain_scheme(body);
+
+    DomainProjSpec pspec = {0};
+    pspec.proj = parse_domain_proj(body);
+    bool merc_uv_b = false;
+    json_get_bool(body, "merc_uv", &merc_uv_b);
+    pspec.merc_uv = merc_uv_b ? 1 : 0;
+    pspec.sphere_yaw = -0.58;
+    pspec.sphere_pitch = 0.22;
+    pspec.sphere_zoom = 1.0;
+    pspec.canvas_w = (double)width;
+    pspec.canvas_h = (double)height;
+    json_get_double(body, "sphere_yaw", &pspec.sphere_yaw);
+    json_get_double(body, "sphere_pitch", &pspec.sphere_pitch);
+    json_get_double(body, "sphere_zoom", &pspec.sphere_zoom);
+    json_get_double(body, "canvas_w", &pspec.canvas_w);
+    json_get_double(body, "canvas_h", &pspec.canvas_h);
 
     int slot = -1;
     bool is_slot =
@@ -799,25 +931,29 @@ static void handle_api_domain(int fd, const char *body, bool keep_alive) {
     if (is_slot) {
         EvalParams ep = {{0}, 0};
         json_get_double_array(body, "params", ep.v, MAX_EVAL_PARAMS, &ep.count);
-        hot_render_domain_slot(slot, &ep, cx, cy, half_w, half_h, width, height, scheme, rgba);
-    } else if (is_dirichlet || fn == &tmp_hot) {
-        /* Render TLS-backed evaluator on current thread so EvalParams/slot/N stay thread-safe. */
-        double x0 = cx - half_w;
-        double y0 = cy + half_h;
-        double dx = (2.0 * half_w) / (double)width;
-        double dy = (2.0 * half_h) / (double)height;
+        hot_render_domain_slot_proj(slot, &ep, cx, cy, half_w, half_h, width, height, scheme,
+                                    &pspec, rgba);
+    } else if (is_dirichlet || fn == &tmp_hot || pspec.proj != DOMAIN_PROJ_PLANAR) {
         for (int py = 0; py < height; py++) {
-            double im = y0 - ((double)py + 0.5) * dy;
             for (int px = 0; px < width; px++) {
-                double re = x0 + ((double)px + 0.5) * dx;
-                double complex w = fn->eval(c_make(re, im));
+                double re = 0.0, im = 0.0;
+                uint8_t alpha = 255;
                 size_t idx = ((size_t)py * (size_t)width + (size_t)px) * 4;
+                if (!eval_builtin_proj_pixel((double)px + 0.5, (double)py + 0.5, width, height, cx,
+                                             cy, half_w, half_h, &pspec, &re, &im, &alpha)) {
+                    rgba[idx + 0] = 0;
+                    rgba[idx + 1] = 0;
+                    rgba[idx + 2] = 0;
+                    rgba[idx + 3] = 0;
+                    continue;
+                }
+                double complex w = fn->eval(c_make(re, im));
                 uint8_t r, g, b;
                 sampler_color_complex(w, scheme, &r, &g, &b);
                 rgba[idx + 0] = r;
                 rgba[idx + 1] = g;
                 rgba[idx + 2] = b;
-                rgba[idx + 3] = 255;
+                rgba[idx + 3] = alpha;
             }
         }
     } else {
@@ -1142,13 +1278,22 @@ static void handle_api_workspace_compile(int fd, const char *body, const char *p
     char kind[32] = "complex";
     json_get_string(body, "kind", kind, sizeof(kind));
     bool is_real = strcmp(kind, "real") == 0;
+    bool is_vector = strcmp(kind, "vector") == 0;
 
     char *cards[MAX_HOT_SLOTS] = {0};
+    char *cnames[MAX_HOT_SLOTS] = {0};
     char *pnames[MAX_EVAL_PARAMS] = {0};
+    int card_kinds[MAX_HOT_SLOTS] = {0};
+    size_t ck_count = 0;
     size_t card_count = json_get_string_array(body, "cards", cards, MAX_HOT_SLOTS, 4096);
+    size_t cname_count = json_get_string_array(body, "card_names", cnames, MAX_HOT_SLOTS, 48);
     size_t param_count = json_get_string_array(body, "param_names", pnames, MAX_EVAL_PARAMS, 32);
+    if (is_vector) {
+        json_get_int_array(body, "card_kinds", card_kinds, MAX_HOT_SLOTS, &ck_count);
+    }
 
     if (card_count == 0) {
+        for (size_t i = 0; i < cname_count; i++) free(cnames[i]);
         for (size_t i = 0; i < param_count; i++) {
             free(pnames[i]);
         }
@@ -1161,6 +1306,7 @@ static void handle_api_workspace_compile(int fd, const char *body, const char *p
         for (size_t i = 0; i < card_count; i++) {
             free(cards[i]);
         }
+        for (size_t i = 0; i < cname_count; i++) free(cnames[i]);
         for (size_t i = 0; i < param_count; i++) {
             free(pnames[i]);
         }
@@ -1170,12 +1316,23 @@ static void handle_api_workspace_compile(int fd, const char *body, const char *p
     diag[0] = '\0';
 
     double elapsed_ms = 0.0;
-    bool ok =
-        hot_compile_workspace(is_real, (const char *const *)cards, card_count,
-                              (const char *const *)pnames, param_count, diag, 4096, &elapsed_ms);
+    bool ok = false;
+    const char *const *cn_ptr = (cname_count > 0) ? (const char *const *)cnames : NULL;
+    if (is_vector) {
+        ok = hot_compile_vector_workspace_named((const char *const *)cards, card_kinds, cn_ptr,
+                                                card_count, (const char *const *)pnames,
+                                                param_count, diag, 4096, &elapsed_ms);
+    } else {
+        ok = hot_compile_workspace_named(is_real, (const char *const *)cards, cn_ptr, card_count,
+                                         (const char *const *)pnames, param_count, diag, 4096,
+                                         &elapsed_ms);
+    }
 
     for (size_t i = 0; i < card_count; i++) {
         free(cards[i]);
+    }
+    for (size_t i = 0; i < cname_count; i++) {
+        free(cnames[i]);
     }
     for (size_t i = 0; i < param_count; i++) {
         free(pnames[i]);
@@ -1325,6 +1482,331 @@ static void handle_api_workspace_parametric(int fd, const char *body, bool keep_
     send_response(fd, 200, "OK", "application/octet-stream", xy, nfloats * sizeof(float),
                   keep_alive);
     free(xy);
+}
+
+static void handle_api_workspace_pullback(int fd, const char *body, bool keep_alive) {
+    double wx = 0.0, wy = 0.0;
+    double xmin = -4.0, xmax = 4.0, ymin = -4.0, ymax = 4.0;
+    json_get_double(body, "wx", &wx);
+    json_get_double(body, "wy", &wy);
+    json_get_double(body, "xmin", &xmin);
+    json_get_double(body, "xmax", &xmax);
+    json_get_double(body, "ymin", &ymin);
+    json_get_double(body, "ymax", &ymax);
+
+    FunctionDef tmp_hot;
+    const FunctionDef *fn = resolve_complex_req(body, &tmp_hot);
+    if (!fn) {
+        send_json_error(fd, 400, "Invalid function", keep_alive);
+        return;
+    }
+    Point2D *seeds = NULL;
+    size_t nseeds = 0;
+    if (strstr(body, "\"seeds\"") != NULL) {
+        json_get_points(body, "seeds", &seeds, &nseeds);
+    }
+    FoundZero res[8];
+    size_t found = sampler_pullback(fn, wx, wy, seeds, nseeds, xmin, xmax, ymin, ymax, res, 8);
+    free(seeds);
+
+    StrBuf sb = {0};
+    sb_append(&sb, "{\"preimages\":[");
+    for (size_t i = 0; i < found; i++) {
+        if (i > 0) {
+            sb_append(&sb, ",");
+        }
+        sb_printf(&sb, "[%.6g,%.6g]", res[i].x, res[i].y);
+    }
+    sb_append(&sb, "]}");
+    send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+    sb_free(&sb);
+}
+
+static void handle_api_workspace_vector_grid(int fd, const char *body, bool keep_alive) {
+    int slot = 0;
+    double xmin = -5.0, xmax = 5.0, ymin = -5.0, ymax = 5.0;
+    int nx = 44, ny = 36;
+    json_get_int(body, "slot", &slot);
+    json_get_double(body, "xmin", &xmin);
+    json_get_double(body, "xmax", &xmax);
+    json_get_double(body, "ymin", &ymin);
+    json_get_double(body, "ymax", &ymax);
+    json_get_int(body, "nx", &nx);
+    json_get_int(body, "ny", &ny);
+
+    if (xmax <= xmin || ymax <= ymin || slot < 0 || slot >= hot_vector_slot_count()) {
+        send_json_error(fd, 400, "Invalid vector grid parameters", keep_alive);
+        return;
+    }
+    if (nx < 4) {
+        nx = 4;
+    }
+    if (nx > 220) {
+        nx = 220;
+    }
+    if (ny < 4) {
+        ny = 4;
+    }
+    if (ny > 180) {
+        ny = 180;
+    }
+
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    size_t nfloats = (size_t)nx * (size_t)ny * 6;
+    float *grid = malloc(nfloats * sizeof(float));
+    if (!grid) {
+        send_json_error(fd, 500, "Out of memory", keep_alive);
+        return;
+    }
+    hot_sample_vector_grid(slot, &params, xmin, xmax, ymin, ymax, nx, ny, grid);
+    send_response(fd, 200, "OK", "application/octet-stream", grid, nfloats * sizeof(float),
+                  keep_alive);
+    free(grid);
+}
+
+static void handle_api_workspace_vector_streamlines(int fd, const char *body, bool keep_alive) {
+    int slot = 0;
+    double xmin = -5.0, xmax = 5.0, ymin = -5.0, ymax = 5.0;
+    int steps = 56;
+    json_get_int(body, "slot", &slot);
+    json_get_double(body, "xmin", &xmin);
+    json_get_double(body, "xmax", &xmax);
+    json_get_double(body, "ymin", &ymin);
+    json_get_double(body, "ymax", &ymax);
+    json_get_int(body, "steps", &steps);
+
+    if (xmax <= xmin || ymax <= ymin || slot < 0 || slot >= hot_vector_slot_count()) {
+        send_json_error(fd, 400, "Invalid streamline parameters", keep_alive);
+        return;
+    }
+    if (steps < 8) {
+        steps = 8;
+    }
+    if (steps > 140) {
+        steps = 140;
+    }
+
+    Point2D *seed_pts = NULL;
+    size_t nseeds = 0;
+    if (!json_get_points(body, "seeds", &seed_pts, &nseeds) || nseeds == 0) {
+        free(seed_pts);
+        send_json_error(fd, 400, "No streamline seeds provided", keep_alive);
+        return;
+    }
+    if (nseeds > 256) {
+        nseeds = 256;
+    }
+
+    double *seeds_xy = malloc(nseeds * 2 * sizeof(double));
+    int stride_pts = steps * 2 + 1;
+    float *out_xy = malloc(nseeds * (size_t)stride_pts * 2 * sizeof(float));
+    int *out_counts = malloc(nseeds * sizeof(int));
+    if (!seeds_xy || !out_xy || !out_counts) {
+        free(seed_pts);
+        free(seeds_xy);
+        free(out_xy);
+        free(out_counts);
+        send_json_error(fd, 500, "Out of memory", keep_alive);
+        return;
+    }
+    for (size_t i = 0; i < nseeds; i++) {
+        seeds_xy[2 * i] = seed_pts[i].x;
+        seeds_xy[2 * i + 1] = seed_pts[i].y;
+    }
+    free(seed_pts);
+
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    hot_sample_vector_streamlines(slot, &params, seeds_xy, nseeds, xmin, xmax, ymin, ymax, steps,
+                                  out_xy, out_counts);
+
+    StrBuf sb = {0};
+    sb_append(&sb, "{\"lines\":[");
+    for (size_t i = 0; i < nseeds; i++) {
+        if (i > 0) {
+            sb_append(&sb, ",");
+        }
+        sb_append(&sb, "[");
+        int cnt = out_counts[i];
+        float *line = out_xy + i * (size_t)stride_pts * 2;
+        for (int k = 0; k < cnt; k++) {
+            if (k > 0) {
+                sb_append(&sb, ",");
+            }
+            sb_printf(&sb, "%.5g,%.5g", (double)line[2 * k], (double)line[2 * k + 1]);
+        }
+        sb_append(&sb, "]");
+    }
+    sb_append(&sb, "]}");
+
+    free(seeds_xy);
+    free(out_xy);
+    free(out_counts);
+    send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+    sb_free(&sb);
+}
+
+static void handle_api_workspace_vector_integral(int fd, const char *body, bool keep_alive) {
+    int slot = 0;
+    bool closed = false;
+    json_get_int(body, "slot", &slot);
+    json_get_bool(body, "closed", &closed);
+    if (slot < 0 || slot >= hot_vector_slot_count()) {
+        send_json_error(fd, 400, "Invalid vector slot", keep_alive);
+        return;
+    }
+    Point2D *pts = NULL;
+    size_t npts = 0;
+    if (!json_get_points(body, "points", &pts, &npts) || npts < 2) {
+        free(pts);
+        send_json_error(fd, 400, "Need at least 2 curve points", keep_alive);
+        return;
+    }
+    double *xy = malloc(npts * 2 * sizeof(double));
+    if (!xy) {
+        free(pts);
+        send_json_error(fd, 500, "Out of memory", keep_alive);
+        return;
+    }
+    for (size_t i = 0; i < npts; i++) {
+        xy[2 * i] = pts[i].x;
+        xy[2 * i + 1] = pts[i].y;
+    }
+    free(pts);
+
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    double work = 0.0, flux = 0.0, arc = 0.0;
+    hot_integrate_vector_curve(slot, &params, xy, npts, closed, &work, &flux, &arc);
+    free(xy);
+
+    char resp[256];
+    int len = snprintf(resp, sizeof(resp),
+                       "{\"work\":%.10g,\"flux\":%.10g,\"arc_length\":%.10g,\"closed\":%s}",
+                       isfinite(work) ? work : 0.0, isfinite(flux) ? flux : 0.0,
+                       isfinite(arc) ? arc : 0.0, closed ? "true" : "false");
+    send_response(fd, 200, "OK", "application/json", resp, (size_t)(len > 0 ? len : 0), keep_alive);
+}
+
+static void handle_api_workspace_vector_eval_pts(int fd, const char *body, bool keep_alive) {
+    int slot = 0;
+    json_get_int(body, "slot", &slot);
+    if (slot < 0 || slot >= hot_vector_slot_count()) {
+        send_json_error(fd, 400, "Invalid vector slot", keep_alive);
+        return;
+    }
+    Point2D *pts = NULL;
+    size_t npts = 0;
+    if (!json_get_points(body, "points", &pts, &npts) || npts < 1) {
+        free(pts);
+        send_json_error(fd, 400, "Need at least 1 point", keep_alive);
+        return;
+    }
+    if (npts > 2048) {
+        npts = 2048;
+    }
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    StrBuf sb = {0};
+    sb_append(&sb, "{\"out\":[");
+    for (size_t i = 0; i < npts; i++) {
+        double fx = NAN, fy = NAN, phi = NAN;
+        hot_eval_vector_slot(slot, pts[i].x, pts[i].y, &params, &fx, &fy, &phi);
+        if (i > 0) {
+            sb_append(&sb, ",");
+        }
+        if (isfinite(fx) && isfinite(fy)) {
+            sb_printf(&sb, "%.7g,%.7g", fx, fy);
+        } else {
+            sb_append(&sb, "null,null");
+        }
+    }
+    sb_append(&sb, "]}");
+    free(pts);
+    send_response(fd, 200, "OK", "application/json", sb.data ? sb.data : "{}", sb.len, keep_alive);
+    sb_free(&sb);
+}
+
+static void handle_api_workspace_vector_eval(int fd, const char *body, bool keep_alive) {
+    int slot = 0;
+    double x = 0.0, y = 0.0, h = 1e-4;
+    json_get_int(body, "slot", &slot);
+    json_get_double(body, "x", &x);
+    json_get_double(body, "y", &y);
+    json_get_double(body, "h", &h);
+    if (slot < 0 || slot >= hot_vector_slot_count()) {
+        send_json_error(fd, 400, "Invalid vector slot", keep_alive);
+        return;
+    }
+    if (h < 1e-6) {
+        h = 1e-6;
+    }
+    EvalParams params;
+    memset(&params, 0, sizeof(params));
+    json_get_double_array(body, "params", params.v, MAX_EVAL_PARAMS, &params.count);
+
+    double fx = 0.0, fy = 0.0, phi = NAN;
+    hot_eval_vector_slot(slot, x, y, &params, &fx, &fy, &phi);
+    double fx_px = 0.0, fy_px = 0.0, fx_mx = 0.0, fy_mx = 0.0;
+    double fx_py = 0.0, fy_py = 0.0, fx_my = 0.0, fy_my = 0.0;
+    hot_eval_vector_slot(slot, x + h, y, &params, &fx_px, &fy_px, NULL);
+    hot_eval_vector_slot(slot, x - h, y, &params, &fx_mx, &fy_mx, NULL);
+    hot_eval_vector_slot(slot, x, y + h, &params, &fx_py, &fy_py, NULL);
+    hot_eval_vector_slot(slot, x, y - h, &params, &fx_my, &fy_my, NULL);
+    double inv2h = 0.5 / h;
+    double div_v = (fx_px - fx_mx) * inv2h + (fy_py - fy_my) * inv2h;
+    double curl_v = (fy_px - fy_mx) * inv2h - (fx_py - fx_my) * inv2h;
+    double mag = hypot(fx, fy);
+
+    StrBuf sb = {0};
+    sb_append(&sb, "{\"fx\":");
+    if (isfinite(fx)) {
+        sb_printf(&sb, "%.10g", fx);
+    } else {
+        sb_append(&sb, "null");
+    }
+    sb_append(&sb, ",\"fy\":");
+    if (isfinite(fy)) {
+        sb_printf(&sb, "%.10g", fy);
+    } else {
+        sb_append(&sb, "null");
+    }
+    sb_append(&sb, ",\"mag\":");
+    if (isfinite(mag)) {
+        sb_printf(&sb, "%.10g", mag);
+    } else {
+        sb_append(&sb, "null");
+    }
+    sb_append(&sb, ",\"div\":");
+    if (isfinite(div_v)) {
+        sb_printf(&sb, "%.10g", div_v);
+    } else {
+        sb_append(&sb, "null");
+    }
+    sb_append(&sb, ",\"curl\":");
+    if (isfinite(curl_v)) {
+        sb_printf(&sb, "%.10g", curl_v);
+    } else {
+        sb_append(&sb, "null");
+    }
+    sb_append(&sb, ",\"phi\":");
+    if (isfinite(phi)) {
+        sb_printf(&sb, "%.10g", phi);
+    } else {
+        sb_append(&sb, "null");
+    }
+    sb_append(&sb, "}");
+    send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+    sb_free(&sb);
 }
 
 static void handle_api_real_seed(int fd, const char *body, bool keep_alive) {
@@ -1819,7 +2301,8 @@ static const char *mime_for_path(const char *path) {
 
 static void handle_static(int fd, const char *req_path, bool keep_alive) {
     const char *rel = (strcmp(req_path, "/") == 0 || strcmp(req_path, "/map") == 0 ||
-                       strcmp(req_path, "/integral") == 0 || strcmp(req_path, "/real") == 0)
+                       strcmp(req_path, "/integral") == 0 || strcmp(req_path, "/real") == 0 ||
+                       strcmp(req_path, "/vector") == 0)
                           ? "index.html"
                           : req_path + 1;
     if (strstr(rel, "..") != NULL || strchr(rel, '\\') != NULL) {
@@ -2040,6 +2523,62 @@ static void serve_client(int fd) {
             handle_api_workspace_implicit(fd, body, keep_alive);
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/parametric") == 0) {
             handle_api_workspace_parametric(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/pullback") == 0) {
+            handle_api_workspace_pullback(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/vector_grid") == 0) {
+            handle_api_workspace_vector_grid(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 &&
+                   strcmp(path, "/api/workspace/vector_streamlines") == 0) {
+            handle_api_workspace_vector_streamlines(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 &&
+                   strcmp(path, "/api/workspace/vector_integral") == 0) {
+            handle_api_workspace_vector_integral(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/workspace/vector_eval") == 0) {
+            handle_api_workspace_vector_eval(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 &&
+                   strcmp(path, "/api/workspace/vector_eval_pts") == 0) {
+            handle_api_workspace_vector_eval_pts(fd, body, keep_alive);
+        } else if (strcmp(method, "POST") == 0 &&
+                   strcmp(path, "/api/workspace/vector_curve") == 0) {
+            int slot = 0;
+            double tmin = 0.0, tmax = 6.283185307179586;
+            int samples = 240;
+            json_get_int(body, "slot", &slot);
+            json_get_double(body, "tmin", &tmin);
+            json_get_double(body, "tmax", &tmax);
+            json_get_int(body, "samples", &samples);
+            if (samples < 16) samples = 16;
+            if (samples > 1000) samples = 1000;
+            if (slot < 0 || slot >= hot_vector_slot_count() || !(tmax > tmin)) {
+                send_json_error(fd, 400, "Invalid curve parameters", keep_alive);
+            } else {
+                EvalParams ep = {{0}, 0};
+                json_get_double_array(body, "params", ep.v, MAX_EVAL_PARAMS, &ep.count);
+                StrBuf sb = {0};
+                sb_append(&sb, "{\"pts\":[");
+                double dt = (tmax - tmin) / (double)(samples - 1);
+                double h = fmax(1e-4, (tmax - tmin) * 1e-4);
+                for (int k = 0; k < samples; k++) {
+                    double t = tmin + dt * (double)k;
+                    double x0 = 0, y0 = 0, xp = 0, yp = 0, xm = 0, ym = 0;
+                    hot_eval_vector_slot(slot, t, 0.0, &ep, &x0, &y0, NULL);
+                    hot_eval_vector_slot(slot, t + h, 0.0, &ep, &xp, &yp, NULL);
+                    hot_eval_vector_slot(slot, t - h, 0.0, &ep, &xm, &ym, NULL);
+                    double vx = (xp - xm) / (2.0 * h), vy = (yp - ym) / (2.0 * h);
+                    double ax = (xp - 2.0 * x0 + xm) / (h * h), ay = (yp - 2.0 * y0 + ym) / (h * h);
+                    if (k > 0) sb_append(&sb, ",");
+                    if (isfinite(x0) && isfinite(y0)) {
+                        sb_printf(&sb, "%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%.6g",
+                                  t, x0, y0, isfinite(vx) ? vx : 0.0, isfinite(vy) ? vy : 0.0,
+                                  isfinite(ax) ? ax : 0.0, isfinite(ay) ? ay : 0.0);
+                    } else {
+                        sb_append(&sb, "null,null,null,null,null,null,null");
+                    }
+                }
+                sb_append(&sb, "]}");
+                send_response(fd, 200, "OK", "application/json", sb.data, sb.len, keep_alive);
+                sb_free(&sb);
+            }
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/find_zeros") == 0) {
             handle_api_find_zeros(fd, body, keep_alive);
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/taylor") == 0) {
